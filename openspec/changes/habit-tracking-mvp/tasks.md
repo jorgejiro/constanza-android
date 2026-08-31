@@ -3,14 +3,20 @@
 Change: `habit-tracking-mvp` · Phase: `sdd-tasks` · Date: 2026-08-31
 Inputs: `proposal.md`, `design.md`, `specs/*/spec.md` (8 capabilities), `openspec/config.yaml`
 
-## Review Workload Forecast
+## Review Workload Forecast (revised 2026-08-31 — measured-evidence re-forecast)
+
+This is a re-forecast of the six undelivered work units, replacing the original intuition-based
+estimates with arithmetic built from the four delivered units' measured actuals (units 1, 2a, 2b, 3).
+Task content, ordering, and dependency edges are **unchanged**; only the size forecast and, for the
+one unit that warrants it, a pre-split are revised.
 
 | Field | Value |
 |-------|-------|
-| Estimated changed lines | ~3,000–3,300 |
-| 400-line budget risk | High |
+| Estimated changed lines (remaining 6 units) | ~3,354 (was ~1,790 in the original forecast) |
+| Review budget for this change | **700** (raised from 400 on measured evidence, per session context) |
+| 400-line budget risk | Medium |
 | Chained PRs recommended | Yes |
-| Suggested split | 10 work units, PR 1 → PR 10 (plus one code-free verification gate) |
+| Suggested split | 7 PRs (was 6) — Unit 5 precautionarily split into 5-i / 5-ii |
 | Delivery strategy | auto-chain (resolved before work unit 1 apply) |
 | Chain strategy | stacked-to-main (resolved before work unit 1 apply) |
 
@@ -18,36 +24,140 @@ Inputs: `proposal.md`, `design.md`, `specs/*/spec.md` (8 capabilities), `openspe
 Decision needed before apply: No — resolved: auto-chain / stacked-to-main
 Chained PRs recommended: Yes
 Chain strategy: stacked-to-main
-400-line budget risk: High
+400-line budget risk: Medium
 ```
 
-### Suggested Work Units
+*(The literal "400-line" guard label is kept for downstream automation matching; the threshold
+actually applied throughout this forecast is **700**, per session context. "Medium" rather than "Low"
+because no point estimate below exceeds 700, but Unit 5 clears budget by only 14 lines and Units 6a/6b
+rest on an unmeasured Compose-line guess — both carry real residual risk of a mid-unit budget stop,
+exactly as happened twice already in the delivered units.)*
 
-| Unit | Goal | Est. lines | Likely PR | Focused test command | Runtime harness | Rollback boundary |
-|------|------|-----------|-----------|----------------------|-----------------|--------------------|
-| 1 | Gradle scaffolding, pinned toolchain, detekt `ForbiddenMethodCall` rule | 320 | PR 1 | `./gradlew assembleDebug`, `./gradlew :domain:test` (empty suite) | N/A — app launches to an empty screen; no behavior to exercise | Delete scaffold files; no runtime state to unwind |
-| 2a | `:domain` model + `dueOn` + `rollupDay`, JVM tests | 400 | PR 2 | `./gradlew :domain:test` | N/A — pure synchronous Kotlin | Revert model/predicate files; `:app` not yet coupled |
-| 2b | `StreakCalculator` + `ComplianceCalculator`, JVM tests | 350 | PR 3 | `./gradlew :domain:test` | N/A — pure synchronous Kotlin | Revert the two calculator files independently |
-| 3 | Room entities, DAOs, mappers, `HabitRepository` | 350 | PR 4 | `./gradlew :app:connectedDebugAndroidTest` | Inspect `app/schemas/1.json`; no scheduling exists yet | Drop Room module files; no armed alarms to cancel |
-| 4a | `AlarmScheduler`, `OccurrencePlanner`, five reschedule receivers | 280 | PR 5 | `./gradlew :app:testDebugUnitTest` | `adb shell cmd appops set <pkg> SCHEDULE_EXACT_ALARM deny`; reboot re-arm | Cancel all alarms via `AlarmScheduler.cancelAll()` before reverting |
-| 4b | `ReconcileWorker`, `MidnightSweepWorker`, injected tunables | 250 | PR 6 | `./gradlew :app:connectedDebugAndroidTest` | `adb shell dumpsys deviceidle force-idle` | `cancelUniqueWork` for reconcile/sweep before reverting |
-| 5 | Notification channel/poster, Action/Answer/Snooze workers, snooze settings | 380 | PR 7 | `./gradlew :app:connectedDebugAndroidTest` | Set device time 23:50, snooze 20 min, confirm no `missed` row at 00:00 | Cancel armed snoozes before reverting; written entries stay valid |
-| — | **Blocking gate**: API 37 on-device delivery matrix (§13.3) | 0 (code-free) | Gate, not a PR | N/A | Full §13.3 adb recipe on a real/emulator **API 37** image | N/A — failure amends `design.md` §5.4, not a revert |
-| 6a | Habit CRUD UI (create/edit/archive, six kind pickers) + adaptive resilience | 350 | PR 8 | `./gradlew :app:connectedDebugAndroidTest` | Create each of six frequency kinds in-app; rotate mid-input | Revert editor composables; Room/repositories untouched |
-| 6b | Today screen, progress display, settings UI + adaptive resilience | 380 | PR 9 | `./gradlew :app:connectedDebugAndroidTest` | Render at `sw=600dp`, rotate; answer one slot of a multi-slot habit | Revert today/progress composables; unit 5's write path untouched |
-| 7 | Manual export/import | 150 | PR 10 | `./gradlew :app:connectedDebugAndroidTest` | Export → wipe app data → import, confirm restoration | Remove export/import use cases; no schema/scheduling change to undo |
+### Method — why one blanket multiplier is the wrong tool
 
-**Dependency edges** (derive chain order from these, do not guess):
-`1 → 2a → 2b → 3 → 4a → {4b, 5}`; `5` also needs `4a`'s `AlarmScheduler`; the **gate** needs `4a + 4b + 5` all merged; `4a → 6a`; `{3, 5} → 6b`; `7` depends only on `3` and can float anywhere after it.
-Suggested linear chain: **1 → 2a → 2b → 3 → 4a → 4b → 5 → gate → 6a → 6b → 7**.
+Four delivered units give two separable, transferable signals, not one number:
 
-**Why 2 and 4 are pre-split, not only 6**: at the proposal's own line estimates, `:domain` (~750) and the
-reminder pipeline (~480) each independently exceed 400 lines once strict-TDD RED/GREEN pairs and the
-injected tunables are counted — not only the UI unit the proposal flagged. Each sub-unit above is
-independently mergeable, testable, and revertible.
+1. **`:domain` logic-density factor ≈ 1.51–1.58×** (2a: 400→633 actual = 1.58×; 2b: 350→530 actual
+   after its correction = 1.51×). Applies to *decision/branching/arithmetic* code wherever it lives,
+   not only inside `:domain`.
+2. **`:app` test:production ratio ≈ 0.75:1**, measured on unit 3 (529 production / 398 test). The
+   generic ratio for ordinary JVM-tested `:app` code with no heavy instrumented suite.
+3. **Instrumented-test line cost ≈ 50 lines/test**, measured directly from unit 3's three instrumented
+   files (248 lines / 5 tests). The most transferable number here: Android test-harness ceremony
+   (`TestListenableWorkerBuilder`, `WorkManagerTestInitHelper`, Compose semantics matchers,
+   `MigrationTestHelper`) is roughly constant regardless of what is under test.
+4. **Room's own 1.51× production-boilerplate / 1.75× total factor is deliberately NOT reapplied
+   wholesale.** It is a property of building a 5-table schema plus DAOs, mappers, and a migration
+   harness. None of the six remaining units create a new schema; reapplying it blindly would itself be
+   the blanket multiplier this re-forecast exists to replace.
 
-**Threat matrix**: N/A for every unit (design §12) — this change spawns no process, runs no shell, does
-no VCS automation. No threat-matrix RED-test tasks are required.
+Per-unit method, chosen by dominant code shape:
+
+- **4a** is decision/branching/arithmetic (permission state machine, DST resolution) — closer in kind
+  to `:domain`'s calculators than to Room. Uses signal 1, split at the lighter `:app` ratio (signal 2),
+  plus a named delta for the new 4a.7 DST task, which is not in the original 280 at all.
+- **4b, 5** are Android-framework ceremony (Worker/Receiver classes, Hilt injection) — a lighter
+  correction than Room's (1.3×, not 1.51×, because these add 2–6 small classes, not a 5-table schema),
+  plus signal 3 counted directly against each unit's *named* test behaviors, not a flat ratio.
+- **6a, 6b** are Compose UI. No delivered unit has shipped Compose code yet, so there is no measured
+  analog — these are named-component build-ups, explicitly flagged low confidence, plus the
+  `ui-adaptive-layout` capability's own tasks (6a.5–6a.7, 6b.6–6b.8) counted as a delta since C1/C4
+  postdate the original 350/380 estimates.
+- **7** is DTO/serialization/transaction code — closest to unit 3's *mapper* sub-component (JVM-tested
+  translation, not schema-heavy), so it gets a light 1.15× correction plus signal 3 for its two
+  instrumented tests, weighted slightly above baseline because round-trip fidelity assertions are
+  heavier than a DAO uniqueness check.
+
+### Revised per-unit projection
+
+| Unit | Original | Method (arithmetic) | Production | Test | Revised total | Factor |
+|---|---|---|---|---|---|---|
+| 4a Alarm scheduling | 280 | `:domain` factor 1.55× on 280 → 434, split 0.75:1 → 248/186; **+ DST delta**: production +50 (`ZonedDateTime` resolution/decision + injected `Clock`/`ZoneId`), test +75 (3 JVM scenarios × 25: spring-forward, fall-back, transition-week guard) | 298 | 261 | **~560** | 2.0× |
+| 4b Reconcile & sweep | 250 | Component build (2 workers + tunables + DI ≈ 210) × 1.3 ceremony correction; **6 named instrumented behaviors** (Reconcile sweep, Sweep Required-write, N_TIMES_PER_WEEK D8 exception, dedicated D3 live-snooze-no-row, grace-expiry, hard-resolve) × 50 | 273 | 300 | **~575** | 2.3× |
+| 5 Notifications & responses | 380 | Component build (channel+poster 80, permission gate 35, ActionReceiver 45, AnswerWorker 65, SnoozeWorker 65, settings 45 ≈ 335) × 1.3; **5 named instrumented behaviors** (idempotent-redelivery ×2 workers, after-midnight crediting, grace-expiry, hard-deadline) × 50 | 436 | 250 | **~686** | 1.8× |
+| 6a Habit CRUD UI + adaptive | 350 | Named-component build: form 60 + 6 kind pickers (6×35=210) + slot editor 45 + validation 15 + archive/list 80 + replan wiring 10 + adaptive delta 40 = 460; tests: create-six-kinds 150 + rotate-mid-input 50. **Low confidence — no Compose unit shipped yet** | 460 | 200 | **~660** | 1.9× |
+| 6b Today/progress/settings UI + adaptive | 380 | Named-component build: today rows 90 + Yes/No/Skip 30 + pending render 35 + progress view 70 + snooze-setting screen 45 + adaptive delta 40 = 310; tests: answer-one-slot 60 + render-600dp 60. **Low confidence, smaller surface than 6a** | 310 | 120 | **~430** | 1.1× |
+| 7 Export/import | 150 | Component build (DTOs+serde 55, export 55, import parse/validate/transaction/remap/cancel/truncate/replan 100, dialog 25, pre-migration hook 20 ≈ 255) × 1.15; 2 instrumented tests above baseline (round-trip 90, malformed-rejection 60) | 293 | 150 | **~443** | 3.0× |
+| **Total** | **1,790** | | **2,070** | **1,367** | **~3,354** | **1.87×** |
+
+### Pre-split — Unit 5 only, precautionary
+
+No point estimate above clears 700 outright. **Unit 5 comes closest at ~686 — only 14 lines under
+budget**, well inside the estimation noise this exercise exists to correct. It is also the most
+component-dense remaining unit (6 production pieces) and the decision the design argues hardest for
+(D3, §9.2's three abandonment branches), so it gets the same precautionary split the mandate requires
+for anything landing at or over budget, rather than waiting to discover the overrun mid-unit the way
+units 2a and 3 both were:
+
+- **5-i — Notification posting, permission gate, action receiver, snooze settings** (tasks 5.1, 5.2,
+  5.3, 5.6). No automated test task exists for these in the original breakdown — coverage is the
+  runtime harness only (manual notification-post / permission-state check), worth flagging rather than
+  silently assumed. Production ≈ 266, test 0, **total ≈ 266**.
+- **5-ii — `AnswerWorker`/`SnoozeWorker` and the full D3 instrumented verification** (tasks 5.4, 5.5,
+  5.7, 5.8). Tests stay with the code they verify, exactly as unit 3's split kept JVM tests with their
+  mappers. Production ≈ 169, test 250 (5 named behaviors), **total ≈ 419**.
+
+Both slices are independently under 700 with real margin (266, 419), independently revertable (5-i
+touches only posting/permission/settings; 5-ii touches only the answer/snooze write path), and
+independently verifiable (5-i via the manual harness; 5-ii via the instrumented worker suite plus the
+existing snooze-across-midnight manual scenario). 266 + 419 = 685 ≈ the whole-unit 686 estimate.
+
+4b (~575) and 6a (~660) are the next-closest units but both carry real margin (125 and 40 lines
+respectively) — worth watching, not worth a mandatory split at this point estimate.
+
+### Revised chain order
+
+PRs 1–6 already exist on GitHub (docs, scaffolding, domain model, calculators, Room core, Room
+on-device). Dependency edges are unchanged from the original suggested linear order.
+
+| PR | Work unit | Lines | Status |
+|---|---|---|---|
+| 1 | docs | — | merged |
+| 2 | scaffolding (WU 1) | 399 actual | merged |
+| 3 | domain model (WU 2a) | 633 actual | merged |
+| 4 | calculators (WU 2b) | 530 actual | merged |
+| 5 | Room core (WU 3-i) | — actual | merged |
+| 6 | Room on-device (WU 3-ii) | 965 actual (3-i+3-ii combined) | merged |
+| 7 | Alarm scheduling (WU 4a) | ~560 | planned |
+| 8 | Reconcile & sweep (WU 4b) | ~575 | planned, depends on PR 7 |
+| 9 | Notification posting/permission/settings (WU 5-i) | ~266 | planned, depends on PR 7 (`AlarmScheduler` edge retained) |
+| 10 | Answer/Snooze workers + D3 verification (WU 5-ii) | ~419 | planned, depends on PR 9 |
+| — | **Blocking gate** (API 37 on-device matrix), code-free | 0 | planned, depends on PR 7 + 8 + 9 + 10 |
+| 11 | Habit CRUD UI + adaptive (WU 6a) | ~660 | planned, depends on PR 6 + 7 |
+| 12 | Today/progress/settings UI + adaptive (WU 6b) | ~430 | planned, depends on PR 6 + 9/10 |
+| 13 | Export/import (WU 7) | ~443 | planned, depends on PR 6 only — can float earlier if throughput matters (unchanged flexibility from the original forecast) |
+
+**New total projected for remaining work: ~3,354 changed lines across 7 PRs** (was ~1,790 across 6).
+
+### Confidence — plain statement, not false precision
+
+- **Trust**: 4a, 4b, 7 — each anchored to a measured signal (the `:domain` logic-density factor, the
+  50-line instrumented-test cost, or unit 3's mapper analog) applied to a named component build, not a
+  guess.
+- **Moderate trust, borderline**: 5 — the component build is solid, but 6 production pieces
+  compressed into one unit is exactly the shape that blew unit 3's budget; treat 686 as a floor, not a
+  ceiling, which is why it gets the precautionary split anyway.
+- **Low trust, explicitly flagged**: 6a and 6b — **no Compose UI unit has shipped in this change yet**,
+  so there is no measured line-count analog for this codebase's Compose style, only a named-component
+  guess. 6a (six distinct schedule-kind pickers) is the single least trustworthy number in this table.
+  If it runs true to every other `:app` unit's pattern of underestimating framework ceremony, 660 could
+  realistically become 850–1,000+; there is no evidence yet to bound that upside, only the delivered
+  units' general lesson that estimates run low.
+- Chained PRs recommended: **Yes**, unchanged.
+
+**Dependency edges** (unchanged — derive chain order from these, do not guess):
+`1 → 2a → 2b → 3 → 4a → {4b, 5}`; `5` also needs `4a`'s `AlarmScheduler`; the **gate** needs
+`4a + 4b + 5` all merged; `4a → 6a`; `{3, 5} → 6b`; `7` depends only on `3` and can float anywhere
+after it. The precautionary split of `5` into `5-i`/`5-ii` does not add or remove an edge: both slices
+sit under the same `5` dependency, and the gate still requires all of `5` (both slices) merged.
+
+**Why 2 and 4 were pre-split, not only 6** (carried from the original forecast, still accurate): at the
+proposal's own line estimates, `:domain` (~750) and the reminder pipeline (~480) each independently
+exceeded 400 lines once strict-TDD RED/GREEN pairs and the injected tunables were counted. This
+re-forecast additionally flags unit 5 as borderline under the now-700 budget, for the reasons above.
+
+**Threat matrix**: N/A for every unit (design §12) — unchanged from the original forecast. This change
+spawns no process, runs no shell, does no VCS automation. No threat-matrix RED-test tasks are required.
 
 ## Phase 0: Strict TDD Gate (blocks Phase 2)
 
@@ -79,7 +189,7 @@ double the production code. Phase 2a therefore ships as a single PR of ~530 line
 `LocalDate`, so a DST transition cannot skip or duplicate a *calendar day*; DST shifts wall-clock
 times of day, and a time of day never enters `:domain`. What remains here is a characterization
 guard (below). The substantive DST behaviour — which instant a 02:30 slot maps to on a
-spring-forward day, when that local time does not exist, and what happens to a 01:30 slot on a
+spring-forward day, when that local time does not exist, and what happens to a 02:30 slot on a
 fall-back day, when it occurs twice — is a property of the `LocalTime`-to-`Instant` conversion in
 `:app`'s alarm scheduler, and is **relocated to work unit 4a**.
 
@@ -125,19 +235,25 @@ build and test standalone with the androidTest sources removed.
 ## Phase 4a: Alarm Scheduling & Reschedule Triggers (Work Unit 4a)
 
 - [ ] 4a.1 Implement `OccurrencePlanner.replanAll()`: plan a 48h forward horizon + one occurrence per slot beyond it, upsert `reminder_occurrences` (design D4).
-- [ ] 4a.2 Implement `AlarmScheduler`: `canScheduleExactAlarms()` before every call; `setExactAndAllowWhileIdle` under `SCHEDULE_EXACT_ALARM`; degrade to `setWindow` (≥10 min) when denied (reminder-delivery: Exact-Alarm Scheduling, Exact-Alarm Permission States).
+- [x] 4a.2 Implement `AlarmScheduler`: `canScheduleExactAlarms()` before every call; `setExactAndAllowWhileIdle` under `SCHEDULE_EXACT_ALARM`; degrade to `setWindow` (≥10 min) when denied (reminder-delivery: Exact-Alarm Scheduling, Exact-Alarm Permission States).
 - [ ] 4a.3 Implement `ExactAlarmPermissionReceiver` for `ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED`, upgrading/downgrading armed alarms.
 - [ ] 4a.4 Implement `BootReceiver`, `PackageReplacedReceiver`, `TimeChangeReceiver` (`TIMEZONE_CHANGED`, `DATE_CHANGED`/`TIME_SET`) wired to `replanAll()` (reminder-delivery: Five Mandatory Reschedule Triggers).
 - [ ] 4a.5 Wire in-app schedule edit to call `replanAll()` inside the same Room transaction (habit-management: Editing the schedule reschedules reminders).
 - [ ] 4a.6 [Unit] Test planner arithmetic and permission-branch decision logic (`./gradlew :app:testDebugUnitTest`).
-- [ ] 4a.7 **DST resolution — relocated here from 2a.10.** Decide and test what instant a reminder
+- [x] 4a.7 **DST resolution — relocated here from 2a.10.** Decide and test what instant a reminder
       slot maps to on a daylight-saving transition, because this is where `LocalDate` + `LocalTime`
       becomes an `Instant`. Two cases, both real and both silent if unhandled:
+      **Correction (verified against `java.time.zone.ZoneRules.getValidOffsets`).** An earlier draft of
+      this task said the fall-back repeat was 01:30. That is the *US* convention. In `Europe/Madrid`
+      **both** transitions pivot between 02:00 and 03:00 local: on 2026-03-29 `02:30` returns zero
+      offsets (the gap) and on 2026-10-25 it returns two (the overlap), while `01:30` is unambiguous
+      on both dates. Never take a DST window from a prose description — query the zone's rules.
+
       - **Spring forward**: a 02:30 slot on a spring-forward date has **no valid local time** — that
         instant does not exist. `ZonedDateTime.of(...)` silently shifts it forward by an hour rather
         than failing. Decide explicitly whether the reminder fires at 03:30, at 01:30, or is skipped
         for that date, and assert the choice.
-      - **Fall back**: a 01:30 slot on a fall-back date occurs **twice**. Decide whether it fires on
+      - **Fall back**: a 02:30 slot on a fall-back date occurs **twice**. Decide whether it fires on
         the first or second occurrence, and assert that it fires exactly **once**, never twice.
       Test against a fixed zone (`Europe/Madrid`: spring-forward 2026-03-29, fall-back 2026-10-25) with
       an injected `Clock`/`ZoneId` — never the ambient default. `:domain`'s

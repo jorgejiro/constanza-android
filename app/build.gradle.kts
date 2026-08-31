@@ -45,6 +45,16 @@ android {
         compose = true
     }
 
+    testOptions {
+        unitTests {
+            // Work unit 4a: AlarmSchedulerTest constructs a real android.jar Intent/PendingIntent
+            // (mocked at the AlarmManager/PendingIntent boundary via MockK, not via Robolectric).
+            // Without this, ANY unmocked SDK method call — including the Intent constructor —
+            // throws "Method ... not mocked." instead of returning a harmless default.
+            isReturnDefaultValues = true
+        }
+    }
+
     sourceSets {
         // MigrationTestHelper (task 3.7) reads exported schemas from the androidTest assets
         // folder; this exposes app/schemas/ (design.md §8, §14) there without copying it.
@@ -81,6 +91,9 @@ dependencies {
     // AGP does not auto-resolve kotlin("test") to the JUnit4 variant the way kotlin("jvm") does
     // for :domain, so the JUnit-glue artifact is named explicitly here.
     testImplementation(kotlin("test-junit"))
+    // Work unit 4a: AlarmScheduler/OccurrencePlanner tests mock Room DAOs (plain interfaces) and
+    // android.app.AlarmManager/PendingIntent (final Android framework classes) without Robolectric.
+    testImplementation(libs.mockk)
 
     androidTestImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.runner)
