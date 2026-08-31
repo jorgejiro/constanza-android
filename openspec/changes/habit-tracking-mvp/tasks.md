@@ -281,6 +281,18 @@ enqueuing nothing would not be independently verifiable. The seam used instead i
 - [ ] 5.4 **Slice ii.** Implement `AnswerWorker`: `@Transaction` upsert `Entry(date = occ.scheduledDate, …)`, `occ.state = RESOLVED`, cancel any armed snooze, cancel the notification only after the write lands (reminder-response: Notification Actions).
 - [ ] 5.5 **Slice ii.** Implement `SnoozeWorker`: `snoozeCount++`, `snoozeUntil = now + duration` clamped to `resolveDeadline`, arm the same `reqCode` alarm, cancel the current notification (reminder-response: Snooze Configuration and Re-arm; habit-entry-tracking: Provisional-Missed happy path).
 - [x] 5.6 Implement snooze settings storage in DataStore: default 20 min; options 10/20/30 min, 1/2/3/4 h; unlimited (reminder-response: Snooze Configuration and Re-arm).
+- [ ] 5.9 **Slice ii. Wire `ReminderFireReceiver` to `NotificationPoster`, with the fire-time quota re-check.**
+      Added 2026-08-31: design §9.1 assigns this step to work unit 5 and `ReminderFireReceiver`'s own
+      KDoc says so, but no numbered task owned it — the alarm fired into a receiver that did nothing,
+      so no reminder could reach the user at all. The gap surfaced when slice i shipped a poster that
+      nothing calls. The receiver must load the occurrence by the id its `PendingIntent` carries,
+      re-evaluate before posting, post via `NotificationPoster`, and record `state = FIRED` with
+      `notifiedAtEpochMs`. The re-evaluation is not decoration: work unit 4a arms an alarm every day
+      for `N_TIMES_PER_WEEK` precisely because D8 defers quota suppression to fire time, so **this is
+      the one place a weekly habit whose quota is already met is silently suppressed**. Without it a
+      "3 times per week" habit nags on all seven days. Keep the receiver validate-only — no Room
+      access on the ~10s `onReceive` budget; enqueue expedited work, as 5.3 does for actions.
+
 - [ ] 5.7 **Slice ii.** [Instrumented] `AnswerWorker`/`SnoozeWorker` tests: idempotent upsert on redelivery; after-midnight origin-date crediting (reminder-response: Origin-Date Crediting).
 - [x] 5.8 [Instrumented] Grace-expiry and hard-resolve-deadline force-resolve tests (habit-entry-tracking: Abandoned Snooze Resolution). **Already shipped in work unit 4b** — `graceExpiryForceResolvesAnAbandonedSnoozeToMissed` and `hardResolveDeadlineForceResolvesRegardlessOfState` in `ReconcileWorkerTest`.
 
