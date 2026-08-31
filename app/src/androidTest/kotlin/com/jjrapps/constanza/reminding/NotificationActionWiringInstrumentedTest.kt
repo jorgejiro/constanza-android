@@ -5,6 +5,7 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import android.service.notification.StatusBarNotification
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -44,14 +45,37 @@ class NotificationActionWiringInstrumentedTest {
     private val notificationManager = context.getSystemService(NotificationManager::class.java)
     private val workManager = WorkManager.getInstance(context)
 
-    /** Same rationale as [NotificationPosterInstrumentedTest]: a clean install starts with
-     *  `POST_NOTIFICATIONS` ungranted on API 33+, and this must not depend on ambient state. */
+    /**
+     * Same rationale as [NotificationPosterInstrumentedTest]: a clean install starts with
+     * `POST_NOTIFICATIONS` ungranted on API 33+, and this must not depend on ambient state.
+     *
+     * The grant is then **awaited**, because `grantRuntimePermission` returns before
+     * `NotificationManager` reflects the new state. Without the wait these two tests fail on a
+     * freshly installed APK — measured on a physical Pixel 10 under
+     * `connectedDebugAndroidTest`, which reinstalls both APKs and so resets the permission, while
+     * the same suite passed against an already-installed APK where the grant had settled. The
+     * failure surfaced as `NoSuchElementException` from the action lookup, because
+     * [NotificationPoster] correctly refuses to post while notifications read as disabled — the
+     * product was right and the test was racing it.
+     */
     @Before
     fun grantNotificationPermission() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
         InstrumentationRegistry.getInstrumentation().uiAutomation.grantRuntimePermission(
             context.packageName,
             Manifest.permission.POST_NOTIFICATIONS,
+        )
+        val deadline = System.currentTimeMillis() + POLL_TIMEOUT_MS
+        while (!notificationManager.areNotificationsEnabled() &&
+            System.currentTimeMillis() < deadline
+        ) {
+            Thread.sleep(POLL_INTERVAL_MS)
+        }
+        assertTrue(
+            "POST_NOTIFICATIONS was granted but NotificationManager still reports notifications " +
+                "disabled after ${POLL_TIMEOUT_MS}ms; the post would be suppressed and the action " +
+                "lookup would fail for a reason unrelated to the wiring under test",
+            notificationManager.areNotificationsEnabled(),
         )
     }
 
@@ -75,9 +99,26 @@ class NotificationActionWiringInstrumentedTest {
 
     private fun postAndFindAction(occurrenceId: Long, labelRes: Int): Notification.Action {
         poster.postReminder(occurrenceId, "Meditate", "Did you meditate today?", HABIT_COLOR_ARGB)
-        val posted = notificationManager.activeNotifications.first { it.id == occurrenceId.toInt() }
+        val posted = awaitPosted(occurrenceId)
         val label = context.getString(labelRes)
         return posted.notification.actions.first { it.title == label }
+    }
+
+    /** `NotificationManager.notify` is a `oneway` Binder call, so a posted notification need not be
+     *  visible in `activeNotifications` by the time `notify` returns. Same race, same fix as
+     *  [NotificationPosterInstrumentedTest.awaitPosted]. */
+    private fun awaitPosted(occurrenceId: Long): StatusBarNotification {
+        val id = occurrenceId.toInt()
+        val deadline = System.currentTimeMillis() + POLL_TIMEOUT_MS
+        var found = notificationManager.activeNotifications.firstOrNull { it.id == id }
+        while (found == null && System.currentTimeMillis() < deadline) {
+            Thread.sleep(POLL_INTERVAL_MS)
+            found = notificationManager.activeNotifications.firstOrNull { it.id == id }
+        }
+        return requireNotNull(found) {
+            "No notification with id $id appeared within ${POLL_TIMEOUT_MS}ms of postReminder, " +
+                "while areNotificationsEnabled() was true"
+        }
     }
 
     /** Sends the action's real [android.app.PendingIntent] exactly as the system does on a tap,
