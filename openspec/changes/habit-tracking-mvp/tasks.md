@@ -68,7 +68,20 @@ no VCS automation. No threat-matrix RED-test tasks are required.
 
 ## Phase 2a: `:domain` Model & Occurrence Predicate (Work Unit 2a) — strict TDD
 
-**2a split mid-apply (budget) — see `sdd/habit-tracking-mvp/apply-progress`: 2a-i (2a.1–2a.6) committed at 386 lines; 2a-ii (2a.7–2a.11) GREEN on disk but uncommitted, budget decision pending.**
+**2a was split mid-apply on a budget stop, then reunited.** The unit measured 518 authored lines
+against the original 400-line budget by task 2a.8, so the executor committed the in-budget slice
+2a-i (2a.1–2a.6, 393 changed lines) and held 2a-ii GREEN but uncommitted rather than shrinking
+scope. The user then **raised the review budget to 600 lines for `:domain` work units**, on the
+evidence that 400 was systematically ~30% too tight for strict-TDD units where tests roughly
+double the production code. Phase 2a therefore ships as a single PR of ~530 lines.
+
+**Correction to 2a.9/2a.10 — DST tests were in the wrong unit.** `dueOn` and `rollupDay` take only
+`LocalDate`, so a DST transition cannot skip or duplicate a *calendar day*; DST shifts wall-clock
+times of day, and a time of day never enters `:domain`. What remains here is a characterization
+guard (below). The substantive DST behaviour — which instant a 02:30 slot maps to on a
+spring-forward day, when that local time does not exist, and what happens to a 01:30 slot on a
+fall-back day, when it occurs twice — is a property of the `LocalTime`-to-`Instant` conversion in
+`:app`'s alarm scheduler, and is **relocated to work unit 4a**.
 
 - [x] 2a.1 [RED] Failing JVM tests for `Habit`, `Schedule` sealed hierarchy, `ReminderSlot`, `Entry`, `EntryStatus`, `Due`, `DayStatus` (habit-scheduling: Six Frequency Kinds; habit-entry-tracking: Entry States).
 - [x] 2a.2 [GREEN] Implement the model types in `domain/src/main/kotlin/.../model`.
@@ -76,11 +89,11 @@ no VCS automation. No threat-matrix RED-test tasks are required.
 - [x] 2a.4 [GREEN] Implement `dueOn(schedule, date, progress): Due` (`weekStart` lives on `Schedule` — see apply-progress deviation note).
 - [x] 2a.5 [RED] Failing tests for `N_TIMES_PER_WEEK` quota + injected ISO-Monday `weekStart` — quota-met silences remainder, resets at week boundary. **[Provisional — OA-3, unconfirmed]** (habit-scheduling: N_TIMES_PER_WEEK Reminder Semantics, Week Boundary).
 - [x] 2a.6 [GREEN] Implement week-start-parameterised quota evaluation.
-- [ ] 2a.7 [RED] Failing tests for `rollupDay()` multi-slot collapse. **[Provisional — OA-2, unconfirmed]** (habit-entry-tracking: Day-Level Rollup and Per-Slot Display).
-- [ ] 2a.8 [GREEN] Implement `rollupDay(schedule, date, slots, entries): DayStatus`.
-- [ ] 2a.9 [RED] Failing tests for DST-adjacent date arithmetic (spring-forward/fall-back) in `dueOn`.
-- [ ] 2a.10 [GREEN] Confirm/adjust `ZonedDateTime`-based DST resolution (design §9.3).
-- [ ] 2a.11 Verify zero `android.*`/`androidx.*` imports resolve in `:domain` (compile-enforced).
+- [x] 2a.7 [RED] Failing tests for `rollupDay()` multi-slot collapse. **[Provisional — OA-2, unconfirmed]** (habit-entry-tracking: Day-Level Rollup and Per-Slot Display).
+- [x] 2a.8 [GREEN] Implement `rollupDay(schedule, date, slots, entries): DayStatus`.
+- [x] 2a.9 Characterization guard for DST-adjacent date arithmetic in `dueOn` (`DueOnDaylightSavingTest`, 5 tests): two-day cadence across the Europe/Madrid spring-forward (2026-03-29) and fall-back (2026-10-25) transitions, `MONTHLY` on a transition date, `DAILY` covering every calendar day of a transition week, and identical results under three default zones with different DST rules (Europe/Madrid, America/Santiago, Pacific/Kiritimati). **Not a RED/GREEN pair** — the behaviour was already correct, so this is a characterization test, not TDD. Its bite was proven instead by two probes: an off-by-one in the cadence (`% n == 1L`) failed 3 tests including both cadence tests, and inserting `ZoneId.systemDefault()` failed `detektMain` with `ForbiddenMethodCall`.
+- [~] 2a.10 **Relocated to work unit 4a.** `ZonedDateTime` DST resolution (design §9.3) belongs to the alarm scheduler, which owns the `LocalTime`-to-`Instant` conversion. `:domain` must stay `LocalDate`-only; the guard in 2a.9 enforces that.
+- [x] 2a.11 Verified zero `android.*`/`androidx.*` imports in `:domain` (`rg '^import android|^import androidx' domain/src` → no matches), compile-enforced by the `kotlin("jvm")` plugin.
 
 ## Phase 2b: Streak & Compliance Calculators (Work Unit 2b) — strict TDD
 
@@ -108,6 +121,19 @@ no VCS automation. No threat-matrix RED-test tasks are required.
 - [ ] 4a.4 Implement `BootReceiver`, `PackageReplacedReceiver`, `TimeChangeReceiver` (`TIMEZONE_CHANGED`, `DATE_CHANGED`/`TIME_SET`) wired to `replanAll()` (reminder-delivery: Five Mandatory Reschedule Triggers).
 - [ ] 4a.5 Wire in-app schedule edit to call `replanAll()` inside the same Room transaction (habit-management: Editing the schedule reschedules reminders).
 - [ ] 4a.6 [Unit] Test planner arithmetic and permission-branch decision logic (`./gradlew :app:testDebugUnitTest`).
+- [ ] 4a.7 **DST resolution — relocated here from 2a.10.** Decide and test what instant a reminder
+      slot maps to on a daylight-saving transition, because this is where `LocalDate` + `LocalTime`
+      becomes an `Instant`. Two cases, both real and both silent if unhandled:
+      - **Spring forward**: a 02:30 slot on a spring-forward date has **no valid local time** — that
+        instant does not exist. `ZonedDateTime.of(...)` silently shifts it forward by an hour rather
+        than failing. Decide explicitly whether the reminder fires at 03:30, at 01:30, or is skipped
+        for that date, and assert the choice.
+      - **Fall back**: a 01:30 slot on a fall-back date occurs **twice**. Decide whether it fires on
+        the first or second occurrence, and assert that it fires exactly **once**, never twice.
+      Test against a fixed zone (`Europe/Madrid`: spring-forward 2026-03-29, fall-back 2026-10-25) with
+      an injected `Clock`/`ZoneId` — never the ambient default. `:domain`'s
+      `DueOnDaylightSavingTest` guard already proves the date predicate is DST-immune; this task
+      covers the conversion that is not.
 
 ## Phase 4b: Reconcile & Midnight Sweep (Work Unit 4b) — depends on 4a
 
