@@ -21,6 +21,7 @@ import kotlin.test.Test
 
 private const val HABIT_ID = 1L
 private const val SLOT_ID = 10L
+private const val RESOLVE_DEADLINE_HOURS = 24L
 private val TODAY = LocalDate.of(2026, 1, 1) // Thursday
 
 /** Task 4a.6: planner arithmetic, isolated from Room/AlarmManager via mocked DAOs and a mocked
@@ -35,7 +36,9 @@ class OccurrencePlannerTest {
     private val alarmScheduler = mockk<AlarmScheduler>()
     private val timeProvider = mockk<TimeProvider>()
     private val planner = OccurrencePlanner(
-        habitDao, scheduleDao, reminderSlotDao, reminderOccurrenceDao, alarmScheduler, timeProvider,
+        SchedulingDaos(habitDao, scheduleDao, reminderSlotDao, reminderOccurrenceDao),
+        alarmScheduler, timeProvider,
+        resolveDeadlineHours = RESOLVE_DEADLINE_HOURS,
     )
 
     private fun stubTimeAndDefaults() {

@@ -1,0 +1,151 @@
+package com.jjrapps.constanza.scheduling
+
+import android.content.Context
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.work.Configuration
+import androidx.work.WorkerFactory
+import androidx.work.WorkerParameters
+import androidx.work.testing.SynchronousExecutor
+import androidx.work.testing.TestListenableWorkerBuilder
+import androidx.work.testing.WorkManagerTestInitHelper
+import com.jjrapps.constanza.core.data.AppDatabase
+import com.jjrapps.constanza.core.data.entity.HabitEntity
+import com.jjrapps.constanza.core.data.entity.ReminderOccurrenceEntity
+import io.mockk.mockk
+import io.mockk.verify
+import kotlinx.coroutines.runBlocking
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import java.time.Instant
+
+private const val HOUR_SECONDS = 3600L
+private const val MINUTE_SECONDS = 60L
+private const val RECONCILE_PERIOD_HOURS = 1L
+private const val RESOLVE_DEADLINE_HOURS = 24L
+
+/**
+ * design.md D3 layers 2-3, §5.5 (reminder-delivery: Missed-Reminder Sweep; habit-entry-tracking:
+ * Abandoned Snooze Resolution). Exercises [ReconcileWorker] via `TestListenableWorkerBuilder`
+ * (task 4b.4), a real in-memory Room database, and a mocked [AlarmScheduler].
+ */
+@RunWith(AndroidJUnit4::class)
+class ReconcileWorkerTest {
+
+    private lateinit var database: AppDatabase
+    private lateinit var alarmScheduler: AlarmScheduler
+    private val now: Instant = Instant.parse("2026-09-02T01:00:00Z")
+
+    @Before
+    fun setUp() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        WorkManagerTestInitHelper.initializeTestWorkManager(
+            context,
+            Configuration.Builder().setExecutor(SynchronousExecutor()).build(),
+        )
+        database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
+        alarmScheduler = mockk(relaxed = true)
+    }
+
+    @After
+    fun tearDown() = database.close()
+
+    private fun buildWorker(): ReconcileWorker {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val daos = SchedulingDaos(
+            database.habitDao(), database.scheduleDao(), database.reminderSlotDao(), database.reminderOccurrenceDao(),
+        )
+        val resolver = OccurrenceResolver(
+            daos, database.entryDao(), alarmScheduler, RECONCILE_PERIOD_HOURS, RESOLVE_DEADLINE_HOURS,
+        )
+        val factory = object : WorkerFactory() {
+            override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters) =
+                ReconcileWorker(appContext, workerParameters, resolver, FakeTimeProvider(now))
+        }
+        return TestListenableWorkerBuilder<ReconcileWorker>(context).setWorkerFactory(factory).build()
+    }
+
+    private suspend fun insertHabit(): Long = database.habitDao().insert(
+        HabitEntity(name = "Read", question = null, colorArgb = 0, notes = null, archivedAt = null, createdAt = now.toString()),
+    )
+
+    @Test
+    fun aDroppedAlarmIsFiredLateInsteadOfLost() = runBlocking {
+        val habitId = insertHabit()
+        val occId = database.reminderOccurrenceDao().upsert(
+            occurrence(habitId, "2026-09-02", now.minusSeconds(30 * MINUTE_SECONDS).toEpochMilli(), "ARMED"),
+        )
+
+        buildWorker().doWork()
+
+        verify { alarmScheduler.schedule(occId, now.toEpochMilli()) }
+        assertTrue(database.entryDao().findByHabitId(habitId).isEmpty())
+        assertEquals("ARMED", database.reminderOccurrenceDao().findById(occId)?.state)
+    }
+
+    @Test
+    fun graceExpiryForceResolvesAnAbandonedSnoozeToMissed() = runBlocking {
+        val habitId = insertHabit()
+        val occ = occurrence(habitId, "2026-09-01", now.minusSeconds(3 * HOUR_SECONDS).toEpochMilli(), "SNOOZED")
+            .copy(snoozeUntilEpochMs = now.minusSeconds(2 * HOUR_SECONDS).toEpochMilli(), snoozeCount = 1)
+        val occId = database.reminderOccurrenceDao().upsert(occ)
+
+        buildWorker().doWork()
+
+        verify { alarmScheduler.cancel(occId) }
+        val entries = database.entryDao().findByHabitAndDate(habitId, "2026-09-01")
+        assertEquals(1, entries.size)
+        assertEquals("MISSED", entries.single().status)
+        assertEquals("ABANDONED", database.reminderOccurrenceDao().findById(occId)?.state)
+    }
+
+    @Test
+    fun hardResolveDeadlineForceResolvesRegardlessOfState() = runBlocking {
+        val habitId = insertHabit()
+        val occId = database.reminderOccurrenceDao().upsert(
+            occurrence(habitId, "2026-08-31", now.minusSeconds(25 * HOUR_SECONDS).toEpochMilli(), "ARMED"),
+        )
+
+        buildWorker().doWork()
+
+        verify { alarmScheduler.cancel(occId) }
+        verify(exactly = 0) { alarmScheduler.schedule(any(), any()) }
+        val entries = database.entryDao().findByHabitAndDate(habitId, "2026-08-31")
+        assertEquals(1, entries.size)
+        assertEquals("ABANDONED", database.reminderOccurrenceDao().findById(occId)?.state)
+    }
+
+    /** design.md D3: "NOT a snooze cap" — decision 11 stands. Many snoozes inside the 24h resolve
+     *  window (a high `snoozeCount`) are all accepted; only elapsed calendar time is bounded. */
+    @Test
+    fun manySnoozesWithinTheResolveWindowAreAllAccepted() = runBlocking {
+        val habitId = insertHabit()
+        val occ = occurrence(habitId, "2026-09-02", now.minusSeconds(HOUR_SECONDS).toEpochMilli(), "SNOOZED")
+            .copy(snoozeUntilEpochMs = now.plusSeconds(10 * MINUTE_SECONDS).toEpochMilli(), snoozeCount = 50)
+        val occId = database.reminderOccurrenceDao().upsert(occ)
+
+        buildWorker().doWork()
+
+        verify(exactly = 0) { alarmScheduler.cancel(any()) }
+        assertTrue(database.entryDao().findByHabitId(habitId).isEmpty())
+        val stored = database.reminderOccurrenceDao().findById(occId)
+        assertEquals("SNOOZED", stored?.state)
+        assertEquals(50, stored?.snoozeCount)
+    }
+
+    private fun occurrence(habitId: Long, date: String, scheduledAtEpochMs: Long, state: String) = ReminderOccurrenceEntity(
+        habitId = habitId,
+        scheduledDate = date,
+        scheduledAtEpochMs = scheduledAtEpochMs,
+        state = state,
+        snoozeUntilEpochMs = null,
+        snoozeCount = 0,
+        notifiedAtEpochMs = null,
+        resolveDeadlineMs = scheduledAtEpochMs + RESOLVE_DEADLINE_HOURS * HOUR_SECONDS * 1000,
+    )
+}
