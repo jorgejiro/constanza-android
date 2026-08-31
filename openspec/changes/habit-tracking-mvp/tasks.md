@@ -97,10 +97,10 @@ fall-back day, when it occurs twice — is a property of the `LocalTime`-to-`Ins
 
 ## Phase 2b: Streak & Compliance Calculators (Work Unit 2b) — strict TDD
 
-- [ ] 2b.1 [RED] Failing tests: `SKIPPED`/`UNKNOWN` pass through without breaking a streak; only `MISSED` breaks; weekly-unit streak for `N_TIMES_PER_WEEK`; recompute-after-correction (habit-progress: Streak Calculation; habit-entry-tracking: Streak interaction).
-- [ ] 2b.2 [GREEN] Implement `StreakCalculator.current` / `.best`.
-- [ ] 2b.3 [RED] Failing tests: `completed / (completed + missed)`; `SKIPPED`/`UNKNOWN` excluded from both sides; caller-supplied `windowDays` (habit-progress: Compliance Calculation).
-- [ ] 2b.4 [GREEN] Implement `ComplianceCalculator.ratio`.
+- [x] 2b.1 [RED] Failing tests: `SKIPPED`/`UNKNOWN` pass through without breaking a streak; only `MISSED` breaks; weekly-unit streak for `N_TIMES_PER_WEEK`; recompute-after-correction (habit-progress: Streak Calculation; habit-entry-tracking: Streak interaction).
+- [x] 2b.2 [GREEN] Implement `StreakCalculator.current` / `.best`.
+- [x] 2b.3 [RED] Failing tests: `completed / (completed + missed)`; `SKIPPED`/`UNKNOWN` excluded from both sides; caller-supplied `windowDays` (habit-progress: Compliance Calculation).
+- [x] 2b.4 [GREEN] Implement `ComplianceCalculator.ratio`.
 
 ## Phase 3: Room Persistence (Work Unit 3)
 
