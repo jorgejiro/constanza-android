@@ -101,6 +101,8 @@ fall-back day, when it occurs twice — is a property of the `LocalTime`-to-`Ins
 - [x] 2b.2 [GREEN] Implement `StreakCalculator.current` / `.best`.
 - [x] 2b.3 [RED] Failing tests: `completed / (completed + missed)`; `SKIPPED`/`UNKNOWN` excluded from both sides; caller-supplied `windowDays` (habit-progress: Compliance Calculation).
 - [x] 2b.4 [GREEN] Implement `ComplianceCalculator.ratio`.
+- [x] 2b.5 [RED→GREEN] Fix: `StreakCalculator` treats an enclosed and a trailing `SKIPPED`/`UNKNOWN` day identically — only `COMPLETED` lengthens, only `MISSED` breaks (corrected `habit-progress` Streak Calculation scenario). Collapsed the tentative/confirmed run split, now unnecessary.
+- [x] 2b.6 [RED→GREEN] Fix: `ComplianceCalculator.ratio` adds the `N_TIMES_PER_WEEK` weekly-quota branch from design D8/§10 (sum of `min(completedInWeek, n)` over whole weeks ÷ sum of `n`, partial edge weeks excluded).
 
 ## Phase 3: Room Persistence (Work Unit 3)
 
