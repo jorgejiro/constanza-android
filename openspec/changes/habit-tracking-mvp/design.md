@@ -203,11 +203,17 @@ Before scaffolding merges, and before any release with `targetSdk = 37`:
       `developer.android.com/about/versions/17/behavior-changes-17` (apps targeting API 37 — note the
       correct slug is `-17`, not `-37`) and `…/behavior-changes-all` (all apps), and reconciled every
       entry against §5.5 and §12.
-- [ ] Re-read the exact-alarm guide (`developer.android.com/develop/background-work/services/alarms/schedule`)
-      and the background-work restrictions pages at API 37.
-- [ ] Record the reconciliation as an amendment to this document. If any item contradicts §5.5, the
-      contradiction is a design change, not an implementation detail.
-- [ ] Run the §14.3 manual delivery matrix on an **API 37** image, not only on API 31.
+- [x] **DISCHARGED 2026-09-01 — see §13.4.** Re-read the exact-alarm guide
+      (`developer.android.com/develop/background-work/services/alarms/schedule`). It settled three
+      questions the matrix run raised; the background-work restrictions pages were not re-read, and
+      that remains open below.
+- [x] **DISCHARGED 2026-09-01 — see §13.4.** Record the reconciliation as an amendment to this
+      document. If any item contradicts §5.5, the contradiction is a design change, not an
+      implementation detail. Nothing found contradicts §5.5; §13.3's own recipes did not survive.
+- [x] **DISCHARGED 2026-09-01 for the eight non-UI scenarios — see §13.4.** Run the **§13.3** (not
+      §14.3 — that cross-reference was wrong) manual delivery matrix on an **API 37** image, not only
+      on API 31. The four UI-dependent rows are deferred, with the reason recorded in §13.4.
+- [ ] Re-read the background-work restrictions pages at API 37. Not covered by the §13.4 run.
 
 Until that gate is discharged, `targetSdk = 37` carries an unquantified delivery risk. Lowering
 `targetSdk` to 36 remains an available, cheap, one-line mitigation if the gate surfaces a blocker —
@@ -1046,6 +1052,122 @@ design change results either way, because the UI is built adaptive-resilient reg
 | Orientation — C1 (§5.7) | Rotate on both devices at both widths; confirm the same. Required because `targetSdk = 37` removes the opt-out for orientation constraints on large screens |
 | Soft keyboard after a config change — C4 (§5.7) | On the habit editor with the keyboard open, rotate (and on the Z Fold 7, fold/unfold). Android 17 does **not** restore IME visibility after an unhandled configuration change; confirm the screen does not assume it survives |
 | OEM throttling survival | On the **Z Fold 7 and only there**: enable One UI's "Put unused apps to sleep" for the app, leave it idle for a multi-day window, and confirm reminders still arrive — late is acceptable, lost is not. This is the assertion the WorkManager missed-reminder sweep exists to satisfy, and no Pixel can make it |
+
+### 13.4 Discharge record — manual delivery matrix run 2026-08-31/09-01 (task G.1)
+
+Run on the Pixel 10 (`55221FDCR005RD`) against `main` at `d0adc17`, i.e. work units 1–5 merged.
+
+**The device is no longer a preview build, and §13.3's caveat about that no longer applies.** §13.3
+records `google/frankel_beta/frankel:DEV/CP41.260731.005.B1/16056512:user/release-keys` with
+`preview_sdk 3723`, `codename DEV`. Measured at run time:
+
+| Property | §13.3 records | Measured |
+|---|---|---|
+| fingerprint | `…frankel:DEV/CP41.260731.005.B1/16056512…` | `google/frankel_beta/frankel:17/CP41.260814.003.B1/16166531:user/release-keys` |
+| `preview_sdk` | `3723` | `0` |
+| `codename` | `DEV` | `REL` |
+
+So these results come from a **released** Android 17, not a beta. §13.3's hedge — "a pass is a strong
+signal rather than a stable guarantee" — is retired for this run.
+
+#### Prerequisite the matrix did not anticipate: nothing can create a habit yet
+
+`MainActivity` renders an empty `Box`, habit CRUD is work unit 6a, and the app's database did not
+exist on the device. Every scenario needs a habit with an armed reminder, so **§13.3 as sequenced
+cannot be run from the product surface until 6a ships**. Discharged instead with three `@SeedOnly`
+fixtures in `app/src/androidTest/.../seed/`, excluded from ordinary verification by
+`testInstrumentationRunnerArguments["notAnnotation"]` and run through `adb shell am instrument`
+(never `connectedDebugAndroidTest`, which uninstalls both APKs and destroys the seeded data):
+`ImminentReminderSeed`, `LiveSnoozeAcrossMidnightSeed`, and the read-only `DatabaseStateReport`.
+Alarms are armed by the real `OccurrencePlanner.replanAll()` driving the real `AlarmScheduler`.
+
+#### Results
+
+| Scenario | Result | Evidence |
+|---|---|---|
+| Armed alarms inspection | **PASS** | Granted: `window=0 exactAllowReason=permission flags=0x5` (`setExactAndAllowWhileIdle`) |
+| Exact alarm revoked | **PASS** | Denied: same occurrences re-armed `window=+10m0s0ms flags=0x0` |
+| Doze | **PASS** | With `mState=IDLE`, the alarm fired, `ReminderFireWorker` ran, notification posted |
+| Timezone change | **PASS** | Future occurrences shifted exactly +1h to hold local 23:23; the already-`FIRED` one kept its instant |
+| Notifications denied | **PASS**, one finding | Alarm fired, occurrence `FIRED`, **no** notification posted, **no** false `MISSED` |
+| Reboot re-arm | **PASS** | After unlock, 8 alarms re-armed `window=0 exactAllowReason=permission` |
+| Snooze across midnight | **PASS** | See below — both halves, across real midnight |
+| Deferred expedited work | **recipe invalid** | See "Recipes that do not work" |
+
+**Delivery proved end to end on real hardware.** A posted reminder:
+`NotificationRecord(pkg=com.jjrapps.constanza id=21 importance=4 channel=reminders contentView=null
+actions=3 color=0xff00897b vis=PRIVATE)`. `id` equals `occurrence.id`, confirming §8.2's shared
+request code; `contentView=null` confirms the standard template §5.7 C2 requires.
+
+**Snooze across midnight — D3's rule, both directions in one sweep pass.** A live snooze
+(`scheduledDate=2026-08-31`, `state=SNOOZED`, `snoozeUntil=2026-09-01T00:20+02:00`) crossed real
+midnight and was still `SNOOZED` with no entry at 00:04, 00:06, 00:14 and 00:15. When the sweep
+finally ran, the same pass wrote `ENTRY date=2026-08-31 status=MISSED source=SWEEP` for a different
+occurrence that was genuinely unanswered — **on the origin date, not on today** — and left the live
+snooze untouched. This is the strongest available confirmation of `OccurrenceResolver`'s one rule.
+
+#### Recipes in §13.3 that do not work on a user build — replace them
+
+Four of §13.3's recipes are unusable as written. Three of them fail for the same reason the manifest
+comment beside `BootReceiver` already states: *"only the system UID may send them regardless of this
+flag."* §13.3 prescribes sending them from `adb` anyway.
+
+| §13.3 recipe | What actually happens | Use instead |
+|---|---|---|
+| `cmd jobscheduler run -f <pkg> <jobId>` to force the periodic `ReconcileWorker` | Refused: `WM-WorkerWrapper: Delaying execution … because it is being executed before schedule`. The job id also churns between attempts | No adb path found. Drive `OccurrenceResolver` from an instrumented test, or wait out the period |
+| `setprop persist.sys.timezone <zone>` | `Failed to set property`; `suggest_manual_time_zone` then fails with `SecurityException: … does not have android.permission.SUGGEST_MANUAL_TIME_AND_ZONE` | `adb shell cmd time_zone_detector set_time_zone_state_for_tests --zone_id <Olson> --user_should_confirm_id false` — **verified working** |
+| `am broadcast -a android.intent.action.TIMEZONE_CHANGED` / `DATE_CHANGED` | Protected broadcasts; the shell cannot send them. `am broadcast` reporting `result=0` means *sent*, not *delivered* | Change the zone with the command above and let the system broadcast; there is no adb path for `DATE_CHANGED` |
+| `am broadcast` to drive a notification action | `ActionReceiver` is correctly `exported="false"`, so a shell broadcast is never delivered | Fire the notification's real `PendingIntent` from an instrumented test, as `NotificationActionWiringInstrumentedTest` does |
+
+Also correct two id-reading traps: real WorkManager job ids come from
+`dumpsys jobscheduler`'s `JOB androidx.work.systemjobscheduler:<uid>/<id>` lines, not the `#<uid>/<id>`
+lines, which are history; and `cmd jobscheduler` needs `-n androidx.work.systemjobscheduler`. Live
+alarms are `Pending alarms per uid: [… <uid>:N]`, and live notifications are
+`NotificationRecord(0x…: pkg=<pkg> …)`. A match count over `dumpsys` output is not a presence check:
+`numPostedByApp` is cumulative across test runs, and it produced two false readings during this run.
+
+#### Findings — none contradicts §5.5, all four are worth acting on
+
+1. **`notifiedAtEpochMs` is recorded for a notification that never reached the user.** With
+   `POST_NOTIFICATIONS` denied the post is correctly suppressed and no false `MISSED` is written, but
+   the occurrence still stores `notifiedAt`. Any later reader that treats that field as "the user was
+   told" would be wrong. PR #14 logged this as cosmetic; on-device it is a data-integrity claim.
+2. **`WorkScheduler.scheduleAll()` re-anchors both periodic workers on every `Application.onCreate`.**
+   `ExistingPeriodicWorkPolicy.UPDATE` with `setInitialDelay(millisUntilNextMidnight())` recomputes
+   the next run each cold start. Measured directly: after a process start at 00:04:55 the midnight
+   sweep's next run read `Delay=+23h29m59s` — it had skipped the 00:00 boundary entirely. In
+   production, a user who opens the app often enough can keep postponing the hourly reconcile and the
+   midnight sweep indefinitely, starving the very net §5.5 calls the correctness guarantee. This also
+   made the gate hard to measure: reading state started the process, which reprogrammed what was
+   being measured.
+3. **After an exact-alarm revoke nothing re-arms until each occurrence's own time passes.** The
+   platform cancels every alarm and stops the app (`Killing …: schedule_exact_alarm revoked`), and the
+   guide confirms the state-changed broadcast fires on **grant only** — so `ExactAlarmPermissionReceiver`
+   not running on revoke is correct. But `scheduleAll()` never calls `replanAll()`, and
+   `reconcile()` re-arms only `STATE_ARMED && scheduledAt < now`. Opening the app does not re-arm:
+   verified twice with zero pending alarms and both periodic jobs healthy. Delivery is "late, not
+   lost" as §5.5 promises, with the whole burden on the hourly net.
+4. **Between a reboot and the first unlock there are zero armed alarms.** `AlarmManager` alarms do not
+   survive a reboot and `BootReceiver` waits for `BOOT_COMPLETED`, which the platform withholds until
+   the user unlocks (`Started users state: [0=RUNNING_LOCKED]`, and the app's data directory is not
+   even stattable). This is the correct consequence of §9.3, not a defect, but it is a delivery
+   window the design never names.
+
+Two further observations, both weaker: WorkManager can hold periodic work `ENQUEUED` with
+`Job Id = null` — a dead safety net nothing detects, repaired only by a cold start, reachable here
+only via a developer-only forced run, so not demonstrably user-reachable; and one
+`Worker result FAILURE` was seen after reboot but the logcat buffer rotated before it could be
+attributed, so it is recorded as unattributed rather than assigned to this app.
+
+#### Deferred, with reasons
+
+- **Large screen (C1), orientation (C1), soft keyboard (C4)** — all three need the today screen and
+  the habit editor, which are work units 6b and 6a. Not runnable now, and the `wm size 800dpx1280dp`
+  override is untested for the same reason.
+- **OEM throttling survival** — Z Fold 7 only, over a multi-day idle window. No Pixel can make this
+  assertion, exactly as §13.3 says.
+- **Natural-timing observation of the hourly net** — the periodic workers never ran on their own
+  inside the observation window, and finding 2 explains why every attempt to observe them moved them.
 
 ## 14. Module and file layout
 
