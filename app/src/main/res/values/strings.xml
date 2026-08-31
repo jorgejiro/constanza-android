@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Constanza</string>
+
+    <!-- reminder-response: Notification Actions (task 5.1). -->
+    <string name="notification_channel_reminders_name">Habit reminders</string>
+    <string name="notification_action_yes">Yes</string>
+    <string name="notification_action_no">No</string>
+    <string name="notification_action_snooze">Snooze</string>
+    <string name="notification_default_question">Did you do it?</string>
 </resources>

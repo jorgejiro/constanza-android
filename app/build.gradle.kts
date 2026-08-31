@@ -92,6 +92,11 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
+    // Work unit 5-i: task 5.6's snooze-duration setting and task 5.2's "requested notification
+    // permission before" flag (design.md §14). Pinned in the version catalog since work unit 1
+    // but wired as a dependency only here, on its first actual use.
+    implementation(libs.androidx.datastore.preferences)
+
     testImplementation(libs.junit)
     // AGP does not auto-resolve kotlin("test") to the JUnit4 variant the way kotlin("jvm") does
     // for :domain, so the JUnit-glue artifact is named explicitly here.

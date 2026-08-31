@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    design.md §5.7 C2: a notification small icon MUST be a vector, never a bitmap, to stay clear
+    of Android 17's `1.5 * screenWidth * screenHeight * 4` RemoteViews Bitmap/Icon memory limit.
+    The system renders only this path's alpha channel as a mask and tints it with
+    NotificationCompat.Builder#setColor(habit.colorArgb) at post time (task 5.1) — the fill colour
+    below is intentionally opaque black and never itself shown.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM10,17l-5,-5 1.41,-1.41L10,14.17l7.59,-7.59L19,8l-9,9z" />
+</vector>
