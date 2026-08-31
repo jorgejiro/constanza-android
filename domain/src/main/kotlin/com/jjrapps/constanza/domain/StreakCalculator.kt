@@ -34,35 +34,27 @@ private fun streaks(schedule: Schedule, entries: List<Entry>, today: LocalDate):
 
 /**
  * Walks calendar days, skipping any [Due.NotDue] date entirely — it neither breaks nor extends
- * (design.md §10: "walks occurrences, not calendar days"). A run only starts counting once the
- * first `COMPLETED` occurrence is found going forward; from then on a `SKIPPED`/`UNKNOWN`
- * pass-through day still tentatively extends the run, but the reported length is always pinned
- * back to the last *confirmed* (`COMPLETED`) day — this is what makes a still-pending `UNKNOWN`
- * occurrence on `today` itself not prematurely credited, while a `SKIPPED` day enclosed between
- * two completions still counts.
+ * (design.md §10: "walks occurrences, not calendar days"). Only a `COMPLETED` day lengthens the
+ * run; only a `MISSED` day breaks it. `SKIPPED` and `UNKNOWN` do neither, so a pass-through day
+ * bridges the run without lengthening it — the treatment is identical whether that day sits
+ * enclosed inside the run or trailing at `today`.
  */
-/** Mutable per-day accumulator for [dailyStreaks], extracted to keep that function's nesting flat. */
+/**
+ * Mutable per-day accumulator for [dailyStreaks], extracted to keep the `while`/`if`/`when` shape
+ * below the detekt `NestedBlockDepth` threshold, not to reconcile any tentative-vs-confirmed
+ * ambiguity — the rule itself no longer needs one.
+ */
 private class DailyRun {
     var run = 0
-    var confirmedRun = 0
-    var started = false
     var best = 0
 
     fun advance(status: EntryStatus) {
         when (status) {
-            EntryStatus.MISSED -> {
-                run = 0
-                confirmedRun = 0
-                started = false
-            }
-            EntryStatus.COMPLETED -> {
-                run++
-                confirmedRun = run
-                started = true
-            }
-            EntryStatus.SKIPPED, EntryStatus.UNKNOWN -> if (started) run++
+            EntryStatus.MISSED -> run = 0
+            EntryStatus.COMPLETED -> run++
+            EntryStatus.SKIPPED, EntryStatus.UNKNOWN -> Unit
         }
-        best = maxOf(best, confirmedRun)
+        best = maxOf(best, run)
     }
 }
 
@@ -77,7 +69,7 @@ private fun dailyStreaks(schedule: Schedule, entries: List<Entry>, today: LocalD
         }
         date = date.plusDays(1)
     }
-    return Streaks(current = run.confirmedRun, best = run.best)
+    return Streaks(current = run.run, best = run.best)
 }
 
 /**

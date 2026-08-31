@@ -20,14 +20,25 @@ class StreakCalculatorTest {
         Entry(habitId = 1L, date = date, slotId = null, status = status)
 
     @Test
-    fun `a skipped day enclosed inside a run does not break the streak and is counted`() {
+    fun `a skipped day bridges a streak without lengthening it`() {
         val start = LocalDate.of(2026, 3, 1)
         val entries = (0..4).map { entry(start.plusDays(it.toLong()), EntryStatus.COMPLETED) } +
             entry(start.plusDays(5), EntryStatus.SKIPPED) +
             (6..8).map { entry(start.plusDays(it.toLong()), EntryStatus.COMPLETED) }
         val today = start.plusDays(8)
 
-        assertEquals(9, StreakCalculator.current(daily, entries, today))
+        assertEquals(8, StreakCalculator.current(daily, entries, today))
+    }
+
+    @Test
+    fun `an enclosed unknown day bridges a streak without lengthening it, just like skipped`() {
+        val start = LocalDate.of(2026, 3, 1)
+        val entries = (0..4).map { entry(start.plusDays(it.toLong()), EntryStatus.COMPLETED) } +
+            entry(start.plusDays(5), EntryStatus.UNKNOWN) +
+            (6..8).map { entry(start.plusDays(it.toLong()), EntryStatus.COMPLETED) }
+        val today = start.plusDays(8)
+
+        assertEquals(8, StreakCalculator.current(daily, entries, today))
     }
 
     @Test
