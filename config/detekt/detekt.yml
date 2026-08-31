@@ -2,14 +2,60 @@ build:
   maxIssues: 0
 
 style:
-  # The :domain clock-access ban (design.md §4), scoped to :domain only — :app's TimeProvider
-  # adapter is exactly where these calls belong (design.md §14, tasks.md 1.6).
+  # The clock-access ban (design.md §4), now enforced in BOTH modules.
+  #
+  # :domain must never read the clock at all — time and zone arrive as parameters, which is what
+  # makes "what happens on 29 February" a test rather than a four-year wait.
+  #
+  # :app is allowed exactly one adapter, SystemTimeProvider, and this rule is what turns that
+  # promise from a KDoc comment into something the build enforces. Every other call site — mappers,
+  # repositories, workers, receivers, the scheduler — takes time through the TimeProvider interface
+  # or an injected ZoneId.
+  #
+  # Note this fires only under `detektMain`/`detektTest`; the plain `detekt` task is PSI-only and
+  # cannot resolve the fully-qualified names these entries match on.
   ForbiddenMethodCall:
     active: true
+    excludes: ['**/core/time/TimeProvider.kt']
     methods:
+      - value: 'java.time.Instant.now'
+        reason: 'reads the clock directly; take an Instant parameter or inject TimeProvider (design.md §4).'
       - value: 'java.time.LocalDate.now'
-        reason: 'reads the clock directly; pass a LocalDate/Instant parameter instead (design.md §4).'
+        reason: 'reads the clock directly; take a LocalDate parameter or inject TimeProvider (design.md §4).'
+      - value: 'java.time.LocalDateTime.now'
+        reason: 'reads the clock directly; take the value as a parameter instead (design.md §4).'
+      - value: 'java.time.LocalTime.now'
+        reason: 'reads the clock directly; take the value as a parameter instead (design.md §4).'
+      - value: 'java.time.ZonedDateTime.now'
+        reason: 'reads the clock and the ambient zone; inject both instead (design.md §4).'
+      - value: 'java.time.ZoneId.systemDefault'
+        reason: 'reads ambient state directly; inject a ZoneId instead (design.md §4).'
+      - value: 'java.time.Clock.systemDefaultZone'
+        reason: 'reads ambient state directly; inject a Clock instead (design.md §4).'
       - value: 'java.lang.System.currentTimeMillis'
         reason: 'reads the clock directly; pass time in as a parameter instead (design.md §4).'
-      - value: 'java.time.ZoneId.systemDefault'
-        reason: 'reads ambient state directly; pass a ZoneId parameter instead (design.md §4).'
+
+  # Guard clauses are the point of these early returns — `not due` and `already in flight` read far
+  # better as exits than as nesting. Recognise them rather than raising the limit.
+  ReturnCount:
+    active: true
+    excludeGuardClauses: true
+
+  # Hilt requires @Binds methods to be abstract, so an abstract @Module with no concrete member is
+  # a framework requirement, not a refactoring opportunity.
+  UnnecessaryAbstractClass:
+    active: true
+    ignoreAnnotated: ['Module']
+
+naming:
+  # @Composable functions are PascalCase by Compose convention, which this rule does not know
+  # about. detekt 1.23.8's FunctionNaming supports only `excludes`, `functionPattern` and
+  # `excludeClassPattern` — `ignoreAnnotated` has no effect here, verified against the plugin's own
+  # bundled default config — so the pattern is widened to admit both cases.
+  #
+  # The cost is stated rather than hidden: this also permits PascalCase on non-composable
+  # functions. Excluding whole UI files instead would have been worse, since it would switch off
+  # every naming check in them rather than relaxing one.
+  FunctionNaming:
+    active: true
+    functionPattern: '[a-zA-Z][a-zA-Z0-9]*'
