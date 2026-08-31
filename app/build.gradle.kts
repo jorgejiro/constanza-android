@@ -24,6 +24,20 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // `androidTest` holds manual, on-device fixtures for the API 37 delivery matrix that must
+        // never run as ordinary verification: ImminentReminderSeed writes to the app's REAL
+        // on-device database and arms real alarms, and DatabaseStateReport reads that same real
+        // database back out to logcat. A routine that silently touches the app database on every
+        // verification run is a trap, and this task also uninstalls both APKs when it finishes,
+        // destroying the matrix's state — so AndroidJUnitRunner is told to skip everything
+        // annotated @SeedOnly.
+        //
+        // `@Ignore` cannot serve this purpose: the runner honours it even when a single method is
+        // targeted with `-e class Pkg.Class#method`, which would make the fixtures unrunnable.
+        // `notAnnotation` is applied only when passed, so a hand-written `adb shell am instrument`
+        // command still runs them. See each fixture's KDoc for its exact command.
+        testInstrumentationRunnerArguments["notAnnotation"] = "com.jjrapps.constanza.seed.SeedOnly"
     }
 
     buildTypes {
