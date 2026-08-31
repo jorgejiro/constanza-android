@@ -76,7 +76,7 @@ The midnight transition MUST NOT write `MISSED` over a live snooze (see Midnight
 
 ### Requirement: Abandoned Snooze Resolution
 
-An occurrence with a live snooze that is never answered MUST still resolve to `MISSED` within a bounded time, so that `UNKNOWN` cannot leak indefinitely and inflate compliance. Resolution MUST occur through whichever of two paths comes first: grace expiry, when a snoozed occurrence's snooze lapses without a new snooze being armed; or a hard resolve deadline of `scheduledAt + 24h`, clamped to the next occurrence of the same slot. Once force-resolved, the `Entry` for that occurrence's originally-scheduled date becomes `MISSED` and remains `MISSED` unless later corrected per the Provisional-Missed Correction requirement. This bound is NOT a cap on how many times an occurrence may be snoozed — snoozing itself remains unlimited; only the calendar date's resolution is bounded.
+An occurrence with a live snooze that is never answered MUST still resolve to `MISSED` within a bounded time, so that `UNKNOWN` cannot leak indefinitely and inflate compliance. Resolution MUST occur through whichever of two paths comes first: grace expiry, when a snoozed occurrence's snooze lapses without a new snooze being armed; or a hard resolve deadline of `scheduledAt + 24h`, clamped to the next occurrence of the same slot. Once force-resolved, the `Entry` for that occurrence's originally-scheduled date becomes `MISSED` and remains `MISSED` unless later corrected per the Provisional-Missed Correction requirement. **The `N_TIMES_PER_WEEK` exception of the Midnight Transition requirement applies here too**: force-resolution MUST NOT write a dated `MISSED` for a schedule kind whose unit of obligation is the week (design D8), because one unmet weekly quota would otherwise fabricate a dated failure. The occurrence is still resolved so it stops being rescanned; only the dated row is withheld. Both write paths MUST share one gate — an earlier implementation applied it at midnight but not on abandonment, and the same phantom failure arrived through the other door. This bound is NOT a cap on how many times an occurrence may be snoozed — snoozing itself remains unlimited; only the calendar date's resolution is bounded.
 
 #### Scenario: Grace expiry resolves an abandoned snooze
 - GIVEN an occurrence with a live snooze whose alarm fires and is dismissed without an answer, and no further snooze is armed
@@ -87,6 +87,11 @@ An occurrence with a live snooze that is never answered MUST still resolve to `M
 - GIVEN an occurrence repeatedly re-snoozed without ever being answered
 - WHEN the resolve deadline of `scheduledAt + 24h` (clamped to the next same-slot occurrence) is reached
 - THEN the occurrence's `Entry` becomes `MISSED` on its originally-scheduled date, and no further snooze is offered for that occurrence
+
+#### Scenario: An abandoned weekly-quota occurrence receives no dated missed
+- GIVEN an `N_TIMES_PER_WEEK` occurrence that is snoozed and then abandoned past its resolve deadline
+- WHEN force-resolution runs
+- THEN no `Entry` row is written for that date, and the occurrence is still marked resolved
 
 #### Scenario: Unlimited snoozing is unaffected by the resolve bound
 - GIVEN an occurrence snoozed many times within the 24-hour resolve window

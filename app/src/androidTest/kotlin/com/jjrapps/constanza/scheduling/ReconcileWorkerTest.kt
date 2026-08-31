@@ -13,6 +13,7 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import com.jjrapps.constanza.core.data.AppDatabase
 import com.jjrapps.constanza.core.data.entity.HabitEntity
 import com.jjrapps.constanza.core.data.entity.ReminderOccurrenceEntity
+import com.jjrapps.constanza.core.data.entity.ScheduleEntity
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.runBlocking
@@ -70,9 +71,23 @@ class ReconcileWorkerTest {
         return TestListenableWorkerBuilder<ReconcileWorker>(context).setWorkerFactory(factory).build()
     }
 
-    private suspend fun insertHabit(): Long = database.habitDao().insert(
-        HabitEntity(name = "Read", question = null, colorArgb = 0, notes = null, archivedAt = null, createdAt = now.toString()),
-    )
+    /**
+     * Inserts a habit AND its schedule. The schedule matters: [OccurrenceResolver] consults it to
+     * decide whether a dated `MISSED` is even permissible, so a habit without one would let these
+     * tests pass without ever exercising that gate.
+     */
+    private suspend fun insertHabit(kind: String = "DAILY", timesPerWeek: Int? = null): Long {
+        val habitId = database.habitDao().insert(
+            HabitEntity(name = "Read", question = null, colorArgb = 0, notes = null, archivedAt = null, createdAt = now.toString()),
+        )
+        database.scheduleDao().upsert(
+            ScheduleEntity(
+                habitId = habitId, kind = kind, timesPerWeek = timesPerWeek, dayOfWeek = null,
+                dayOfMonth = null, intervalDays = null, anchorDate = null, weekStart = 1,
+            ),
+        )
+        return habitId
+    }
 
     @Test
     fun aDroppedAlarmIsFiredLateInsteadOfLost() = runBlocking {
@@ -136,6 +151,26 @@ class ReconcileWorkerTest {
         val stored = database.reminderOccurrenceDao().findById(occId)
         assertEquals("SNOOZED", stored?.state)
         assertEquals(50, stored?.snoozeCount)
+    }
+
+    @Test
+    fun anAbandonedWeeklyHabitNeverReceivesADatedMissed() = runBlocking {
+        // design.md D8: N_TIMES_PER_WEEK's unit of obligation is the week, so no date may carry a
+        // MISSED for it. The midnight sweep already honoured that; abandonment did not, which let
+        // the same phantom failure in through the other door.
+        val habitId = insertHabit(kind = "N_TIMES_PER_WEEK", timesPerWeek = 3)
+        val occId = database.reminderOccurrenceDao().upsert(
+            occurrence(habitId, "2026-08-31", now.minusSeconds(25 * HOUR_SECONDS).toEpochMilli(), "ARMED"),
+        )
+
+        buildWorker().doWork()
+
+        verify { alarmScheduler.cancel(occId) }
+        assertTrue(
+            "an abandoned weekly-quota occurrence must not fabricate a dated failure",
+            database.entryDao().findByHabitAndDate(habitId, "2026-08-31").isEmpty(),
+        )
+        assertEquals("ABANDONED", database.reminderOccurrenceDao().findById(occId)?.state)
     }
 
     private fun occurrence(habitId: Long, date: String, scheduledAtEpochMs: Long, state: String) = ReminderOccurrenceEntity(

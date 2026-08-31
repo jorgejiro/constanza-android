@@ -70,10 +70,7 @@ class OccurrenceResolver @Inject constructor(
         for (occ in daos.reminderOccurrenceDao.findUnresolved()) {
             val scheduledDate = LocalDate.parse(occ.scheduledDate)
             if (shouldSkipSweep(occ, scheduledDate, today, now)) continue
-            val schedule = daos.scheduleDao.findByHabitId(occ.habitId)?.toDomain()
-            if (schedule != null && dueOn(schedule, scheduledDate, ZERO_PROGRESS) == Due.Required) {
-                writeMissed(occ, now)
-            }
+            if (carriesDatedObligation(occ, scheduledDate)) writeMissed(occ, now)
             daos.reminderOccurrenceDao.upsert(occ.copy(state = STATE_RESOLVED))
         }
     }
@@ -97,8 +94,27 @@ class OccurrenceResolver @Inject constructor(
 
     private suspend fun forceResolve(occ: ReminderOccurrenceEntity, now: Instant) {
         alarmScheduler.cancel(occ.id)
-        writeMissed(occ, now)
+        if (carriesDatedObligation(occ, LocalDate.parse(occ.scheduledDate))) writeMissed(occ, now)
         daos.reminderOccurrenceDao.upsert(occ.copy(state = STATE_ABANDONED))
+    }
+
+    /**
+     * design.md D8: only a determinate per-date obligation may carry a dated `MISSED`.
+     * `N_TIMES_PER_WEEK` returns [Due.Candidate], never [Due.Required], because its unit of
+     * obligation is the week — a dated row there would fabricate up to seven failures out of one
+     * unmet weekly quota and corrupt compliance.
+     *
+     * Deliberately shared by BOTH write paths. The midnight sweep applied this gate and
+     * abandonment did not, so an `N_TIMES_PER_WEEK` occurrence that was snoozed and then abandoned
+     * still produced the phantom failure D8 exists to prevent — the same defect arriving by the
+     * other door. One gate with two callers makes it impossible to fix one and forget the other.
+     */
+    private suspend fun carriesDatedObligation(
+        occ: ReminderOccurrenceEntity,
+        scheduledDate: LocalDate,
+    ): Boolean {
+        val schedule = daos.scheduleDao.findByHabitId(occ.habitId)?.toDomain() ?: return false
+        return dueOn(schedule, scheduledDate, ZERO_PROGRESS) == Due.Required
     }
 
     private suspend fun writeMissed(occ: ReminderOccurrenceEntity, now: Instant) {
