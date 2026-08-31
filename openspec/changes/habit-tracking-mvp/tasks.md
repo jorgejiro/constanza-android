@@ -189,7 +189,7 @@ double the production code. Phase 2a therefore ships as a single PR of ~530 line
 `LocalDate`, so a DST transition cannot skip or duplicate a *calendar day*; DST shifts wall-clock
 times of day, and a time of day never enters `:domain`. What remains here is a characterization
 guard (below). The substantive DST behaviour — which instant a 02:30 slot maps to on a
-spring-forward day, when that local time does not exist, and what happens to a 01:30 slot on a
+spring-forward day, when that local time does not exist, and what happens to a 02:30 slot on a
 fall-back day, when it occurs twice — is a property of the `LocalTime`-to-`Instant` conversion in
 `:app`'s alarm scheduler, and is **relocated to work unit 4a**.
 
@@ -235,19 +235,25 @@ build and test standalone with the androidTest sources removed.
 ## Phase 4a: Alarm Scheduling & Reschedule Triggers (Work Unit 4a)
 
 - [ ] 4a.1 Implement `OccurrencePlanner.replanAll()`: plan a 48h forward horizon + one occurrence per slot beyond it, upsert `reminder_occurrences` (design D4).
-- [ ] 4a.2 Implement `AlarmScheduler`: `canScheduleExactAlarms()` before every call; `setExactAndAllowWhileIdle` under `SCHEDULE_EXACT_ALARM`; degrade to `setWindow` (≥10 min) when denied (reminder-delivery: Exact-Alarm Scheduling, Exact-Alarm Permission States).
+- [x] 4a.2 Implement `AlarmScheduler`: `canScheduleExactAlarms()` before every call; `setExactAndAllowWhileIdle` under `SCHEDULE_EXACT_ALARM`; degrade to `setWindow` (≥10 min) when denied (reminder-delivery: Exact-Alarm Scheduling, Exact-Alarm Permission States).
 - [ ] 4a.3 Implement `ExactAlarmPermissionReceiver` for `ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED`, upgrading/downgrading armed alarms.
 - [ ] 4a.4 Implement `BootReceiver`, `PackageReplacedReceiver`, `TimeChangeReceiver` (`TIMEZONE_CHANGED`, `DATE_CHANGED`/`TIME_SET`) wired to `replanAll()` (reminder-delivery: Five Mandatory Reschedule Triggers).
 - [ ] 4a.5 Wire in-app schedule edit to call `replanAll()` inside the same Room transaction (habit-management: Editing the schedule reschedules reminders).
 - [ ] 4a.6 [Unit] Test planner arithmetic and permission-branch decision logic (`./gradlew :app:testDebugUnitTest`).
-- [ ] 4a.7 **DST resolution — relocated here from 2a.10.** Decide and test what instant a reminder
+- [x] 4a.7 **DST resolution — relocated here from 2a.10.** Decide and test what instant a reminder
       slot maps to on a daylight-saving transition, because this is where `LocalDate` + `LocalTime`
       becomes an `Instant`. Two cases, both real and both silent if unhandled:
+      **Correction (verified against `java.time.zone.ZoneRules.getValidOffsets`).** An earlier draft of
+      this task said the fall-back repeat was 01:30. That is the *US* convention. In `Europe/Madrid`
+      **both** transitions pivot between 02:00 and 03:00 local: on 2026-03-29 `02:30` returns zero
+      offsets (the gap) and on 2026-10-25 it returns two (the overlap), while `01:30` is unambiguous
+      on both dates. Never take a DST window from a prose description — query the zone's rules.
+
       - **Spring forward**: a 02:30 slot on a spring-forward date has **no valid local time** — that
         instant does not exist. `ZonedDateTime.of(...)` silently shifts it forward by an hour rather
         than failing. Decide explicitly whether the reminder fires at 03:30, at 01:30, or is skipped
         for that date, and assert the choice.
-      - **Fall back**: a 01:30 slot on a fall-back date occurs **twice**. Decide whether it fires on
+      - **Fall back**: a 02:30 slot on a fall-back date occurs **twice**. Decide whether it fires on
         the first or second occurrence, and assert that it fires exactly **once**, never twice.
       Test against a fixed zone (`Europe/Madrid`: spring-forward 2026-03-29, fall-back 2026-10-25) with
       an injected `Clock`/`ZoneId` — never the ambient default. `:domain`'s

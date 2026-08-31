@@ -22,6 +22,12 @@
             </intent-filter>
         </activity>
 
+
+        <!-- design.md §9.1/§12: the AlarmManager PendingIntent target. Private to this app. -->
+        <receiver
+            android:name=".scheduling.ReminderFireReceiver"
+            android:exported="false" />
+
     </application>
 
 </manifest>
