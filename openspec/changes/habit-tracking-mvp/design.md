@@ -917,7 +917,12 @@ object StreakCalculator { fun current(schedule: Schedule, entries: List<Entry>, 
                           fun best(schedule: Schedule, entries: List<Entry>, today: LocalDate): Int }
 
 /** completed / (completed + missed). SKIPPED and UNKNOWN excluded from BOTH sides.
- *  `windowDays` is a caller parameter; the MVP UI passes 30 (OA-4). */
+ *  `windowDays` is a caller parameter; the MVP UI passes 30 (OA-4).
+ *  For NTimesPerWeek the unit is the week (D8), exactly as for StreakCalculator: the ratio is
+ *  sum over whole weeks in the window of min(completedInWeek, n), divided by sum of n over those
+ *  same weeks. Summing before dividing, rather than averaging per-week ratios, keeps every week
+ *  equally weighted and avoids a short partial week distorting the result. Partial weeks at the
+ *  window edge are excluded, because a week that has not finished cannot have fallen short yet. */
 object ComplianceCalculator { fun ratio(schedule: Schedule, entries: List<Entry>,
                                         today: LocalDate, windowDays: Int): Double }
 ```

@@ -3,6 +3,7 @@ package com.jjrapps.constanza.domain
 import com.jjrapps.constanza.domain.model.Entry
 import com.jjrapps.constanza.domain.model.EntryStatus
 import com.jjrapps.constanza.domain.model.Schedule
+import java.time.DayOfWeek
 import java.time.LocalDate
 import kotlin.test.assertEquals
 import org.junit.Test
@@ -79,5 +80,25 @@ class ComplianceCalculatorTest {
         val today = LocalDate.of(2026, 7, 1)
 
         assertEquals(0.0, ComplianceCalculator.ratio(daily, emptyList(), today, windowDays = 30))
+    }
+
+    @Test
+    fun `an n-times-per-week habit is measured in weeks, not days`() {
+        val schedule = Schedule.NTimesPerWeek(times = 3, weekStart = DayOfWeek.MONDAY)
+        // Week 1 (Mon 2026-03-02..Sun 2026-03-08): 3 of 3 completions — quota met.
+        // Week 2 (Mon 2026-03-09..Sun 2026-03-15): 2 of 3 completions — short by 1.
+        val entries = listOf(
+            entry(LocalDate.of(2026, 3, 2), EntryStatus.COMPLETED),
+            entry(LocalDate.of(2026, 3, 4), EntryStatus.COMPLETED),
+            entry(LocalDate.of(2026, 3, 6), EntryStatus.COMPLETED),
+            entry(LocalDate.of(2026, 3, 9), EntryStatus.COMPLETED),
+            entry(LocalDate.of(2026, 3, 11), EntryStatus.COMPLETED),
+        )
+        val today = LocalDate.of(2026, 3, 15)
+
+        assertEquals(
+            (3 + 2) / (3.0 + 3.0),
+            ComplianceCalculator.ratio(schedule, entries, today, windowDays = 14),
+        )
     }
 }
