@@ -68,12 +68,14 @@ no VCS automation. No threat-matrix RED-test tasks are required.
 
 ## Phase 2a: `:domain` Model & Occurrence Predicate (Work Unit 2a) — strict TDD
 
-- [ ] 2a.1 [RED] Failing JVM tests for `Habit`, `Schedule` sealed hierarchy, `ReminderSlot`, `Entry`, `EntryStatus`, `Due`, `DayStatus` (habit-scheduling: Six Frequency Kinds; habit-entry-tracking: Entry States).
-- [ ] 2a.2 [GREEN] Implement the model types in `domain/src/main/kotlin/.../model`.
-- [ ] 2a.3 [RED] Failing tests for `dueOn()` across all six kinds, incl. `MONTHLY` month-length clamping and `EveryNDays` anchor arithmetic (habit-scheduling: Occurrence-Due Predicate; MONTHLY/EVERY_N_DAYS scenarios).
-- [ ] 2a.4 [GREEN] Implement `dueOn(schedule, date, progress, weekStart): Due`.
-- [ ] 2a.5 [RED] Failing tests for `N_TIMES_PER_WEEK` quota + injected ISO-Monday `weekStart` — quota-met silences remainder, resets at week boundary. **[Provisional — OA-3, unconfirmed]** (habit-scheduling: N_TIMES_PER_WEEK Reminder Semantics, Week Boundary).
-- [ ] 2a.6 [GREEN] Implement week-start-parameterised quota evaluation.
+**2a split mid-apply (budget) — see `sdd/habit-tracking-mvp/apply-progress`: 2a-i (2a.1–2a.6) committed at 386 lines; 2a-ii (2a.7–2a.11) GREEN on disk but uncommitted, budget decision pending.**
+
+- [x] 2a.1 [RED] Failing JVM tests for `Habit`, `Schedule` sealed hierarchy, `ReminderSlot`, `Entry`, `EntryStatus`, `Due`, `DayStatus` (habit-scheduling: Six Frequency Kinds; habit-entry-tracking: Entry States).
+- [x] 2a.2 [GREEN] Implement the model types in `domain/src/main/kotlin/.../model`.
+- [x] 2a.3 [RED] Failing tests for `dueOn()` across all six kinds, incl. `MONTHLY` month-length clamping and `EveryNDays` anchor arithmetic (habit-scheduling: Occurrence-Due Predicate; MONTHLY/EVERY_N_DAYS scenarios).
+- [x] 2a.4 [GREEN] Implement `dueOn(schedule, date, progress): Due` (`weekStart` lives on `Schedule` — see apply-progress deviation note).
+- [x] 2a.5 [RED] Failing tests for `N_TIMES_PER_WEEK` quota + injected ISO-Monday `weekStart` — quota-met silences remainder, resets at week boundary. **[Provisional — OA-3, unconfirmed]** (habit-scheduling: N_TIMES_PER_WEEK Reminder Semantics, Week Boundary).
+- [x] 2a.6 [GREEN] Implement week-start-parameterised quota evaluation.
 - [ ] 2a.7 [RED] Failing tests for `rollupDay()` multi-slot collapse. **[Provisional — OA-2, unconfirmed]** (habit-entry-tracking: Day-Level Rollup and Per-Slot Display).
 - [ ] 2a.8 [GREEN] Implement `rollupDay(schedule, date, slots, entries): DayStatus`.
 - [ ] 2a.9 [RED] Failing tests for DST-adjacent date arithmetic (spring-forward/fall-back) in `dueOn`.

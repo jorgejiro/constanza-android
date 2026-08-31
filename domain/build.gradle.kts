@@ -18,6 +18,8 @@ kotlin {
 
 dependencies {
     testImplementation(libs.junit)
+    // JUnit4 runner + kotlin.test assertions, per design.md D10.
+    testImplementation(kotlin("test"))
 }
 
 tasks.test {
