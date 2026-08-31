@@ -77,6 +77,12 @@ interface EntryDao {
     @Query("SELECT * FROM entries WHERE habitId = :habitId")
     suspend fun findByHabitId(habitId: Long): List<EntryEntity>
 
+    /** design.md D7/task 5.9: ISO-8601 date strings sort lexicographically == chronologically, so
+     *  `BETWEEN` correctly bounds a calendar-week range — used by `ReminderFireWorker` to build a
+     *  real [com.jjrapps.constanza.domain.model.PeriodProgress] for the fire-time quota re-check. */
+    @Query("SELECT * FROM entries WHERE habitId = :habitId AND date BETWEEN :from AND :to")
+    suspend fun findByHabitIdBetweenDates(habitId: Long, from: String, to: String): List<EntryEntity>
+
     @Query("DELETE FROM entries WHERE habitId = :habitId AND slotId = :slotId")
     suspend fun deleteBySlot(habitId: Long, slotId: Long)
 }
@@ -102,10 +108,13 @@ interface ReminderOccurrenceDao {
     @Query("SELECT * FROM reminder_occurrences WHERE habitId = :habitId")
     suspend fun findByHabitId(habitId: Long): List<ReminderOccurrenceEntity>
 
-    /** design.md §9.2, work unit 4b: every occurrence [OccurrenceResolver] still needs to look at —
-     *  `RESOLVED` and `ABANDONED` are the two terminal states, so everything else is fair game for
-     *  the hourly reconcile pass and the midnight sweep. */
-    @Query("SELECT * FROM reminder_occurrences WHERE state != 'RESOLVED' AND state != 'ABANDONED'")
+    /** design.md §9.2/§9.1, work units 4b/5.9: `RESOLVED`, `ABANDONED`, and `SUPPRESSED` are the
+     *  three terminal states (design.md §8.1's state column) excluded here — a fire-time
+     *  quota-met `SUPPRESSED` (task 5.9) stops being rescanned immediately, same as the other two. */
+    @Query(
+        "SELECT * FROM reminder_occurrences " +
+            "WHERE state != 'RESOLVED' AND state != 'ABANDONED' AND state != 'SUPPRESSED'",
+    )
     suspend fun findUnresolved(): List<ReminderOccurrenceEntity>
 
     /** [AlarmScheduler.schedule]'s exact/inexact result lands here (reminder-delivery: Exact-Alarm

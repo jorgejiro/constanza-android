@@ -46,6 +46,12 @@ class NotificationPoster @Inject constructor(@ApplicationContext private val con
         manager.notify(occurrenceId.toInt(), buildNotification(occurrenceId, habitName, question, colorArgb))
     }
 
+    /** design.md §9.1: cancels [occurrenceId]'s posted notification, a no-op when none is showing.
+     *  [AnswerWorker]/[SnoozeWorker] call this ONLY after their own write has landed. */
+    fun cancel(occurrenceId: Long) {
+        manager.cancel(occurrenceId.toInt())
+    }
+
     /** design.md §11's degradation table, restated as one predicate: not-enabled OR muted-channel
      *  both mean "no post", never a crash and never a silent lie about delivery. */
     fun canPost(): Boolean {
