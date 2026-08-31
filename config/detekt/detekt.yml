@@ -1,0 +1,15 @@
+build:
+  maxIssues: 0
+
+style:
+  # The :domain clock-access ban (design.md §4), scoped to :domain only — :app's TimeProvider
+  # adapter is exactly where these calls belong (design.md §14, tasks.md 1.6).
+  ForbiddenMethodCall:
+    active: true
+    methods:
+      - value: 'java.time.LocalDate.now'
+        reason: 'reads the clock directly; pass a LocalDate/Instant parameter instead (design.md §4).'
+      - value: 'java.lang.System.currentTimeMillis'
+        reason: 'reads the clock directly; pass time in as a parameter instead (design.md §4).'
+      - value: 'java.time.ZoneId.systemDefault'
+        reason: 'reads ambient state directly; pass a ZoneId parameter instead (design.md §4).'
