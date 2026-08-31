@@ -5,10 +5,12 @@ package com.jjrapps.constanza.reminding
  * work unit 5-i so 5-ii's `ActionReceiver` implements against an already-fixed contract instead
  * of the two slices co-designing it across a PR boundary.
  *
- * [ACTION_RECEIVER_CLASS] is referenced by fully-qualified string, not by class literal, because
- * that receiver does not exist yet in this slice — [android.content.Intent.setClassName] lets
- * this contract compile and run correctly today (tapping an action currently does nothing, since
- * nothing is registered to receive it) without a forward reference to unwritten code.
+ * [ACTION_RECEIVER_CLASS] is referenced by fully-qualified string, not by class literal, so this
+ * contract stays a plain `object` with no compile-time dependency on the `reminding.ActionReceiver`
+ * class it targets — [android.content.Intent.setClassName] resolves the component by name at
+ * dispatch time instead. `ActionReceiver` is implemented (slice ii) and declared in
+ * `AndroidManifest.xml` with `android:exported="false"`, so tapping Yes/No/Snooze on a posted
+ * notification enqueues the matching `AnswerWorker`/`SnoozeWorker` request.
  *
  * [EXTRA_OCCURRENCE_ID]'s value is always `occurrence.id` (design.md §8.2) — the same integer
  * already doing triple duty as the notification id and the alarm's own `PendingIntent` request

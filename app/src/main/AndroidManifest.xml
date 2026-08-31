@@ -79,6 +79,14 @@
             android:name=".scheduling.ReminderFireReceiver"
             android:exported="false" />
 
+        <!-- design.md §9.1/§12: the notification-action PendingIntent target
+             (`ActionIntentContract.ACTION_RECEIVER_CLASS`). No intent-filter: every PendingIntent
+             targets this component explicitly via `setClassName`, so a filter would only widen the
+             surface with no benefit. Private to this app. -->
+        <receiver
+            android:name=".reminding.ActionReceiver"
+            android:exported="false" />
+
     </application>
 
 </manifest>
