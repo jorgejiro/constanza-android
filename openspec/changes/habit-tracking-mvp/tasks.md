@@ -106,14 +106,21 @@ fall-back day, when it occurs twice — is a property of the `LocalTime`-to-`Ins
 
 ## Phase 3: Room Persistence (Work Unit 3)
 
-- [ ] 3.1 Create entities `habits`, `schedules`, `reminder_slots`, `entries` (`slotId NOT NULL DEFAULT 0`, D11), `reminder_occurrences`, with indices (design §8.1).
-- [ ] 3.2 Create DAOs incl. the `UNIQUE(habitId, date, slotId)` upsert query on `entries`.
-- [ ] 3.3 Create `AppDatabase` (`version = 1`, `exportSchema = true`); commit generated `app/schemas/1.json`.
-- [ ] 3.4 Create mappers translating `:app` entities ↔ `:domain` types, incl. the `0 ↔ null` slot sentinel (D11) and a `TimeProvider` abstraction (§4 — never read the clock directly).
-- [ ] 3.5 Implement `HabitRepository.deleteSlot()` as a `@Transaction` reassigning/deleting affected entries (D11 cost of dropping the FK).
+**Work unit 3 split on a budget stop.** The unit measured 965 authored lines against a 700-line
+cap, so it ships as two PRs: **3-i** (tasks 3.1–3.5, 3.8 — schema, DAOs, mappers, DI, repository,
+plus the JVM mapper tests) and **3-ii** (tasks 3.6–3.7 — the on-device DAO, migration and
+transaction verification, with its androidTest Gradle wiring). Both slices were fully written and
+green before the split; this was a commit-boundary decision, not missing work. 3-i was verified to
+build and test standalone with the androidTest sources removed.
+
+- [x] 3.1 Create entities `habits`, `schedules`, `reminder_slots`, `entries` (`slotId NOT NULL DEFAULT 0`, D11), `reminder_occurrences`, with indices (design §8.1).
+- [x] 3.2 Create DAOs incl. the `UNIQUE(habitId, date, slotId)` upsert query on `entries`.
+- [x] 3.3 Create `AppDatabase` (`version = 1`, `exportSchema = true`); commit generated `app/schemas/1.json`.
+- [x] 3.4 Create mappers translating `:app` entities ↔ `:domain` types, incl. the `0 ↔ null` slot sentinel (D11) and a `TimeProvider` abstraction (§4 — never read the clock directly).
+- [x] 3.5 Implement `HabitRepository.deleteSlot()` as a `@Transaction` reassigning/deleting affected entries (D11 cost of dropping the FK).
 - [ ] 3.6 [Instrumented] DAO test: `UNIQUE(habitId, date, slotId)` actually rejects duplicates for `slotId = 0`.
 - [ ] 3.7 [Instrumented] `MigrationTestHelper` harness test against `app/schemas/1.json` (establishes the harness for the future v1→v2 additive migration, §8.3).
-- [ ] 3.8 Wire Hilt modules for the database/DAOs (D5); confirm `:domain` still carries zero DI annotations.
+- [x] 3.8 Wire Hilt modules for the database/DAOs (D5); confirm `:domain` still carries zero DI annotations.
 
 ## Phase 4a: Alarm Scheduling & Reschedule Triggers (Work Unit 4a)
 
