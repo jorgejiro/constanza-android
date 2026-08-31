@@ -1,0 +1,211 @@
+# openspec/config.yaml
+schema: spec-driven
+
+project: constanza-android
+
+context: |
+  Constanza: native Android habit tracker (tracking + reminders only,
+  no to-do list, no gamification). Repository is greenfield: no source
+  code, no Gradle files, no build system exist yet as of this init.
+  Reference apps (Loop Habit Tracker/uhabits GPL-3.0, HabitNow, Habitify,
+  Streaks) are reference-only; no code may be copied or derived from them.
+
+stack:
+  status: partially_ratified
+  note: >
+    Reviewed and revised by sdd-design for change habit-tracking-mvp on
+    2026-08-31 (see openspec/changes/habit-tracking-mvp/design.md). The
+    items under `ratified` and `ratified_by_design` are decided; the items
+    under `still_unpinned` are NOT settled and must not be treated as
+    detected facts. No Gradle build exists in this repository yet, so no
+    version below has been built here.
+
+  ratified:
+    date: 2026-08-31
+    by: user
+    items:
+      - "minSdk = 31"
+      - "compileSdk = 37 (Android 17; released platform, not a preview)"
+      - "targetSdk = 37 (deliberate forward step, above the Play floor of 36)"
+      - "Exactly two Gradle modules: :domain (pure Kotlin JVM) and :app"
+      - "Exact alarms under SCHEDULE_EXACT_ALARM only; never USE_EXACT_ALARM"
+      - "Storage local-only forever; manual file export/import; no cloud sync"
+      - "Entry states completed/missed/skipped/unknown; skipped is neutral"
+      - "Notification actions Yes/No/Snooze; snooze default 20 min, unlimited"
+
+  ratified_by_design:
+    date: 2026-08-31
+    phase: sdd-design
+    items:
+      - "DI: Hilt with KSP (:app only; :domain has no DI annotations at all)"
+      - "Serialization: kotlinx-serialization-json, in :app only"
+      - "Settings storage: DataStore Preferences; Room for domain data only"
+      - "Unit test framework: JUnit4 (revises the earlier unratified JUnit5 plan;
+         instrumented tests are JUnit4-based regardless, and JUnit5 on Android
+         needs an extra third-party Gradle plugin)"
+      - "Export/import file format: a single UTF-8 JSON document via SAF"
+      - "Week boundary: ISO-8601 Monday start, parameterised, never locale-derived"
+
+  still_unpinned: []
+  pinned_by_apply:
+    date: 2026-08-31
+    phase: sdd-apply (work unit 1)
+    items:
+      - "Room 2.8.4 and WorkManager 2.11.2 — latest stable releases on Google Maven at
+         scaffolding time; both resolve and build successfully in this repository
+         (:app depends on room-runtime/room-ktx/room-compiler and work-runtime-ktx)"
+      - "Lint / formatter: detekt 1.23.8, applied to :domain only. The custom
+         ForbiddenMethodCall rule (config/detekt/detekt.yml) requires TYPE RESOLUTION
+         to resolve fully qualified call targets — the plain `detekt` task is PSI-only
+         and never fires it. The real enforcement command is `./gradlew detektMain`
+         (wired into :domain's `check` task). Verified: the rule fires on
+         LocalDate.now()/System.currentTimeMillis()/ZoneId.systemDefault() and is
+         clean once those calls are removed."
+      - "AGP 9.3.2 / Kotlin 2.4.10 / KSP 2.3.11 / Compose BOM 2026.08.00 / Hilt 2.60.1
+         carried from the user's verified sibling project sleep-noise-android; now
+         also verified building in THIS repository via assembleDebug. AGP 9 has
+         built-in Kotlin support, so org.jetbrains.kotlin.android is not applied to
+         :app (only kotlin(\"jvm\") for :domain)."
+
+  sdk:
+    minSdk: 31
+    compileSdk: 37
+    targetSdk: 37
+    platform_prerequisite: >
+      The android-37.0 platform must be present locally; AGP downloads it on the
+      first build. Verified installed on the current machine at
+      $ANDROID_HOME/platforms/android-37.0 (ro.build.version.release=17,
+      codename=REL, preview_sdk=0, min_supported_target_sdk=28). A fresh clone on
+      another machine will trigger the download.
+    lint_note: >
+      No OldTargetApi suppression is needed or permitted here: targetSdk equals
+      compileSdk equals the newest platform.
+    open_risk: >
+      UNVERIFIED. The targetSdk=37 behaviour-change list was NOT read against
+      authoritative Android documentation during sdd-design (no web or context7
+      access in that phase). API surface was verified locally against the
+      installed android-37.0 platform, but API surface does not encode
+      targetSdk-gated behaviour. Alarm quotas, notification limits, foreground
+      service restrictions, and background-execution/Doze behaviour at API 37
+      remain unverified. Discharging this gate is BLOCKING before Gradle
+      scaffolding merges — see design.md section 5.4.
+
+  language: Kotlin
+  ui: Jetpack Compose, Material 3
+  persistence: Room (local only) for domain data; DataStore Preferences for settings
+  scheduling: >
+    AlarmManager exact alarms fire the reminders (setExactAndAllowWhileIdle under
+    SCHEDULE_EXACT_ALARM, degrading to a >=10 min inexact window when not
+    permitted); WorkManager reconciles, sweeps missed reminders, and performs the
+    expedited notification-action writes. Notification actions land on a
+    validate-only BroadcastReceiver, never a Room write in onReceive().
+  di: Hilt (KSP)
+  build: Gradle with Kotlin DSL and version catalogs
+  architecture: >
+    Exactly TWO Gradle modules. :domain applies kotlin("jvm") only and holds the
+    habit model, the occurrence-due predicate, the day-level rollup, and the
+    streak/compliance calculators as pure synchronous functions; the module type
+    itself is the enforcement, because android.* and androidx.* cannot resolve
+    there. Time enters :domain as a parameter, never by reading the clock. :app
+    holds everything Android and is organised by CAPABILITY packages (habit,
+    scheduling, tracking, reminding, progress, portability, core) rather than by
+    layer, so the package tree names the product. Clean/Hexagonal boundaries are
+    preserved by the module type plus package discipline, not by extra Gradle
+    modules. Richer modularisation (:feature-*, :core-ui) is deferred until a
+    second build target exists (widget, Wear OS) or build-time pain is measured.
+    This REPLACES the earlier full multi-module plan, which was marked
+    planned_unratified precisely so sdd-design could revise it.
+
+testing:
+  status: planned_not_yet_verifiable
+  note: >
+    No build system exists yet, so none of the commands below have been
+    run or verified. They are the intended commands for when the Gradle
+    project is scaffolded (expected during sdd-design/sdd-apply for the
+    first change).
+  unit:
+    available: false
+    command: "./gradlew test"
+    framework: JUnit5 / Kotlin (planned, unratified)
+  instrumented:
+    available: false
+    command: "./gradlew connectedAndroidTest"
+    framework: AndroidX Test / Espresso (planned, unratified)
+  coverage:
+    available: false
+    command: ""
+  quality:
+    linter:
+      available: false
+      command: ""
+    formatter:
+      available: false
+      command: ""
+
+  # Recorded by sdd-design (2026-08-31) for change habit-tracking-mvp. At design time this was
+  # DESIGN INTENT ONLY. The `available` flags above are left untouched by sdd-apply work unit 1
+  # (still scoped to :app instrumented/lint status, unverified); `strict_tdd` below WAS updated
+  # by sdd-apply once `./gradlew :domain:test` was verified green in this repository — see the
+  # gate condition this replaces.
+  design_intent:
+    frameworks:
+      unit: "JUnit4 + kotlin.test (revises the earlier unratified JUnit5 plan)"
+      mocking: "MockK; Turbine for Flow; kotlinx-coroutines-test"
+      instrumented: "AndroidX Test + androidx.work:work-testing + compose-ui-test-junit4"
+      migrations: "Room MigrationTestHelper against the checked-in app/schemas/1.json"
+    commands:
+      domain_unit: "./gradlew :domain:test"
+      app_unit: "./gradlew :app:testDebugUnitTest"
+      instrumented: "./gradlew :app:connectedDebugAndroidTest"
+      aggregate: "./gradlew check"
+      assemble: "./gradlew assembleDebug"
+    strict_tdd_gate: >
+      Once ./gradlew :domain:test runs green in THIS repository, enable strict TDD
+      SCOPED TO :domain — that module is pure, fast, and dependency-free, and holds
+      the logic where a silent error is most expensive. Keep :app non-strict while
+      its instrumented suite is still unverified. Do not flip the flag on the basis
+      of this recorded intent alone.
+    manual_verification_note: >
+      Alarm delivery across reboot, timezone change, Doze, OEM throttling, denied
+      permissions, and snooze-across-midnight is not automatable and has an adb
+      recipe matrix in design.md section 13.3. It MUST be run on an API 37 image.
+
+strict_tdd: true
+strict_tdd_scope: ":domain only — :app stays non-strict (its instrumented suite is still unverified)"
+strict_tdd_reason: >
+  Flipped by sdd-apply (work unit 1, 2026-08-31): `./gradlew :domain:test` was verified green in
+  this repository (PlaceholderTest passes; empty-suite acceptance criterion from tasks.md 1.9 is
+  satisfied). This discharges the strict_tdd_gate condition recorded above by sdd-design. Strict
+  TDD now applies to :domain (pure, fast, dependency-free — the highest-value place for a RED
+  test to exist before the GREEN implementation, per design.md §13.2). :app remains non-strict
+  until its instrumented suite (Room DAOs, workers, Compose UI tests) is verified in work unit 3+.
+
+rules:
+  proposal:
+    - Include a rollback plan for any change that touches scheduling/alarms or persisted data
+    - State explicitly which parts of the stack above the proposal treats as still unratified
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+    - Keep the domain module (scheduling/scoring) framework-agnostic in requirement language
+  design:
+    - Confirm or revise the planned stack in this file's `stack:` section; do not assume it silently
+    - Document architecture decisions with rationale, especially module boundaries
+    - Include sequence diagrams for reminder/alarm and snooze flows
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+    - Sequence Gradle/module scaffolding before feature tasks that depend on it
+  apply:
+    guidelines:
+      - Follow Clean/Hexagonal/Screaming Architecture boundaries once scaffolded
+      - Keep the domain module free of Android SDK imports
+    tdd: true # :domain scope only — see strict_tdd_reason above
+    test_command: "./gradlew :domain:test"
+  verify:
+    test_command: "./gradlew check"
+    build_command: "./gradlew assembleDebug"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
+    - Update this file's `stack:` and `testing:` status from planned to verified once confirmed
