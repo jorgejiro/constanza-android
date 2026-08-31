@@ -4,6 +4,7 @@ import com.jjrapps.constanza.core.data.dao.HabitDao
 import com.jjrapps.constanza.core.data.dao.ReminderOccurrenceDao
 import com.jjrapps.constanza.core.data.dao.ReminderSlotDao
 import com.jjrapps.constanza.core.data.dao.ScheduleDao
+import com.jjrapps.constanza.core.data.entity.HabitEntity
 import com.jjrapps.constanza.core.data.entity.ReminderOccurrenceEntity
 import com.jjrapps.constanza.core.data.mapper.toDomain
 import com.jjrapps.constanza.core.time.TimeProvider
@@ -40,6 +41,20 @@ private const val STATE_ARMED = "ARMED"
 private val ALWAYS_ZERO_PROGRESS = PeriodProgress(completedInWeek = 0, completedInMonth = 0)
 
 /**
+ * The five values that travel together through the planning recursion: which slot of which habit,
+ * on what schedule, resolved in which zone. They are always passed as a unit and never varied
+ * independently, so grouping them keeps the planning functions readable — which is what detekt's
+ * `LongParameterList` was pointing at.
+ */
+private data class SlotPlan(
+    val habitId: Long,
+    val slotId: Long,
+    val minuteOfDay: Int,
+    val schedule: Schedule,
+    val zone: ZoneId,
+)
+
+/**
  * design.md D4/§9.1/§9.3: the single idempotent entry point every one of the five reschedule
  * triggers (task 4a.4, [ExactAlarmPermissionReceiver]) and the schedule-edit path
  * ([ScheduleEditor], task 4a.5) converge on. Reads `habits`/`schedules`/`reminder_slots`, upserts
@@ -65,58 +80,54 @@ class OccurrencePlanner @Inject constructor(
         val zone = timeProvider.zone()
         val horizonEnd = today.plusDays(HORIZON_DAYS)
         for (habit in habitDao.findAllSnapshot()) {
-            if (habit.archived) {
-                cancelAllFor(habit.id)
-                continue
-            }
-            val schedule = scheduleDao.findByHabitId(habit.id)?.toDomain()
-            val enabledSlots = reminderSlotDao.findByHabitId(habit.id).filter { it.enabled }
-            cancelStaleArmedOccurrences(habit.id, enabledSlots.map { it.id }.toSet())
-            if (schedule == null || enabledSlots.isEmpty()) continue // no reminder time set: no occurrence planned (D7/OA-3)
-            for (slot in enabledSlots) {
-                planSlot(habit.id, slot.id, slot.minuteOfDay, schedule, today, horizonEnd, zone)
-            }
+            planHabit(habit, today, horizonEnd, zone)
         }
     }
 
-    private suspend fun planSlot(
-        habitId: Long,
-        slotId: Long,
-        minuteOfDay: Int,
-        schedule: Schedule,
+    private suspend fun planHabit(
+        habit: HabitEntity,
         today: LocalDate,
         horizonEnd: LocalDate,
         zone: ZoneId,
     ) {
+        if (habit.archived) {
+            cancelAllFor(habit.id)
+            return
+        }
+        val schedule = scheduleDao.findByHabitId(habit.id)?.toDomain()
+        val enabledSlots = reminderSlotDao.findByHabitId(habit.id).filter { it.enabled }
+        cancelStaleArmedOccurrences(habit.id, enabledSlots.map { it.id }.toSet())
+        // No reminder time set means no occurrence is planned (D7/OA-3).
+        if (schedule == null || enabledSlots.isEmpty()) return
+        for (slot in enabledSlots) {
+            planSlot(SlotPlan(habit.id, slot.id, slot.minuteOfDay, schedule, zone), today, horizonEnd)
+        }
+    }
+
+    private suspend fun planSlot(plan: SlotPlan, today: LocalDate, horizonEnd: LocalDate) {
         var date = today
         while (!date.isAfter(horizonEnd)) {
-            planDateIfDue(habitId, slotId, minuteOfDay, schedule, date, zone)
+            planDateIfDue(plan, date)
             date = date.plusDays(1)
         }
         var beyond = horizonEnd.plusDays(1)
         val cutoff = horizonEnd.plusDays(LOOKAHEAD_CAP_DAYS)
         while (!beyond.isAfter(cutoff)) {
-            if (planDateIfDue(habitId, slotId, minuteOfDay, schedule, beyond, zone)) break
+            if (planDateIfDue(plan, beyond)) break
             beyond = beyond.plusDays(1)
         }
     }
 
     /** Returns whether [date] is due for [schedule], regardless of whether a new row was written —
      *  the beyond-horizon search above uses this to know when to stop looking. */
-    private suspend fun planDateIfDue(
-        habitId: Long,
-        slotId: Long,
-        minuteOfDay: Int,
-        schedule: Schedule,
-        date: LocalDate,
-        zone: ZoneId,
-    ): Boolean {
-        if (dueOn(schedule, date, ALWAYS_ZERO_PROGRESS) == Due.NotDue) return false
+    private suspend fun planDateIfDue(plan: SlotPlan, date: LocalDate): Boolean {
+        if (dueOn(plan.schedule, date, ALWAYS_ZERO_PROGRESS) == Due.NotDue) return false
         val dateText = date.toString()
-        val existing = reminderOccurrenceDao.findByHabitSlotDate(habitId, slotId, dateText)
-        if (existing != null && existing.state != STATE_ARMED) return true // in-flight/resolved: leave it alone
-        val scheduledAt = resolveOccurrenceInstant(date, minuteOfDay, zone)
-        val entity = (existing ?: emptyArmedOccurrence(habitId, slotId, dateText)).copy(
+        val existing = reminderOccurrenceDao.findByHabitSlotDate(plan.habitId, plan.slotId, dateText)
+        // Already in flight or resolved: leave it alone.
+        if (existing != null && existing.state != STATE_ARMED) return true
+        val scheduledAt = resolveOccurrenceInstant(date, plan.minuteOfDay, plan.zone)
+        val entity = (existing ?: emptyArmedOccurrence(plan.habitId, plan.slotId, dateText)).copy(
             scheduledAtEpochMs = scheduledAt.toEpochMilli(),
             state = STATE_ARMED,
             resolveDeadlineMs = scheduledAt.plusSeconds(RESOLVE_DEADLINE_HOURS * SECONDS_PER_HOUR).toEpochMilli(),
