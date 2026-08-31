@@ -269,14 +269,20 @@ build and test standalone with the androidTest sources removed.
 
 ## Phase 5: Notifications & Responses (Work Unit 5) — depends on 4a
 
-- [ ] 5.1 Create the notification channel and `NotificationPoster`: `areNotificationsEnabled()` + channel-importance check before every post; Yes/No/Snooze actions with `PendingIntent.FLAG_IMMUTABLE`, `reqCode = occurrence.id` (reminder-response: Notification Actions).
-- [ ] 5.2 Implement `NotificationPermission` gate: `SDK_INT >= 33` contextual request; 31–32 skip entirely (reminder-response: Notification Permission Scope).
-- [ ] 5.3 Implement `ActionReceiver` (`exported = false`, validate-only, no Room access) enqueuing expedited unique work per action (design §9.1).
-- [ ] 5.4 Implement `AnswerWorker`: `@Transaction` upsert `Entry(date = occ.scheduledDate, …)`, `occ.state = RESOLVED`, cancel any armed snooze, cancel the notification only after the write lands (reminder-response: Notification Actions).
-- [ ] 5.5 Implement `SnoozeWorker`: `snoozeCount++`, `snoozeUntil = now + duration` clamped to `resolveDeadline`, arm the same `reqCode` alarm, cancel the current notification (reminder-response: Snooze Configuration and Re-arm; habit-entry-tracking: Provisional-Missed happy path).
-- [ ] 5.6 Implement snooze settings storage in DataStore: default 20 min; options 10/20/30 min, 1/2/3/4 h; unlimited (reminder-response: Snooze Configuration and Re-arm).
-- [ ] 5.7 [Instrumented] `AnswerWorker`/`SnoozeWorker` tests: idempotent upsert on redelivery; after-midnight origin-date crediting (reminder-response: Origin-Date Crediting).
-- [ ] 5.8 [Instrumented] Grace-expiry and hard-resolve-deadline force-resolve tests (habit-entry-tracking: Abandoned Snooze Resolution).
+**Split into slice i (posting) and slice ii (responding), 2026-08-31 — a corrected boundary, not the
+one the forecast proposed.** The forecast suggested splitting after 5.3, but the `ActionReceiver`
+enqueues work by Worker class, and those workers (5.4/5.5) are the other slice — a stub receiver
+enqueuing nothing would not be independently verifiable. The seam used instead is behavioural:
+**5-i posts the reminder, 5-ii answers it.**
+
+- [x] 5.1 Create the notification channel and `NotificationPoster`: `areNotificationsEnabled()` + channel-importance check before every post; Yes/No/Snooze actions with `PendingIntent.FLAG_IMMUTABLE`, `reqCode = occurrence.id` (reminder-response: Notification Actions).
+- [x] 5.2 Implement `NotificationPermission` gate: `SDK_INT >= 33` contextual request; 31–32 skip entirely (reminder-response: Notification Permission Scope).
+- [ ] 5.3 **Slice ii.** Implement `ActionReceiver` (`exported = false`, validate-only, no Room access) enqueuing expedited unique work per action (design §9.1) — implements against the `ActionIntentContract` (action strings, extras, explicit receiver class name) already fixed by 5.1.
+- [ ] 5.4 **Slice ii.** Implement `AnswerWorker`: `@Transaction` upsert `Entry(date = occ.scheduledDate, …)`, `occ.state = RESOLVED`, cancel any armed snooze, cancel the notification only after the write lands (reminder-response: Notification Actions).
+- [ ] 5.5 **Slice ii.** Implement `SnoozeWorker`: `snoozeCount++`, `snoozeUntil = now + duration` clamped to `resolveDeadline`, arm the same `reqCode` alarm, cancel the current notification (reminder-response: Snooze Configuration and Re-arm; habit-entry-tracking: Provisional-Missed happy path).
+- [x] 5.6 Implement snooze settings storage in DataStore: default 20 min; options 10/20/30 min, 1/2/3/4 h; unlimited (reminder-response: Snooze Configuration and Re-arm).
+- [ ] 5.7 **Slice ii.** [Instrumented] `AnswerWorker`/`SnoozeWorker` tests: idempotent upsert on redelivery; after-midnight origin-date crediting (reminder-response: Origin-Date Crediting).
+- [x] 5.8 [Instrumented] Grace-expiry and hard-resolve-deadline force-resolve tests (habit-entry-tracking: Abandoned Snooze Resolution). **Already shipped in work unit 4b** — `graceExpiryForceResolvesAnAbandonedSnoozeToMissed` and `hardResolveDeadlineForceResolvesRegardlessOfState` in `ReconcileWorkerTest`.
 
 ## Blocking Verification Gate — API 37 On-Device Delivery Matrix
 
