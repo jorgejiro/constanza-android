@@ -983,7 +983,48 @@ enable strict TDD **scoped to `:domain`** — that module is pure, fast, depende
 logic where a silent error is most expensive. `:app` stays non-strict while its instrumented suite is
 still unverified.
 
-### 13.3 Manual delivery matrix (not automatable; run on an API 37 image — §5.4)
+### 13.3 Manual delivery matrix (not automatable — the remaining half of the §5.4 gate)
+
+> **Status**: the documentation half of the §5.4 gate is **discharged** (see §5.7). This matrix is the
+> half that remains, and it can only run once the reminder pipeline and notification handling exist —
+> i.e. after work units 4a, 4b and 5 are merged, not in work unit 1.
+
+#### Device matrix — three devices, and none substitutes for another
+
+| Device | OS | Proves | Cannot prove |
+|---|---|---|---|
+| **Pixel 10** (the project's Android 17 test device) | Android 17 **QPR beta**: `sdk_full 37.1`, `preview_sdk 3723`, `codename DEV`, `user`/`release-keys` | AOSP truth — exact alarms, notification actions, Doze, expedited jobs, the five reschedule broadcasts, and every API-37-**gated** behaviour change | Anything OEM-specific. Stock Android never reproduces One UI or MIUI throttling |
+| **Galaxy Z Fold 7** | Latest Samsung **stable** | One UI "Put unused apps to sleep"; a genuine `sw >= 600dp` screen; fold/unfold as a real configuration change | API 37 gated behaviour, **if** it ships on Android 16 |
+| **Galaxy S25** (owner's daily driver) | Samsung stable | Final confirmation on the device the app will actually live on | — use sparingly, at the owner's request |
+
+**Every finding recorded from this matrix MUST carry the device fingerprint.** The Pixel is a preview
+build (`preview_sdk 3723`, `codename DEV`), so a failure seen there may be beta-only and a pass is a
+strong signal rather than a stable guarantee. QPR betas update monthly; a later re-run may not
+reproduce an earlier result. The Pixel's fingerprint at the time of writing:
+`google/frankel_beta/frankel:DEV/CP41.260731.005.B1/16056512:user/release-keys`.
+
+**Large-screen testing without an Android 17 foldable.** The C1 large-screen change (§5.7) is gated on
+the app targeting 37 **and** running on Android 17+. The only Android 17 device available is a
+regular-width phone: the Pixel 10 measures `1080x2424` at density `420`, i.e. **sw ≈ 411dp**, below the
+600dp threshold. Override it — `wm size` accepts dp units directly on this device:
+
+```
+adb shell wm size 800dpx1280dp   # forces sw >= 600dp, triggering the gated large-screen behaviour
+adb shell wm size reset          # ALWAYS reset afterwards
+# density alternative: 1080px / (280/160) = 617dp
+adb shell wm density 280 ; adb shell wm density reset
+```
+
+If the Z Fold 7 ships on Android 17 stable it covers this natively and the override becomes a
+convenience. If it ships on Android 16, the gated behaviour is observable only via this override. No
+design change results either way, because the UI is built adaptive-resilient regardless of any opt-out.
+
+**Recipes verified as available on the connected Pixel 10 on 2026-08-31**: `dumpsys deviceidle`,
+`cmd appops get/set <pkg> SCHEDULE_EXACT_ALARM`, `am get-standby-bucket <pkg>`, `cmd jobscheduler run -f`,
+`wm size` / `wm density` with dp units.
+
+#### Scenarios
+
 
 | Scenario | Recipe |
 |---|---|
@@ -995,6 +1036,11 @@ still unverified.
 | Notifications denied | `adb shell pm revoke <pkg> android.permission.POST_NOTIFICATIONS` |
 | Reboot re-arm | `adb reboot`, unlock, confirm alarms re-armed after `BOOT_COMPLETED` |
 | Snooze across midnight | Set device time to 23:50, snooze 20 min, confirm **no** `missed` row is written at 00:00 and the answer credits the previous day |
+| Reconcile net without waiting an hour | `adb shell cmd jobscheduler run -f <pkg> <jobId>` force-runs the periodic `ReconcileWorker` immediately. **Without this, each iteration of testing the reminder-recovery net costs an hour of waiting.** Use it for every reconcile assertion |
+| Large screen — C1 (§5.7) | `adb shell wm size 800dpx1280dp`, then confirm no layout breaks, clips, overlaps, or loses content on the today screen and the habit editor. Then `wm size reset`. Repeat natively on the Z Fold 7, unfolded |
+| Orientation — C1 (§5.7) | Rotate on both devices at both widths; confirm the same. Required because `targetSdk = 37` removes the opt-out for orientation constraints on large screens |
+| Soft keyboard after a config change — C4 (§5.7) | On the habit editor with the keyboard open, rotate (and on the Z Fold 7, fold/unfold). Android 17 does **not** restore IME visibility after an unhandled configuration change; confirm the screen does not assume it survives |
+| OEM throttling survival | On the **Z Fold 7 and only there**: enable One UI's "Put unused apps to sleep" for the app, leave it idle for a multi-day window, and confirm reminders still arrive — late is acceptable, lost is not. This is the assertion the WorkManager missed-reminder sweep exists to satisfy, and no Pixel can make it |
 
 ## 14. Module and file layout
 
