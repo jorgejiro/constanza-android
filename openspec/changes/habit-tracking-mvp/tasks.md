@@ -277,11 +277,11 @@ enqueuing nothing would not be independently verifiable. The seam used instead i
 
 - [x] 5.1 Create the notification channel and `NotificationPoster`: `areNotificationsEnabled()` + channel-importance check before every post; Yes/No/Snooze actions with `PendingIntent.FLAG_IMMUTABLE`, `reqCode = occurrence.id` (reminder-response: Notification Actions).
 - [x] 5.2 Implement `NotificationPermission` gate: `SDK_INT >= 33` contextual request; 31–32 skip entirely (reminder-response: Notification Permission Scope).
-- [ ] 5.3 **Slice ii.** Implement `ActionReceiver` (`exported = false`, validate-only, no Room access) enqueuing expedited unique work per action (design §9.1) — implements against the `ActionIntentContract` (action strings, extras, explicit receiver class name) already fixed by 5.1.
-- [ ] 5.4 **Slice ii.** Implement `AnswerWorker`: `@Transaction` upsert `Entry(date = occ.scheduledDate, …)`, `occ.state = RESOLVED`, cancel any armed snooze, cancel the notification only after the write lands (reminder-response: Notification Actions).
-- [ ] 5.5 **Slice ii.** Implement `SnoozeWorker`: `snoozeCount++`, `snoozeUntil = now + duration` clamped to `resolveDeadline`, arm the same `reqCode` alarm, cancel the current notification (reminder-response: Snooze Configuration and Re-arm; habit-entry-tracking: Provisional-Missed happy path).
+- [x] 5.3 **Slice ii.** Implement `ActionReceiver` (`exported = false`, validate-only, no Room access) enqueuing expedited unique work per action (design §9.1) — implements against the `ActionIntentContract` (action strings, extras, explicit receiver class name) already fixed by 5.1.
+- [x] 5.4 **Slice ii.** Implement `AnswerWorker`: `@Transaction` upsert `Entry(date = occ.scheduledDate, …)`, `occ.state = RESOLVED`, cancel any armed snooze, cancel the notification only after the write lands (reminder-response: Notification Actions).
+- [x] 5.5 **Slice ii.** Implement `SnoozeWorker`: `snoozeCount++`, `snoozeUntil = now + duration` clamped to `resolveDeadline`, arm the same `reqCode` alarm, cancel the current notification (reminder-response: Snooze Configuration and Re-arm; habit-entry-tracking: Provisional-Missed happy path).
 - [x] 5.6 Implement snooze settings storage in DataStore: default 20 min; options 10/20/30 min, 1/2/3/4 h; unlimited (reminder-response: Snooze Configuration and Re-arm).
-- [ ] 5.9 **Slice ii. Wire `ReminderFireReceiver` to `NotificationPoster`, with the fire-time quota re-check.**
+- [x] 5.9 **Slice ii. Wire `ReminderFireReceiver` to `NotificationPoster`, with the fire-time quota re-check.**
       Added 2026-08-31: design §9.1 assigns this step to work unit 5 and `ReminderFireReceiver`'s own
       KDoc says so, but no numbered task owned it — the alarm fired into a receiver that did nothing,
       so no reminder could reach the user at all. The gap surfaced when slice i shipped a poster that
@@ -293,7 +293,7 @@ enqueuing nothing would not be independently verifiable. The seam used instead i
       "3 times per week" habit nags on all seven days. Keep the receiver validate-only — no Room
       access on the ~10s `onReceive` budget; enqueue expedited work, as 5.3 does for actions.
 
-- [ ] 5.7 **Slice ii.** [Instrumented] `AnswerWorker`/`SnoozeWorker` tests: idempotent upsert on redelivery; after-midnight origin-date crediting (reminder-response: Origin-Date Crediting).
+- [x] 5.7 **Slice ii.** [Instrumented] `AnswerWorker`/`SnoozeWorker` tests: idempotent upsert on redelivery; after-midnight origin-date crediting (reminder-response: Origin-Date Crediting).
 - [x] 5.8 [Instrumented] Grace-expiry and hard-resolve-deadline force-resolve tests (habit-entry-tracking: Abandoned Snooze Resolution). **Already shipped in work unit 4b** — `graceExpiryForceResolvesAnAbandonedSnoozeToMissed` and `hardResolveDeadlineForceResolvesRegardlessOfState` in `ReconcileWorkerTest`.
 
 ## Blocking Verification Gate — API 37 On-Device Delivery Matrix

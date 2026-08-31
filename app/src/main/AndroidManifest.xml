@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -11,6 +12,20 @@
         android:icon="@android:drawable/sym_def_app_icon"
         android:label="@string/app_name"
         android:theme="@style/Theme.Constanza">
+
+        <!-- Task 5.9 discovery: this auto-initializer ran before Hilt injected `workerFactory`,
+             so every worker fell back to a bare reflective constructor. Removed here;
+             ConstanzaApplication calls `WorkManager.initialize()` itself, after Hilt injection. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
 
         <activity
             android:name=".core.ui.MainActivity"
@@ -62,6 +77,14 @@
         <!-- design.md §9.1/§12: the AlarmManager PendingIntent target. Private to this app. -->
         <receiver
             android:name=".scheduling.ReminderFireReceiver"
+            android:exported="false" />
+
+        <!-- design.md §9.1/§12: the notification-action PendingIntent target
+             (`ActionIntentContract.ACTION_RECEIVER_CLASS`). No intent-filter: every PendingIntent
+             targets this component explicitly via `setClassName`, so a filter would only widen the
+             surface with no benefit. Private to this app. -->
+        <receiver
+            android:name=".reminding.ActionReceiver"
             android:exported="false" />
 
     </application>
