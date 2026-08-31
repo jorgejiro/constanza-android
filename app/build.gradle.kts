@@ -84,6 +84,10 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.androidx.work.runtime.ktx)
+    // Work unit 4b: @HiltWorker/HiltWorkerFactory (design.md D5) is how ReconcileWorker and
+    // MidnightSweepWorker — framework-instantiated like the receivers — get constructor injection.
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
@@ -101,6 +105,11 @@ dependencies {
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.room.testing)
+    // Work unit 4b: TestListenableWorkerBuilder/WorkManagerTestInitHelper for ReconcileWorker and
+    // MidnightSweepWorker (task 4b.4); mockk-android mocks AlarmScheduler on-device, mirroring the
+    // JVM mockk idiom already used by AlarmSchedulerTest.
+    androidTestImplementation(libs.androidx.work.testing)
+    androidTestImplementation(libs.mockk.android)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

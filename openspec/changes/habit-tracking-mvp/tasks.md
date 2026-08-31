@@ -262,10 +262,10 @@ build and test standalone with the androidTest sources removed.
 
 ## Phase 4b: Reconcile & Midnight Sweep (Work Unit 4b) — depends on 4a
 
-- [ ] 4b.1 Implement `ReconcileWorker` (hourly periodic; period injected as `RECONCILE_PERIOD_HOURS = 1`, a Hilt-provided constant, not a literal) — detects `ARMED` occurrences past due and fires late (reminder-delivery: Missed-Reminder Sweep).
-- [ ] 4b.2 Implement `MidnightSweepWorker`: writes `MISSED` only where `dueOn(...) == Required` and NOT `(state = SNOOZED AND snoozeUntil > now)` (habit-entry-tracking: Midnight Transition, N_TIMES_PER_WEEK exception — D3/D8).
-- [ ] 4b.3 Inject `RESOLVE_DEADLINE_HOURS = 24` as a tunable constant (`scheduledAt + resolveDeadline`, clamped to the next same-slot occurrence) driving both grace expiry and hard resolve (habit-entry-tracking: Abandoned Snooze Resolution).
-- [ ] 4b.4 [Instrumented] `TestListenableWorkerBuilder`/`WorkManagerTestInitHelper` tests for both workers; **dedicated D3 test**: a live snooze at midnight leaves no `entries` row.
+- [x] 4b.1 Implement `ReconcileWorker` (hourly periodic; period injected as `RECONCILE_PERIOD_HOURS = 1`, a Hilt-provided constant, not a literal) — detects `ARMED` occurrences past due and fires late (reminder-delivery: Missed-Reminder Sweep).
+- [x] 4b.2 Implement `MidnightSweepWorker`: writes `MISSED` only where `dueOn(...) == Required` and NOT `(state = SNOOZED AND snoozeUntil > now)` (habit-entry-tracking: Midnight Transition, N_TIMES_PER_WEEK exception — D3/D8).
+- [x] 4b.3 Inject `RESOLVE_DEADLINE_HOURS = 24` as a tunable constant (`scheduledAt + resolveDeadline`, clamped to the next same-slot occurrence) driving both grace expiry and hard resolve (habit-entry-tracking: Abandoned Snooze Resolution).
+- [x] 4b.4 [Instrumented] `TestListenableWorkerBuilder`/`WorkManagerTestInitHelper` tests for both workers; **dedicated D3 test**: a live snooze at midnight leaves no `entries` row.
 
 ## Phase 5: Notifications & Responses (Work Unit 5) — depends on 4a
 

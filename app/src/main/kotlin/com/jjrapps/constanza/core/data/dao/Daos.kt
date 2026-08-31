@@ -102,6 +102,12 @@ interface ReminderOccurrenceDao {
     @Query("SELECT * FROM reminder_occurrences WHERE habitId = :habitId")
     suspend fun findByHabitId(habitId: Long): List<ReminderOccurrenceEntity>
 
+    /** design.md §9.2, work unit 4b: every occurrence [OccurrenceResolver] still needs to look at —
+     *  `RESOLVED` and `ABANDONED` are the two terminal states, so everything else is fair game for
+     *  the hourly reconcile pass and the midnight sweep. */
+    @Query("SELECT * FROM reminder_occurrences WHERE state != 'RESOLVED' AND state != 'ABANDONED'")
+    suspend fun findUnresolved(): List<ReminderOccurrenceEntity>
+
     /** [AlarmScheduler.schedule]'s exact/inexact result lands here (reminder-delivery: Exact-Alarm
      *  Permission States) — a single-column update is cheaper than a full-row [upsert]. */
     @Query("UPDATE reminder_occurrences SET exact = :exact WHERE id = :id")

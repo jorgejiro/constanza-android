@@ -1,12 +1,9 @@
 package com.jjrapps.constanza.scheduling
 
-import com.jjrapps.constanza.core.data.dao.HabitDao
-import com.jjrapps.constanza.core.data.dao.ReminderOccurrenceDao
-import com.jjrapps.constanza.core.data.dao.ReminderSlotDao
-import com.jjrapps.constanza.core.data.dao.ScheduleDao
 import com.jjrapps.constanza.core.data.entity.HabitEntity
 import com.jjrapps.constanza.core.data.entity.ReminderOccurrenceEntity
 import com.jjrapps.constanza.core.data.mapper.toDomain
+import com.jjrapps.constanza.core.di.ResolveDeadlineHours
 import com.jjrapps.constanza.core.time.TimeProvider
 import com.jjrapps.constanza.domain.dueOn
 import com.jjrapps.constanza.domain.model.Due
@@ -24,10 +21,6 @@ private const val HORIZON_DAYS = 2L
  *  `EVERY_N_DAYS` interval) cannot loop unbounded. */
 private const val LOOKAHEAD_CAP_DAYS = 400L
 
-/** design.md D3/§9.1: `resolveDeadline = scheduledAt + 24h`. Written here because the column is
- *  `NOT NULL`; the deadline is *consumed* by work unit 4b's `ReconcileWorker`/`MidnightSweepWorker`
- *  (task 4b.3), not by this unit. */
-private const val RESOLVE_DEADLINE_HOURS = 24L
 private const val SECONDS_PER_HOUR = 3600L
 private const val STATE_ARMED = "ARMED"
 
@@ -68,18 +61,16 @@ private data class SlotPlan(
  * provides on its own.
  */
 class OccurrencePlanner @Inject constructor(
-    private val habitDao: HabitDao,
-    private val scheduleDao: ScheduleDao,
-    private val reminderSlotDao: ReminderSlotDao,
-    private val reminderOccurrenceDao: ReminderOccurrenceDao,
+    private val daos: SchedulingDaos,
     private val alarmScheduler: AlarmScheduler,
     private val timeProvider: TimeProvider,
+    @ResolveDeadlineHours private val resolveDeadlineHours: Long,
 ) {
     suspend fun replanAll() {
         val today = timeProvider.today()
         val zone = timeProvider.zone()
         val horizonEnd = today.plusDays(HORIZON_DAYS)
-        for (habit in habitDao.findAllSnapshot()) {
+        for (habit in daos.habitDao.findAllSnapshot()) {
             planHabit(habit, today, horizonEnd, zone)
         }
     }
@@ -94,8 +85,8 @@ class OccurrencePlanner @Inject constructor(
             cancelAllFor(habit.id)
             return
         }
-        val schedule = scheduleDao.findByHabitId(habit.id)?.toDomain()
-        val enabledSlots = reminderSlotDao.findByHabitId(habit.id).filter { it.enabled }
+        val schedule = daos.scheduleDao.findByHabitId(habit.id)?.toDomain()
+        val enabledSlots = daos.reminderSlotDao.findByHabitId(habit.id).filter { it.enabled }
         cancelStaleArmedOccurrences(habit.id, enabledSlots.map { it.id }.toSet())
         // No reminder time set means no occurrence is planned (D7/OA-3).
         if (schedule == null || enabledSlots.isEmpty()) return
@@ -123,34 +114,34 @@ class OccurrencePlanner @Inject constructor(
     private suspend fun planDateIfDue(plan: SlotPlan, date: LocalDate): Boolean {
         if (dueOn(plan.schedule, date, ALWAYS_ZERO_PROGRESS) == Due.NotDue) return false
         val dateText = date.toString()
-        val existing = reminderOccurrenceDao.findByHabitSlotDate(plan.habitId, plan.slotId, dateText)
+        val existing = daos.reminderOccurrenceDao.findByHabitSlotDate(plan.habitId, plan.slotId, dateText)
         // Already in flight or resolved: leave it alone.
         if (existing != null && existing.state != STATE_ARMED) return true
         val scheduledAt = resolveOccurrenceInstant(date, plan.minuteOfDay, plan.zone)
         val entity = (existing ?: emptyArmedOccurrence(plan.habitId, plan.slotId, dateText)).copy(
             scheduledAtEpochMs = scheduledAt.toEpochMilli(),
             state = STATE_ARMED,
-            resolveDeadlineMs = scheduledAt.plusSeconds(RESOLVE_DEADLINE_HOURS * SECONDS_PER_HOUR).toEpochMilli(),
+            resolveDeadlineMs = scheduledAt.plusSeconds(resolveDeadlineHours * SECONDS_PER_HOUR).toEpochMilli(),
         )
-        val id = reminderOccurrenceDao.upsert(entity)
+        val id = daos.reminderOccurrenceDao.upsert(entity)
         val exact = alarmScheduler.schedule(id, scheduledAt.toEpochMilli())
-        reminderOccurrenceDao.updateExact(id, exact)
+        daos.reminderOccurrenceDao.updateExact(id, exact)
         return true
     }
 
     private suspend fun cancelAllFor(habitId: Long) {
-        reminderOccurrenceDao.findByHabitId(habitId).forEach { alarmScheduler.cancel(it.id) }
-        reminderOccurrenceDao.deleteByHabitId(habitId)
+        daos.reminderOccurrenceDao.findByHabitId(habitId).forEach { alarmScheduler.cancel(it.id) }
+        daos.reminderOccurrenceDao.deleteByHabitId(habitId)
     }
 
     /** Cancels an armed occurrence whose slot is no longer enabled or no longer exists — the
      *  "cancels what should not exist" half of §9.3's replan contract. */
     private suspend fun cancelStaleArmedOccurrences(habitId: Long, enabledSlotIds: Set<Long>) {
-        reminderOccurrenceDao.findByHabitId(habitId)
+        daos.reminderOccurrenceDao.findByHabitId(habitId)
             .filter { it.state == STATE_ARMED && it.slotId !in enabledSlotIds }
             .forEach {
                 alarmScheduler.cancel(it.id)
-                reminderOccurrenceDao.deleteById(it.id)
+                daos.reminderOccurrenceDao.deleteById(it.id)
             }
     }
 

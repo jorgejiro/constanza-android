@@ -4,11 +4,16 @@ import android.app.AlarmManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+private const val DATE_CHANGED_SWEEP_WORK_NAME = "midnight-sweep-on-date-changed"
 
 /**
  * design.md §9.3: shared `goAsync()` + coroutine boilerplate for every reschedule-trigger receiver
@@ -52,8 +57,9 @@ class PackageReplacedReceiver : BroadcastReceiver() {
 }
 
 /** Wall-clock `RTC_WAKEUP` targets must be recomputed after a timezone, date, or time change —
- *  including the DST transition itself (design.md §9.3, task 4a.7). Also a redundant
- *  midnight-sweep trigger for work unit 4b. */
+ *  including the DST transition itself (design.md §9.3, task 4a.7). `ACTION_DATE_CHANGED` is also
+ *  one of design.md §9.2's three redundant midnight-sweep triggers for work unit 4b: it enqueues an
+ *  immediate one-shot [MidnightSweepWorker] run rather than waiting for the next periodic tick. */
 @AndroidEntryPoint
 class TimeChangeReceiver : BroadcastReceiver() {
     @Inject lateinit var occurrencePlanner: OccurrencePlanner
@@ -61,6 +67,15 @@ class TimeChangeReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action !in ALLOWED_ACTIONS) return
         replanAsync(occurrencePlanner)
+        if (intent.action == Intent.ACTION_DATE_CHANGED) enqueueMidnightSweep(context)
+    }
+
+    private fun enqueueMidnightSweep(context: Context) {
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            DATE_CHANGED_SWEEP_WORK_NAME,
+            ExistingWorkPolicy.KEEP,
+            OneTimeWorkRequestBuilder<MidnightSweepWorker>().build(),
+        )
     }
 
     companion object {
