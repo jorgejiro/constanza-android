@@ -72,6 +72,9 @@ dependencies {
     ksp(libs.hilt.compiler)
 
     testImplementation(libs.junit)
+    // AGP does not auto-resolve kotlin("test") to the JUnit4 variant the way kotlin("jvm") does
+    // for :domain, so the JUnit-glue artifact is named explicitly here.
+    testImplementation(kotlin("test-junit"))
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
