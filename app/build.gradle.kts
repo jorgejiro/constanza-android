@@ -44,6 +44,12 @@ android {
     buildFeatures {
         compose = true
     }
+
+    sourceSets {
+        // MigrationTestHelper (task 3.7) reads exported schemas from the androidTest assets
+        // folder; this exposes app/schemas/ (design.md §8, §14) there without copying it.
+        getByName("androidTest").assets.srcDirs("$projectDir/schemas")
+    }
 }
 
 ksp {
@@ -76,5 +82,28 @@ dependencies {
     // for :domain, so the JUnit-glue artifact is named explicitly here.
     testImplementation(kotlin("test-junit"))
 
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.room.testing)
+
     debugImplementation(libs.androidx.compose.ui.tooling)
+}
+
+// androidx.room:room-testing 2.8.4's own published module metadata declares a strict
+// kotlinx-serialization-bom constraint at 1.7.3, but the migration-bundle `$$serializer` classes
+// it ships are compiled against kotlinx-serialization-core's 1.8.x `GeneratedSerializer` shape
+// (which added `typeParametersSerializers()`). Left unresolved, MigrationTestHelper crashes with
+// `AbstractMethodError` at runtime. Forcing the newer, backward-compatible core/json artifacts
+// resolves the mismatch; this is a Room 2.8.4 packaging gap, not an app-level version choice.
+configurations.all {
+    resolutionStrategy {
+        force(
+            "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.8.1",
+            "org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.1",
+            "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.8.1",
+            "org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1",
+        )
+    }
 }

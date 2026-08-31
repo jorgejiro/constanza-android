@@ -118,8 +118,8 @@ build and test standalone with the androidTest sources removed.
 - [x] 3.3 Create `AppDatabase` (`version = 1`, `exportSchema = true`); commit generated `app/schemas/1.json`.
 - [x] 3.4 Create mappers translating `:app` entities ↔ `:domain` types, incl. the `0 ↔ null` slot sentinel (D11) and a `TimeProvider` abstraction (§4 — never read the clock directly).
 - [x] 3.5 Implement `HabitRepository.deleteSlot()` as a `@Transaction` reassigning/deleting affected entries (D11 cost of dropping the FK).
-- [ ] 3.6 [Instrumented] DAO test: `UNIQUE(habitId, date, slotId)` actually rejects duplicates for `slotId = 0`.
-- [ ] 3.7 [Instrumented] `MigrationTestHelper` harness test against `app/schemas/1.json` (establishes the harness for the future v1→v2 additive migration, §8.3).
+- [x] 3.6 [Instrumented] DAO test: `UNIQUE(habitId, date, slotId)` actually rejects duplicates for `slotId = 0`.
+- [x] 3.7 [Instrumented] `MigrationTestHelper` harness test against `app/schemas/1.json` (establishes the harness for the future v1→v2 additive migration, §8.3).
 - [x] 3.8 Wire Hilt modules for the database/DAOs (D5); confirm `:domain` still carries zero DI annotations.
 
 ## Phase 4a: Alarm Scheduling & Reschedule Triggers (Work Unit 4a)
