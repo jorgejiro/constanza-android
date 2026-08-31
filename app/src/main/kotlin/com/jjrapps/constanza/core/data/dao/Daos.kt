@@ -26,6 +26,11 @@ interface HabitDao {
     @Query("SELECT * FROM habits ORDER BY sortOrder")
     fun observeAll(): Flow<List<HabitEntity>>
 
+    /** Non-`Flow` snapshot for [com.jjrapps.constanza.scheduling.OccurrencePlanner], which runs
+     *  once per reschedule trigger rather than observing continuously. */
+    @Query("SELECT * FROM habits")
+    suspend fun findAllSnapshot(): List<HabitEntity>
+
     @Query("DELETE FROM habits WHERE id = :id")
     suspend fun deleteById(id: Long)
 }
@@ -76,6 +81,10 @@ interface EntryDao {
     suspend fun deleteBySlot(habitId: Long, slotId: Long)
 }
 
+/**
+ * design.md D4/§8.2: `id` doubles as the notification id, the `PendingIntent` request code, and
+ * the `WorkManager` unique-work suffix — every write below keys off that same id.
+ */
 @Dao
 interface ReminderOccurrenceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -84,6 +93,23 @@ interface ReminderOccurrenceDao {
     @Query("SELECT * FROM reminder_occurrences WHERE id = :id")
     suspend fun findById(id: Long): ReminderOccurrenceEntity?
 
+    @Query(
+        "SELECT * FROM reminder_occurrences " +
+            "WHERE habitId = :habitId AND slotId = :slotId AND scheduledDate = :scheduledDate",
+    )
+    suspend fun findByHabitSlotDate(habitId: Long, slotId: Long, scheduledDate: String): ReminderOccurrenceEntity?
+
+    @Query("SELECT * FROM reminder_occurrences WHERE habitId = :habitId")
+    suspend fun findByHabitId(habitId: Long): List<ReminderOccurrenceEntity>
+
+    /** [AlarmScheduler.schedule]'s exact/inexact result lands here (reminder-delivery: Exact-Alarm
+     *  Permission States) — a single-column update is cheaper than a full-row [upsert]. */
+    @Query("UPDATE reminder_occurrences SET exact = :exact WHERE id = :id")
+    suspend fun updateExact(id: Long, exact: Boolean)
+
     @Query("DELETE FROM reminder_occurrences WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM reminder_occurrences WHERE habitId = :habitId")
+    suspend fun deleteByHabitId(habitId: Long)
 }

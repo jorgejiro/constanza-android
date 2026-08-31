@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.detekt)
 }
 
 android {
@@ -119,4 +120,52 @@ configurations.all {
             "org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1",
         )
     }
+}
+
+// Work unit 4a follow-up: :app now holds time-sensitive code (TimeProvider, InstantResolver,
+// OccurrencePlanner), so the clock-access ban that :domain has enforced since work unit 1 applies
+// here too. SystemTimeProvider is the single exempted adapter; see config/detekt/detekt.yml.
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
+}
+
+// detekt 1.23.8 does not hook AGP 9's variant API, so it registers no `detekt<Variant>` tasks for
+// this module — only a plain, PSI-only `detekt`. The task below is registered by hand so :app gets
+// detekt coverage at all.
+//
+// KNOWN GAP, stated here so a green build is not mistaken for a guarantee: `ForbiddenMethodCall`
+// — the clock-access ban — does NOT fire in this module. It was probed, not assumed: inserting
+// `java.time.LocalDate.now()` into OccurrencePlanner fails `:domain:detektMain` and passes here,
+// with an identical shared config and a 74-entry classpath. Semantic rules need type resolution
+// that this hand-rolled task does not obtain under AGP 9, and 1.23.8 is the latest release, so
+// there is nothing to upgrade to.
+//
+// What this task DOES enforce here is every PSI rule — LongParameterList, ReturnCount,
+// MaxLineLength, LoopWithTooManyJumpStatements, MagicNumber and the rest — which is real value and
+// already caught six findings on first run.
+//
+// In :app the clock ban therefore rests on the TimeProvider convention and on review, exactly as
+// it did before this change. Revisit when detekt supports AGP 9 variants.
+val detektMain by tasks.registering(io.gitlab.arturbosch.detekt.Detekt::class) {
+    description = "Runs detekt on :app main sources with type resolution."
+    setSource(files("src/main/kotlin"))
+    config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
+    buildUponDefaultConfig = true
+    classpath.setFrom(
+        configurations.getByName("debugCompileClasspath"),
+        tasks.named("compileDebugKotlin").map { it.outputs.files },
+    )
+    jvmTarget = "11"
+    reports {
+        html.required.set(false)
+        xml.required.set(false)
+        txt.required.set(false)
+        sarif.required.set(false)
+        md.required.set(false)
+    }
+}
+
+tasks.named("check") {
+    dependsOn(detektMain)
 }
