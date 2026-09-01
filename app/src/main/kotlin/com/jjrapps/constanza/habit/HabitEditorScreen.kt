@@ -40,6 +40,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.theme.HabitPalette
 
 /**
  * Tasks 6a.1 (non-schedule half)/6a.2/6a.3 — container. [habitId] is `null` for creation, an
@@ -242,7 +243,7 @@ private val SWATCH_BORDER = 3.dp
 @Composable
 private fun ColorSwatchRow(selected: Int, onColorChange: (Int) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        HabitColorPalette.SWATCHES.forEach { swatch ->
+        HabitPalette.ARGB.forEach { swatch ->
             val borderColor = if (swatch == selected) MaterialTheme.colorScheme.primary else Color.Transparent
             Row(
                 modifier = Modifier

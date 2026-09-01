@@ -213,7 +213,7 @@ testing:
       unit: "JUnit4 + kotlin.test (revises the earlier unratified JUnit5 plan)"
       mocking: "MockK; Turbine for Flow; kotlinx-coroutines-test"
       instrumented: "AndroidX Test + androidx.work:work-testing + compose-ui-test-junit4"
-      migrations: "Room MigrationTestHelper against the checked-in app/schemas/1.json"
+      migrations: "Room MigrationTestHelper against the checked-in app/schemas/com.jjrapps.constanza.core.data.AppDatabase/1.json"
     commands:
       domain_unit: "./gradlew :domain:test"
       app_unit: "./gradlew :app:testDebugUnitTest"

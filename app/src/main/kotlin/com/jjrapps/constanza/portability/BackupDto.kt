@@ -16,7 +16,13 @@ import kotlinx.serialization.Serializable
 const val CURRENT_BACKUP_FORMAT_VERSION = 1
 
 private const val BACKUP_FORMAT_NAME = "constanza.backup"
-private const val CURRENT_SCHEMA_VERSION = 1
+
+/**
+ * Task 2.7 (correction C5): NOT `private` — `BackupImporter` gates its legacy-colour
+ * normalization on this value (`schemaVersion < CURRENT_SCHEMA_VERSION`), so it must be visible
+ * outside this file. `2` as of the warm-dark-design-system habit-colour repaint (work unit 2).
+ */
+const val CURRENT_SCHEMA_VERSION = 2
 
 @Serializable
 data class BackupFile(
