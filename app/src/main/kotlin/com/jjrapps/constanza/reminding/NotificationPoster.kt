@@ -40,10 +40,17 @@ class NotificationPoster @Inject constructor(@ApplicationContext private val con
      * of every [PendingIntent] below — the same integer [com.jjrapps.constanza.scheduling.AlarmScheduler]
      * already uses for the alarm's own `PendingIntent`. No second id scheme exists anywhere in
      * this pipeline.
+     *
+     * Returns whether the notification actually reached the system: `false` means [canPost] gated
+     * it and nothing was posted. Callers that persist delivery MUST branch on this instead of
+     * assuming a post happened — [canPost] promises "no post, never a silent lie about delivery",
+     * and only the caller can keep the second half of that promise in the database (design.md
+     * §13.4 finding 1, task G.3).
      */
-    fun postReminder(occurrenceId: Long, habitName: String, question: String?, colorArgb: Int) {
-        if (!canPost()) return
+    fun postReminder(occurrenceId: Long, habitName: String, question: String?, colorArgb: Int): Boolean {
+        if (!canPost()) return false
         manager.notify(occurrenceId.toInt(), buildNotification(occurrenceId, habitName, question, colorArgb))
+        return true
     }
 
     /** design.md §9.1: cancels [occurrenceId]'s posted notification, a no-op when none is showing.

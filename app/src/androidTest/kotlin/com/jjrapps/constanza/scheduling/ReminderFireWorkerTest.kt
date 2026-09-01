@@ -15,11 +15,14 @@ import com.jjrapps.constanza.core.data.AppDatabase
 import com.jjrapps.constanza.core.data.entity.EntryEntity
 import com.jjrapps.constanza.core.data.entity.ReminderOccurrenceEntity
 import com.jjrapps.constanza.reminding.NotificationPoster
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -78,6 +81,7 @@ class ReminderFireWorkerTest {
 
     @Test
     fun postsTheNotificationAndRecordsFiredState() = runBlocking {
+        every { notificationPoster.postReminder(any(), any(), any(), any()) } returns true
         val habitId = insertHabit(kind = "DAILY")
         val now = Instant.parse("2026-09-01T08:00:00Z")
         val occId = insertArmedOccurrence(habitId, "2026-09-01", now)
@@ -87,6 +91,28 @@ class ReminderFireWorkerTest {
         val stored = database.reminderOccurrenceDao().findById(occId)
         assertEquals("FIRED", stored?.state)
         assertEquals(now.toEpochMilli(), stored?.notifiedAtEpochMs)
+    }
+
+    /**
+     * design.md §13.4 finding 1 (task G.3). The gate said "no post", so the row must not claim a
+     * delivery: `notifiedAtEpochMs` stays null. The state is still FIRED and deliberately NOT
+     * SUPPRESSED — that one is D8's terminal quota exit which `findUnresolved()` excludes, whereas
+     * a permission- or mute-suppressed occurrence has to stay unresolved so the reconcile net and
+     * the Today screen still handle it, and so it never becomes a false `MISSED` (design.md §5.5,
+     * §11). Before this branch existed the same run stored `notifiedAt = now`.
+     */
+    @Test
+    fun aGatedPostRecordsNoNotifiedAtAndStillLandsOnFired() = runBlocking {
+        every { notificationPoster.postReminder(any(), any(), any(), any()) } returns false
+        val habitId = insertHabit(kind = "DAILY")
+        val now = Instant.parse("2026-09-01T08:00:00Z")
+        val occId = insertArmedOccurrence(habitId, "2026-09-01", now)
+        buildWorker(occId, now).doWork()
+
+        val stored = database.reminderOccurrenceDao().findById(occId)
+        assertEquals("FIRED", stored?.state)
+        assertNull("a suppressed post must not record a notification", stored?.notifiedAtEpochMs)
+        assertTrue(database.entryDao().findByHabitId(habitId).isEmpty())
     }
 
     /** design.md D7/D8/OA-3: the ONE place an already-met weekly quota is caught before nagging. */

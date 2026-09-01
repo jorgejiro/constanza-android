@@ -69,7 +69,13 @@ class NotificationPosterInstrumentedTest {
             NotificationManagerCompat.from(context).areNotificationsEnabled(),
         )
 
-        poster.postReminder(OCCURRENCE_ID, "Meditate", "Did you meditate today?", HABIT_COLOR_ARGB)
+        // The return value is the fire path's only evidence of delivery (design.md §13.4 finding 1,
+        // task G.3), and the real notification build is only exercisable here, not in the
+        // mockable-jar unit test — so `true` is asserted on the same call whose visibility is awaited.
+        assertTrue(
+            "postReminder must report a real post when notifications are enabled",
+            poster.postReminder(OCCURRENCE_ID, "Meditate", "Did you meditate today?", HABIT_COLOR_ARGB),
+        )
 
         val posted = awaitPosted(OCCURRENCE_ID)
         assertEquals(EXPECTED_ACTION_COUNT, posted.notification.actions?.size)
