@@ -1,6 +1,8 @@
 package com.jjrapps.constanza.habit
 
 import android.content.Context
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -65,5 +67,35 @@ class HabitEditorRotationComposeTest {
         restorationTester.emulateSavedInstanceStateRestore()
 
         composeTestRule.onNodeWithText("Read before bed").assertExists()
+    }
+
+    /**
+     * Task 6a.9's regression guard. The focus latch records **which** field gained focus last, so a
+     * configuration change restores the caret where the user actually was. This asserts the harder
+     * half: focus goes back to the **notes** field, not to the name field — a bare per-field boolean
+     * would have said "name held focus at some point" and thrown the caret back there.
+     *
+     * The keyboard itself is not asserted here, and deliberately so:
+     * [StateRestorationTester.emulateSavedInstanceStateRestore] rebuilds the composition without
+     * recreating the Activity, so there is no real IME to observe. That half was measured on the
+     * device instead — `mInputShown` `true` → `true` across a real rotation, against `true` → `false`
+     * before the fix (design.md §13.5, finding 2). What this test can hold is the saved-state
+     * mechanism that made the keyboard restoration possible, which is precisely the part that was
+     * broken: the old flag was cleared by the teardown's own `onFocusChanged(false)`.
+     */
+    @Test
+    fun rotatingRestoresFocusToTheFieldThatHadIt() {
+        val viewModel = HabitEditorViewModel(fixture.habitRepository, fixture.timeProvider)
+        val restorationTester = StateRestorationTester(composeTestRule)
+        restorationTester.setContent {
+            HabitEditorRoute(habitId = null, onDone = {}, viewModel = viewModel)
+        }
+        composeTestRule.onNodeWithText(text(R.string.habit_editor_notes_label))
+            .performTextInput("after the news")
+
+        restorationTester.emulateSavedInstanceStateRestore()
+
+        composeTestRule.onNodeWithText("after the news").assertIsFocused()
+        composeTestRule.onNodeWithText(text(R.string.habit_editor_name_label)).assertIsNotFocused()
     }
 }
