@@ -25,6 +25,15 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * convention. Neither `tasks.md` nor `design.md` anticipated this; `MIGRATION_1_2` as a `class`
  * member fails `:app:detektMain`, and a `@Suppress` was rejected for the same reason decision 1
  * rejected one for `MagicNumber`.
+ *
+ * **Second deviation, same root cause, flagged for unit 3.** Task 3.3 asked for the pre-migration
+ * snapshot's `filesDir` to be "passed into `PreMigrationSnapshotWriter` at the migration call
+ * site" — but an `object` cannot take a constructor parameter, and this file has to stay an
+ * `object` for the reason above. Resolved with a factory function, [migration1To2], instead: the
+ * caller (`DatabaseModule`) builds the [PreMigrationSnapshotWriter] with its own `filesDir` and
+ * hands it in; the function returns a fresh [Migration] closing over that writer. A function name
+ * is camelCase by `FunctionNaming`, so the naming tension this deviation is about never arises for
+ * it — no `@Suppress` needed here either.
  */
 internal object AppMigrations {
 
@@ -35,10 +44,18 @@ internal object AppMigrations {
      * inlined hex literals would compile, run, report success, and rewrite zero rows. Every value
      * below is a **bound argument** taken from [HabitColorRemap.LEGACY_TO_CURRENT], never hex text
      * inside the SQL, so Kotlin's own `Int` conversion is the only place the sign is ever decided.
+     *
+     * **Task 3.2 (design.md decision 4).** [writer]`.write(db)` runs as the *first* statement,
+     * before the `UPDATE` — the only point in this function where a genuine "before" state exists.
+     * Its `Boolean` result is discarded on purpose: [PreMigrationSnapshotWriter.write] already logs
+     * its own failure at WARN and never throws for a recoverable cause, so nothing here may turn
+     * that outcome into a migration failure, on success or on failure.
      */
-    val MIGRATION_1_2: Migration =
+    fun migration1To2(writer: PreMigrationSnapshotWriter): Migration =
         object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                writer.write(db)
+
                 val entries = HabitColorRemap.LEGACY_TO_CURRENT.entries.toList()
                 val caseWhenSql = "WHEN ? THEN ? ".repeat(entries.size)
                 val inPlaceholders = entries.joinToString(separator = ",") { "?" }

@@ -9,6 +9,7 @@ import com.jjrapps.constanza.core.data.dao.ReminderOccurrenceDao
 import com.jjrapps.constanza.core.data.dao.ReminderSlotDao
 import com.jjrapps.constanza.core.data.dao.ScheduleDao
 import com.jjrapps.constanza.core.data.migration.AppMigrations
+import com.jjrapps.constanza.core.data.migration.PreMigrationSnapshotWriter
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -28,7 +29,11 @@ object DatabaseModule {
             // Task 2.4 (design.md decision 3, hard blocker C4): without this, Room throws
             // `IllegalStateException: A migration from 1 to 2 was required but not found` at
             // first open on every existing install.
-            .addMigrations(AppMigrations.MIGRATION_1_2)
+            //
+            // Task 3.3: `AppMigrations` stays an `object` (see its KDoc), so `filesDir` cannot be
+            // a constructor parameter on it — the writer is built here, at the one call site that
+            // has a `Context`, and handed into the factory function instead.
+            .addMigrations(AppMigrations.migration1To2(PreMigrationSnapshotWriter(context.filesDir)))
             .build()
 
     @Provides

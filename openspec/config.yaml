@@ -21,27 +21,6 @@ carried_forward_open_items:
     close either item silently in a future change — resolve it explicitly and
     remove it from this list when done, or replace it with a new decision.
   items:
-    - id: "7.5"
-      title: "Automatic pre-migration export hook"
-      status: blocked
-      origin: "habit-tracking-mvp tasks.md, task 7.5 (left unchecked, not marked complete)"
-      reason: >
-        AppDatabase is at version = 1 with no Migration class anywhere in this
-        repository, so there is no "before" state for an export hook to run
-        against yet. No hook placed in :app's normal startup/DI path can work
-        either: Room applies migrations lazily and every typed DAO is bound to
-        the TARGET schema, so by the time a DAO is queryable the migration has
-        already run. The only correct placement is a version-agnostic raw-SQL
-        dump (enumerate sqlite_master, read each table via Cursor) as the
-        FIRST statement inside the future Migration(1, 2).migrate(db) body,
-        before any ALTER TABLE runs.
-      why_it_matters: >
-        Not housekeeping. Ratified decision 6 and OA-1 put manual export/import
-        in the MVP specifically as the failed-migration recovery path (see
-        openspec/specs/data-portability/spec.md); the automatic snapshot is
-        what makes that recovery reach a user who never exported by hand
-        before the migration that corrupted their data.
-      owner_condition: "Belongs to whoever writes the first Room migration (the first schema change past version 1)."
     - id: "G.7-throttling-row"
       title: "One UI \"put unused apps to sleep\" survival row (Galaxy Z Fold 7)"
       status: blocked
