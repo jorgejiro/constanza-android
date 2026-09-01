@@ -633,7 +633,24 @@ Work unit 6b (tasks 6b.1–6b.10) is now fully complete across both slices.
 - [x] 7.2 Implement export: read Room + DataStore settings, serialize to `constanza-backup-<yyyyMMdd-HHmmss>.json` via SAF `ACTION_CREATE_DOCUMENT` (data-portability: Export).
 - [x] 7.3 Implement import: full parse-and-validate before any write; refuse a newer `formatVersion`; on success, replace-all in one Room transaction with ID remapping, then cancel all alarms, truncate `reminder_occurrences`, and `replanAll()` (data-portability: Import, Round-Trip Fidelity).
 - [x] 7.4 Implement the destructive-import confirmation dialog gating the import call (data-portability: Declined confirmation changes nothing).
-- [ ] 7.5 Wire an automatic pre-migration export hook, invoked before any future Room migration runs (proposal rollback plan). NOT STARTED — deferred, crossed the ~600-line budget stop before reaching it; see apply-progress for what a real v2 migration would need.
+- [ ] 7.5 Wire an automatic pre-migration export hook, invoked before any future Room migration runs (proposal rollback plan).
+      **BLOCKED on the first migration existing — re-scoped 2026-09-01, and this is not the same thing
+      as budget debt.** `AppDatabase` is at `version = 1` with no `Migration` anywhere, so there is no
+      "before" for a hook to run in. The unit-7 batch stopped at 916 lines before reaching this task,
+      but even with unlimited budget the task as written cannot be honestly completed now.
+      **Why no hook in `:app`'s normal path can work, established while investigating:** Room applies
+      migrations lazily, and every typed DAO is bound to the TARGET schema. By the time any DAO is
+      queryable the migration has already run, so a repository- or DI-level hook can never read
+      pre-migration data. The only correct place is a **version-agnostic raw-SQL dump** — enumerate
+      `sqlite_master`, read each table through a `Cursor` — as the **first statement inside the future
+      `Migration(1, 2).migrate(db: SupportSQLiteDatabase)` body**, writing an emergency snapshot to
+      internal storage before any `ALTER TABLE`.
+      Building that helper now would leave untestable code with no caller, which is the dead-path
+      pattern this change has already paid for five times. So this task belongs to whoever writes the
+      first migration, and it is **load bearing**: ratified decision 6 and OA-1 both put export/import
+      in the MVP specifically as the failed-migration recovery path, and the *automatic* pre-migration
+      snapshot is what makes that recovery available to a user who never thought to export by hand.
+      Until it exists, that recovery depends on the user having exported manually.
 - [x] 7.6 [Instrumented] Round-trip test: export → wipe → import restores all habits/schedules/slots/entries, incl. archived history, byte-equivalent (data-portability: Round-Trip Fidelity).
 - [x] 7.7 [Instrumented] Malformed-file rejection test: existing dataset untouched (data-portability: Malformed file leaves data intact).
 
