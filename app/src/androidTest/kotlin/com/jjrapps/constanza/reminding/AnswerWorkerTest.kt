@@ -16,6 +16,7 @@ import com.jjrapps.constanza.core.data.entity.ReminderOccurrenceEntity
 import com.jjrapps.constanza.scheduling.AlarmScheduler
 import com.jjrapps.constanza.scheduling.FakeTimeProvider
 import com.jjrapps.constanza.scheduling.insertHabitWithSchedule
+import com.jjrapps.constanza.tracking.EntryWriter
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.runBlocking
@@ -53,10 +54,11 @@ class AnswerWorkerTest {
 
     private fun buildWorker(occId: Long, status: String, now: Instant): AnswerWorker {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val responder = AnswerResponder(
+        val entryWriter = EntryWriter(
             database, database.entryDao(), database.reminderOccurrenceDao(),
             alarmScheduler, NotificationPoster(context), FakeTimeProvider(now),
         )
+        val responder = AnswerResponder(entryWriter)
         val inputData = Data.Builder()
             .putLong(AnswerWorker.KEY_OCCURRENCE_ID, occId)
             .putString(AnswerWorker.KEY_STATUS, status)

@@ -13,10 +13,15 @@ import java.time.LocalDate
  * Mandated function 2 (design.md §10): collapses a multi-slot day into one [DayStatus],
  * independent of any UI (habit-entry-tracking: Day-Level Rollup and Per-Slot Display).
  *
- * **Provisional (OA-2, unconfirmed)**: the classification precedence below — a missed slot
- * outranks partial completion, which outranks a still-fully-pending day — is this
- * implementation's own assumption, not a spec-mandated priority. A reviewer may want a different
- * tie-break once OA-2 is confirmed.
+ * **OA-2 was ratified 2026-09-01** (design.md §1), but it settled the *screen shape* — one row per
+ * habit carrying this rollup, expandable to per-slot rows — and **not** the precedence below.
+ *
+ * **Still this implementation's own assumption, now visible to users (task 6b.10):** a missed slot
+ * outranks partial completion, which outranks a still-fully-pending day. No spec mandates that
+ * order. It used to be invisible; with the ratified collapsed row it is the single word a user reads
+ * for the whole day, so a three-slot day with two completions and one miss reads `ANY_MISSED` rather
+ * than `PARTIAL`. That is a product choice about whether the collapsed row leads with the failure or
+ * with the progress, and it deserves a deliberate answer rather than inheriting one.
  */
 fun rollupDay(
     schedule: Schedule,

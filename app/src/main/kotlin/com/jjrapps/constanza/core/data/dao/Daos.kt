@@ -88,6 +88,10 @@ interface EntryDao {
     @Query("SELECT * FROM entries WHERE habitId = :habitId AND date BETWEEN :from AND :to")
     suspend fun findByHabitIdBetweenDates(habitId: Long, from: String, to: String): List<EntryEntity>
 
+    /** Task 6b.1: the today screen's own reactive entry source — every habit's rows for one date. */
+    @Query("SELECT * FROM entries WHERE date = :date")
+    fun observeByDate(date: String): Flow<List<EntryEntity>>
+
     @Query("DELETE FROM entries WHERE habitId = :habitId AND slotId = :slotId")
     suspend fun deleteBySlot(habitId: Long, slotId: Long)
 }
@@ -121,6 +125,15 @@ interface ReminderOccurrenceDao {
             "WHERE state != 'RESOLVED' AND state != 'ABANDONED' AND state != 'SUPPRESSED'",
     )
     suspend fun findUnresolved(): List<ReminderOccurrenceEntity>
+
+    /** Task 6b.3: the today screen's reactive twin of [findUnresolved] — same predicate, so a
+     *  slot's pending/snoozed state (design.md D3) always agrees with what re-arming actually
+     *  considers live. */
+    @Query(
+        "SELECT * FROM reminder_occurrences " +
+            "WHERE state != 'RESOLVED' AND state != 'ABANDONED' AND state != 'SUPPRESSED'",
+    )
+    fun observeUnresolved(): Flow<List<ReminderOccurrenceEntity>>
 
     /** [AlarmScheduler.schedule]'s exact/inexact result lands here (reminder-delivery: Exact-Alarm
      *  Permission States) — a single-column update is cheaper than a full-row [upsert]. */

@@ -12,18 +12,20 @@ import com.jjrapps.constanza.core.ui.theme.ConstanzaTheme
 import com.jjrapps.constanza.habit.HabitEditorRoute
 import com.jjrapps.constanza.habit.HabitListRoute
 import com.jjrapps.constanza.scheduling.ReplanOnResumeObserver
+import com.jjrapps.constanza.tracking.TodayRoute
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
 /**
- * The single launcher Activity. Hosts the habit list and editor (work unit 6a, design.md §14);
- * the Today screen is implemented in work unit 6b.
+ * The single launcher Activity. Hosts the Today screen (work unit 6b, the daily-use home), the
+ * habit list, and the editor (work unit 6a, design.md §14).
  *
  * The one non-UI thing it does is register design.md §5.5/§13.1's `onResume()` re-check
  * (task G.5). The decision logic lives in [ReplanOnResumeObserver], not here.
  *
- * Still deferred to work unit 6b, and deliberately NOT built here: §13.1's non-blocking banner
- * explaining that reminders may arrive late, with one tap to `ACTION_REQUEST_SCHEDULE_EXACT_ALARM`.
+ * **Still deferred, and no numbered 6b task owns it** (flagged, not silently dropped, per
+ * design.md §13.4's unowned-promise pattern): §13.1's non-blocking banner explaining that
+ * reminders may arrive late, with one tap to `ACTION_REQUEST_SCHEDULE_EXACT_ALARM`.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -53,14 +55,21 @@ class MainActivity : ComponentActivity() {
  * mid-edit — a worse content loss than anything inside the editor screen itself.
  */
 private sealed interface ConstanzaRoute : java.io.Serializable {
+    data object Today : ConstanzaRoute
     data object HabitList : ConstanzaRoute
     data class HabitEditor(val habitId: Long?) : ConstanzaRoute
 }
 
+/** Task 6b.1: Today is the daily-use home screen; [ConstanzaRoute.HabitList] is reached from its
+ *  "Manage habits" action and returns here rather than staying its own top-level destination. */
 @Composable
 private fun ConstanzaApp() {
-    var route by rememberSaveable { mutableStateOf<ConstanzaRoute>(ConstanzaRoute.HabitList) }
+    var route by rememberSaveable { mutableStateOf<ConstanzaRoute>(ConstanzaRoute.Today) }
     when (val current = route) {
+        is ConstanzaRoute.Today -> TodayRoute(
+            onManageHabits = { route = ConstanzaRoute.HabitList },
+        )
+
         is ConstanzaRoute.HabitList -> HabitListRoute(
             onCreateHabit = { route = ConstanzaRoute.HabitEditor(habitId = null) },
             onEditHabit = { habitId -> route = ConstanzaRoute.HabitEditor(habitId) },

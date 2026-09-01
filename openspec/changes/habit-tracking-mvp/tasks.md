@@ -487,14 +487,97 @@ verification).
 
 ## Phase 6b: Today Screen, Progress & Settings UI (Work Unit 6b) — depends on 3, 5
 
-- [ ] 6b.1 Implement the today screen: due habits, independent per-slot rows (habit-entry-tracking: Slot Independence, Day-Level Rollup and Per-Slot Display).
-- [ ] 6b.2 Wire in-app Yes/No/Skip to write `Entry` through the same write path as notification actions (habit-entry-tracking: Entry States, Slot Independence).
-- [ ] 6b.3 Render pending/snoozed state ("pending, snoozed until HH:mm") by reading `reminder_occurrences` (design §7 D3).
-- [ ] 6b.4 Implement the progress view: current/best streak and compliance, calling `StreakCalculator`/`ComplianceCalculator` with `windowDays = 30`. **[Provisional — OA-4, unconfirmed]** (habit-progress: Streak Calculation, Compliance Calculation).
+**Split into two slices, same pattern as 6a's split.** Slice i (6b.1/6b.2/6b.3/6b.7) is the
+daily-use surface: seeing today's habits and answering them. Slice ii (6b.4/6b.5/6b.6/6b.8) is
+progress, snooze settings, and the adaptive layout + its device test. Slice i measured 608
+production/test lines (git diff main..HEAD, per-file: `EntryWriter.kt` 111, `TodayModel.kt` 93,
+`TodayViewModel.kt` 67, `TodayScreen.kt` 183, `TodayComposeTest.kt` 92, plus `Daos.kt`/
+`MainActivity.kt`/`AnswerWorker.kt`/`AnswerWorkerTest.kt`/`strings.xml` edits), crossing the
+~600-line stop instruction on this batch's own required Compose test — reported rather than
+pushed past, per the same instruction that converted unit 6a's overshoots into decisions.
+
+- [x] 6b.1 Implement the today screen: due habits, independent per-slot rows (habit-entry-tracking: Slot Independence, Day-Level Rollup and Per-Slot Display).
+      **OA-2 ratified 2026-09-01, as revised (design.md §1's assumption table):** one row per habit carrying
+      the day rollup, **expandable** to that habit's per-slot rows, each independently answerable. A
+      single-slot habit reads as one plain row. Not a flat always-expanded per-slot list, and not a
+      day-level-only control — the latter was proposed, then withdrawn once it turned out to leave a user who
+      missed one slot's notification with no in-app way to answer that slot.
+      **Done:** `tracking/TodayModel.kt` (`buildTodayHabitRow`, a pure join over `:domain`'s own
+      `rollupDay` — the day-level classification is never reimplemented in `:app`) +
+      `tracking/TodayViewModel.kt`/`TodayScreen.kt`. Wired as the app's home screen in
+      `MainActivity` (`ConstanzaRoute.Today`, reached before `HabitList`) — not itself a numbered
+      task, but implied by "implement the today screen": an unreachable screen is not delivered.
+- [x] 6b.2 Wire in-app Yes/No/Skip to write `Entry` through the same write path as notification actions (habit-entry-tracking: Entry States, Slot Independence).
+      **Owns an extraction this task's wording assumes already exists.** There is no shared entry-write
+      component: `AnswerWorker` calls `entryDao.upsert(...)` inline, so "the same write path" has to be made
+      into one before it can be shared. Extract it so the notification action and the in-app answer provably
+      run the same code, rather than two paths that merely look alike — `SKIPPED` is in-app only (ratified
+      decision 4 and the spec both say it is never settable from a notification), so the shared path must
+      admit it without letting the notification route reach it.
+      Recorded explicitly because this is the **seventh** case in this change of work that a task's prose
+      assumed was already built (see design.md §13.4); the previous six each shipped a dead or hollow path.
+      **Done:** `tracking/EntryWriter.kt`. `answerOccurrence` (notification route) and `answerInApp`
+      (in-app route) both funnel through the same private `resolveOccurrenceAndWrite` when an
+      occurrence exists, so the two provably run identical transactional upsert/resolve/cancel code
+      rather than two paths that merely look alike. `SKIPPED` restriction expressed in the type
+      system, not a comment: `NotificationEntryStatus` (COMPLETED/MISSED only) vs
+      `InAppEntryStatus` (COMPLETED/MISSED/SKIPPED) — the notification route cannot construct a
+      SKIPPED write even by caller mistake, there is no such member to pass. `AnswerResponder`
+      (former inline `entryDao.upsert` call site) is now a thin adapter over
+      `EntryWriter.answerOccurrence`; its existing idempotency and origin-date-crediting tests
+      (`AnswerWorkerTest`) pass unchanged through the new seam.
+      **Test debt carried to a follow-up batch** (crossed the ~600-line stop before writing these):
+      an explicit comparative assertion that both routes produce the same `Entry` for equivalent
+      inputs (currently proven only implicitly — one shared code path, both callers' existing tests
+      green); a direct test that `InAppEntryStatus.SKIPPED` reaches storage (exercised in production
+      code and reachable from `TodayScreen`'s "Skip" button, but no dedicated test taps it); unit
+      tests for `TodayViewModel`'s rollup/expansion state and `TodayModel`'s pending/snoozed
+      rendering in isolation (covered today only via the one end-to-end `TodayComposeTest`, which
+      exercises `COMPLETED` and never drives a live `SNOOZED` occurrence).
+- [x] 6b.3 Render pending/snoozed state ("pending, snoozed until HH:mm") by reading `reminder_occurrences` (design §7 D3).
+      **Done:** `TodayModel.toTodaySlot` reads `ReminderOccurrenceDao.observeUnresolved()` (a new
+      reactive twin of the existing `findUnresolved()` — same SQL predicate, so the today screen's
+      pending/snoozed state can never disagree with what re-arming considers live) and surfaces
+      `snoozedUntilEpochMs` only while `state == "SNOOZED"`. State constants stay the scattered
+      per-file `private const val STATE_*` this codebase already has (`AnswerWorker.kt`,
+      `SnoozeWorker.kt`, `OccurrencePlanner.kt`, `OccurrenceResolver.kt`, `ReminderFireWorker.kt`) —
+      one more literal `"SNOOZED"` comparison was added consistent with that existing convention
+      rather than a new parallel list; a shared `ReminderOccurrenceState` type is a real refactor to
+      propose, not smuggle into this task. **No dedicated test exercises a live `SNOOZED` occurrence
+      yet** (see 6b.2's test-debt note) — carried to the follow-up batch.
+- [ ] 6b.4 Implement the progress view: current/best streak and compliance, calling `StreakCalculator`/`ComplianceCalculator` with `windowDays = 30`. **[Stale marker — OA-4 was ratified 2026-09-01, design.md §1; not this slice's task to fix]** (habit-progress: Streak Calculation, Compliance Calculation).
 - [ ] 6b.5 Implement the snooze-default setting screen bound to the DataStore entry from 5.6 (reminder-response: Snooze Configuration and Re-arm).
 - [ ] 6b.6 Apply single responsive layout to the today screen for multi-slot habits at `sw >= 600dp` and any orientation (ui-adaptive-layout: Today screen scenario).
-- [ ] 6b.7 [Compose UI test] Answer one slot of a multi-slot habit; verify the sibling slot stays `UNKNOWN`.
+- [x] 6b.7 [Compose UI test] Answer one slot of a multi-slot habit; verify the sibling slot stays `UNKNOWN`.
+      **Done:** `tracking/TodayComposeTest.kt`, `answeringOneSlotLeavesTheSiblingSlotUnknown`. Drives
+      the real `TodayRoute` UI (not a mocked argument capture): creates a two-slot `TIMES_PER_DAY`
+      habit through `HabitRepository`, expands the row, taps "Yes" on the first slot, and asserts
+      exactly one `Entry` row exists — for the tapped slot only — since `UNKNOWN` is never persisted
+      (design.md §8.1), "one row, right slot" IS the slot-independence assertion. Passed on the
+      connected Pixel 10 (API 37), keyguard confirmed down first.
 - [ ] 6b.8 [Compose UI test] Render the today screen at `sw = 600dp` with a multi-slot habit due; verify no clipping/overlap.
+- [ ] 6b.9 **Slice ii. Added 2026-09-01 — the exact-alarm banner, finally given a number.** §13.1's
+      failure table and §12 both promise a non-blocking banner explaining that reminders may arrive late,
+      with one tap to `ACTION_REQUEST_SCHEDULE_EXACT_ALARM`. Task G.5 deferred it to work unit 6b, and no
+      task in 6b.1–6b.8 ever owned it. It surfaces when `canScheduleExactAlarms()` is false — the default
+      on a fresh install targeting API 33+, so this is the common path, not an edge case. Non-blocking:
+      reminders still work, degraded to a ten-minute inexact window (design §13.4's measurement).
+      **Eighth instance of the unowned-promise pattern** — and the second caught before shipping rather
+      than after, because the implementer flagged it instead of absorbing it.
+- [ ] 6b.10 **Slice ii. Added 2026-09-01 — decide `rollupDay`'s classification precedence.** Today a
+      missed slot outranks partial completion, which outranks a fully-pending day. No spec mandates that
+      order; it is `DayRollup.kt`'s own assumption, and it was harmless while invisible. **OA-2's ratified
+      collapsed row makes it the single word a user reads for a whole day**, so a three-slot day with two
+      completions and one miss reads `ANY_MISSED` rather than `PARTIAL`. That is a product choice about
+      whether the row leads with the failure or the progress. Decide it deliberately, amend
+      `habit-entry-tracking` with the answer, and update `DayRollup.kt`'s KDoc — which currently records
+      the open question rather than pretending OA-2 settled it.
+
+**Flagged — eighth unowned-promise instance (see design.md §13.4, learning obs #35):**
+design.md §12/§1298 name a non-blocking "reminders may arrive late" banner with one tap to
+`ACTION_REQUEST_SCHEDULE_EXACT_ALARM`, explicitly "deferred to work unit 6b" — but no task in
+6b.1–6b.8 owns it. Not built this slice (out of scope for 6b.1/6b.2/6b.3/6b.7); flagged rather
+than silently absorbed or dropped, matching `MainActivity`'s own KDoc note.
 
 ## Phase 7: Data Portability (Work Unit 7) — depends on 3 only
 

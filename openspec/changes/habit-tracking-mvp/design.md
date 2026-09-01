@@ -45,15 +45,37 @@ crediting.
 
 ### Orchestrator assumptions carried into this design
 
-Each is marked **`[OA]`** at the point of use and needs confirmation at design review.
+Each was marked **`[OA]`** at the point of use and needed confirmation at design review. **That review never
+happened as an event.** OA-3 was ratified 2026-09-01 only because task 6a.8 could not be built without it,
+after surviving four work units unconfirmed; the rest were closed the same day once that near-miss made the
+debt visible. All five are now settled.
 
-| # | Assumption | Where used |
-|---|---|---|
-| OA-1 | Export/import stays in MVP as the failed-migration recovery path | §8.4, §10 |
-| OA-2 | Today screen shows per-slot state; the day rollup is a separate `:domain` function | §7 D2, §11 |
-| OA-3 | `N_TIMES_PER_WEEK` fires daily until the quota is met, then silent; nothing if no time is set | §7 D7, D8 |
-| OA-4 | Compliance is window-parameterised; the MVP UI passes 30 days | §11 |
-| OA-5 | Import replaces all data rather than merging | §8.4 |
+| # | Assumption | Where used | Status |
+|---|---|---|---|
+| OA-1 | Export/import stays in MVP as the failed-migration recovery path | §8.4, §10 | **Settled** — already covered by ratified product decision 6 ("local-only forever with manual export/import to file"). Never actually an open question. |
+| OA-2 | Today screen shows per-slot state; the day rollup is a separate `:domain` function | §7 D2, §11 | **REVISED and ratified 2026-09-01** — see below. |
+| OA-3 | `N_TIMES_PER_WEEK` fires daily until the quota is met, then silent; nothing if no time is set | §7 D7, D8 | **Ratified 2026-09-01** as written. Already implemented and device-verified (§13.4's D8 result), so confirmation cost no rework. |
+| OA-4 | Compliance is window-parameterised; the MVP UI passes 30 days | §11 | **Ratified 2026-09-01** as written: a fixed 30-day window in the MVP UI. The calculator stays parameterised, so a user-selectable window remains a cheap later addition. |
+| OA-5 | Import replaces all data rather than merging | §8.4 | **Ratified 2026-09-01** as written. Replace-all keeps import a recovery path and avoids conflict-resolution logic, which ratified decision 6 rejected the cloud precisely to avoid. Work unit 7 must make the destructive nature explicit in the UI before it runs. |
+
+**OA-2, as revised.** The today screen shows **one row per habit carrying the day rollup, expandable to that
+habit's per-slot rows**, each slot independently answerable. A single-slot habit therefore reads as one plain
+row.
+
+The user's first answer was a day-level state only, and it was withdrawn once the conflict was laid out —
+recorded here because the reasoning is the useful part. Four things already in the product require slot
+independence: ratified product decision 2 ("each slot fires its own notification and is satisfied/missed
+independently. NOT a counter-without-time model"); `habit-entry-tracking`'s **MUST** that each slot occurrence
+"MUST have its own `Entry` and MUST be answerable independently of every other slot that date"; the shipped
+schema's `UNIQUE(habitId, date, slotId)` on `entries` and its per-slot occurrence identity; and the shipped,
+device-verified notification path, where each slot posts its own notification whose Yes/No/Snooze answers that
+slot alone.
+
+The decisive argument was not purity but a hole: a three-slot habit already sends three separate
+notifications, so a day-level-only screen leaves a user who missed the 14:00 one with **no in-app way to answer
+that slot** — either a day-level answer writes to some arbitrary slot, or single-slot answers exist only
+through notifications. The expandable row keeps the uncluttered glance the day-level answer was reaching for
+while preserving the capability the rest of the system already provides.
 
 ## 2. Ratified stack
 

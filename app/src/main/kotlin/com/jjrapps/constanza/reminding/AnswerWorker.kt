@@ -2,56 +2,29 @@ package com.jjrapps.constanza.reminding
 
 import android.content.Context
 import androidx.hilt.work.HiltWorker
-import androidx.room.withTransaction
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.jjrapps.constanza.core.data.AppDatabase
-import com.jjrapps.constanza.core.data.dao.EntryDao
-import com.jjrapps.constanza.core.data.dao.ReminderOccurrenceDao
-import com.jjrapps.constanza.core.data.entity.EntryEntity
-import com.jjrapps.constanza.core.time.TimeProvider
-import com.jjrapps.constanza.scheduling.AlarmScheduler
+import com.jjrapps.constanza.tracking.EntryWriter
+import com.jjrapps.constanza.tracking.NotificationEntryStatus
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import javax.inject.Inject
 
-private const val ENTRY_SOURCE_NOTIFICATION = "NOTIFICATION"
-private const val STATE_RESOLVED = "RESOLVED"
-
 /**
  * design.md §9.1/§8.2 (reminder-response: Notification Actions, Origin-Date Crediting;
- * habit-entry-tracking: Provisional-Missed Correction). `date = occ.scheduledDate`, never
- * `today()`, is the one line implementing Origin-Date Crediting. The `UNIQUE(habitId, date,
- * slotId)` replace plus no-op re-cancels make a redelivered broadcast or retried worker converge
- * on one row. The notification is cancelled ONLY after the transaction commits.
+ * habit-entry-tracking: Provisional-Missed Correction). Thin adapter over [EntryWriter] (task
+ * 6b.2): the actual write, the origin-date crediting, and the idempotent-upsert/cancel sequence
+ * all now live in [EntryWriter.answerOccurrence], shared with the in-app Today screen route.
  */
-class AnswerResponder @Inject constructor(
-    private val database: AppDatabase,
-    private val entryDao: EntryDao,
-    private val reminderOccurrenceDao: ReminderOccurrenceDao,
-    private val alarmScheduler: AlarmScheduler,
-    private val notificationPoster: NotificationPoster,
-    private val timeProvider: TimeProvider,
-) {
+class AnswerResponder @Inject constructor(private val entryWriter: EntryWriter) {
     /** [status] is [AnswerWorker.STATUS_COMPLETED] ("Yes") or [AnswerWorker.STATUS_MISSED] ("No"). */
     suspend fun answer(occurrenceId: Long, status: String) {
-        val occ = reminderOccurrenceDao.findById(occurrenceId) ?: return
-        database.withTransaction {
-            entryDao.upsert(
-                EntryEntity(
-                    habitId = occ.habitId,
-                    date = occ.scheduledDate,
-                    slotId = occ.slotId,
-                    status = status,
-                    value = null,
-                    answeredAt = timeProvider.now().toString(),
-                    source = ENTRY_SOURCE_NOTIFICATION,
-                ),
-            )
-            reminderOccurrenceDao.upsert(occ.copy(state = STATE_RESOLVED))
+        val notificationStatus = when (status) {
+            AnswerWorker.STATUS_COMPLETED -> NotificationEntryStatus.COMPLETED
+            AnswerWorker.STATUS_MISSED -> NotificationEntryStatus.MISSED
+            else -> return
         }
-        alarmScheduler.cancel(occurrenceId)
-        notificationPoster.cancel(occurrenceId)
+        entryWriter.answerOccurrence(occurrenceId, notificationStatus)
     }
 }
 
