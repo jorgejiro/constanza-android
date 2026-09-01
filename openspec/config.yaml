@@ -12,36 +12,42 @@ context: |
 
 carried_forward_open_items:
   note: >
-    Genuinely open, blocked work items surfaced by habit-tracking-mvp
-    (archived 2026-09-01 to openspec/changes/archive/2026-09-01-habit-tracking-mvp/).
-    Neither is a stale checkbox or an oversight; both are documented, reasoned
-    blocks with a named owner condition. This section is the durable home for
-    them because the change folder itself now lives under archive/, which a
-    future contributor opening a new change is unlikely to browse. Do not
-    close either item silently in a future change — resolve it explicitly and
-    remove it from this list when done, or replace it with a new decision.
+    Genuinely open work items surfaced by a change but deliberately left out of
+    its scope. None of these is a stale checkbox or an oversight; each is a
+    documented, reasoned block with a named owner condition. This section is the
+    durable home for them because a change folder eventually moves under
+    archive/, which a future contributor opening a new change is unlikely to
+    browse. Do not close any item silently in a future change — resolve it
+    explicitly and remove it from this list when done, or replace it with a new
+    decision. Item 7.5 was closed this way by warm-dark-design-system, which
+    wrote the app's first Room migration and so met its owner condition.
   items:
-    - id: "7.5"
-      title: "Automatic pre-migration export hook"
+    - id: "lint-preexisting-errors"
+      title: "Three pre-existing Android Lint errors block ./gradlew check"
       status: blocked
-      origin: "habit-tracking-mvp tasks.md, task 7.5 (left unchecked, not marked complete)"
+      origin: >
+        Surfaced by warm-dark-design-system task 6.4, which was the first task
+        anywhere in this repository to run the full `./gradlew check` aggregate.
+        Earlier work only ever ran `:app:detektMain` and `:domain:detektMain`,
+        so nothing before it could have caught these.
       reason: >
-        AppDatabase is at version = 1 with no Migration class anywhere in this
-        repository, so there is no "before" state for an export hook to run
-        against yet. No hook placed in :app's normal startup/DI path can work
-        either: Room applies migrations lazily and every typed DAO is bound to
-        the TARGET schema, so by the time a DAO is queryable the migration has
-        already run. The only correct placement is a version-agnostic raw-SQL
-        dump (enumerate sqlite_master, read each table via Cursor) as the
-        FIRST statement inside the future Migration(1, 2).migrate(db) body,
-        before any ALTER TABLE runs.
+        All three errors are pre-existing and sit in files that
+        warm-dark-design-system never touches (verified: `git diff main..HEAD`
+        is empty for all three across the whole PR chain). Fixing them inside
+        that change would have expanded a change already running 2-3x its
+        review budget, into files outside its scope. They belong in their own
+        small PR.
+      items:
+        - "MissingPermission — app/src/main/kotlin/com/jjrapps/constanza/reminding/NotificationPoster.kt:52. The manager.notify call. Worth a real look rather than a suppression: NotificationPoster does gate on canPost() (added by task G.3), so the call is guarded in fact, but lint cannot prove it through the helper. The fix is either an inline permission check lint can see or an annotation that documents the existing guard."
+        - "NonObservableLocale — app/src/main/kotlin/com/jjrapps/constanza/habit/ScheduleEditors.kt:242. Reading locale in a non-observable way inside a composable, so the schedule editor will not recompose on a locale change."
+        - "ViewModelConstructorInComposable — app/src/androidTest/kotlin/com/jjrapps/constanza/habit/HabitScheduleKindComposeTest.kt:60. Test-only, lowest of the three."
       why_it_matters: >
-        Not housekeeping. Ratified decision 6 and OA-1 put manual export/import
-        in the MVP specifically as the failed-migration recovery path (see
-        openspec/specs/data-portability/spec.md); the automatic snapshot is
-        what makes that recovery reach a user who never exported by hand
-        before the migration that corrupted their data.
-      owner_condition: "Belongs to whoever writes the first Room migration (the first schema change past version 1)."
+        `./gradlew check` is the natural aggregate gate for CI, and while these
+        three stand it cannot be made a required check. The MissingPermission
+        one is on the notification path of a reminder app, which is the one
+        place a silently-dropped post costs a user the whole feature.
+      owner_condition: "Its own PR, independent of any design or feature work. No blocker — it needs no device, no decision and no other change to land first."
+
     - id: "G.7-throttling-row"
       title: "One UI \"put unused apps to sleep\" survival row (Galaxy Z Fold 7)"
       status: blocked
@@ -213,7 +219,7 @@ testing:
       unit: "JUnit4 + kotlin.test (revises the earlier unratified JUnit5 plan)"
       mocking: "MockK; Turbine for Flow; kotlinx-coroutines-test"
       instrumented: "AndroidX Test + androidx.work:work-testing + compose-ui-test-junit4"
-      migrations: "Room MigrationTestHelper against the checked-in app/schemas/1.json"
+      migrations: "Room MigrationTestHelper against the checked-in app/schemas/com.jjrapps.constanza.core.data.AppDatabase/1.json"
     commands:
       domain_unit: "./gradlew :domain:test"
       app_unit: "./gradlew :app:testDebugUnitTest"

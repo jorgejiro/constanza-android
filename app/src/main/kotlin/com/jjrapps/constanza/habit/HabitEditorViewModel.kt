@@ -3,6 +3,7 @@ package com.jjrapps.constanza.habit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jjrapps.constanza.core.time.TimeProvider
+import com.jjrapps.constanza.core.ui.theme.HabitPalette
 import com.jjrapps.constanza.domain.model.Habit
 import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
@@ -321,7 +322,7 @@ data class HabitEditorUiState(
     val habitId: Long? = null,
     val name: String = "",
     val question: String = "",
-    val colorArgb: Int = HabitColorPalette.DEFAULT,
+    val colorArgb: Int = HabitPalette.DEFAULT,
     val notes: String = "",
     val schedule: Schedule = Schedule.Daily(),
     val slots: List<ReminderSlot> = emptyList(),
@@ -334,17 +335,4 @@ data class HabitEditorUiState(
 
 sealed interface HabitEditorEvent {
     data object Saved : HabitEditorEvent
-}
-
-/** A small fixed swatch set — a full colour picker is out of scope for this slice. */
-object HabitColorPalette {
-    val SWATCHES = listOf(
-        0xFF00897B.toInt(),
-        0xFF1E88E5.toInt(),
-        0xFFE53935.toInt(),
-        0xFFFB8C00.toInt(),
-        0xFF8E24AA.toInt(),
-        0xFF43A047.toInt(),
-    )
-    val DEFAULT = SWATCHES.first()
 }

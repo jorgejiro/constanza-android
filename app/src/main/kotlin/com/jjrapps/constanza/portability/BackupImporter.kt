@@ -2,6 +2,7 @@ package com.jjrapps.constanza.portability
 
 import androidx.room.withTransaction
 import com.jjrapps.constanza.core.data.AppDatabase
+import com.jjrapps.constanza.core.data.migration.HabitColorRemap
 import com.jjrapps.constanza.reminding.ReminderSettingsStore
 import com.jjrapps.constanza.reminding.SnoozeDuration
 import com.jjrapps.constanza.scheduling.AlarmScheduler
@@ -23,6 +24,24 @@ class MalformedBackupException(message: String, cause: Throwable? = null) : Exce
  *  whole import instead of importing partially. */
 class UnsupportedBackupVersionException(fileVersion: Int) :
     Exception("This backup was made by a newer version of Constanza (format $fileVersion) and can't be imported here.")
+
+/**
+ * Task 2.8 (data-portability: Backup Schema Version Read On Import, Legacy Habit Colour Normalized
+ * On Import). A pure, top-level function — not a [BackupImporter] method — so
+ * `BackupImporterNormalizationTest` can assert its behaviour directly, without constructing a
+ * [BackupImporter] and its five injected collaborators. [schemaVersion] `< CURRENT_SCHEMA_VERSION`
+ * (a file exported before this palette change) has every habit's [BackupHabit.colorArgb] rewritten
+ * through [HabitColorRemap.normalize] — the same one-to-one map `AppMigrations.MIGRATION_1_2`
+ * applies to already-persisted data. `schemaVersion == CURRENT_SCHEMA_VERSION` returns [habits]
+ * unchanged: colours are imported byte-identical (data-portability: Round-Trip Fidelity, "Current-
+ * version round trip preserves colour exactly").
+ */
+internal fun normalizeHabitColors(habits: List<BackupHabit>, schemaVersion: Int): List<BackupHabit> =
+    if (schemaVersion < CURRENT_SCHEMA_VERSION) {
+        habits.map { it.copy(colorArgb = HabitColorRemap.normalize(it.colorArgb)) }
+    } else {
+        habits
+    }
 
 /**
  * Task 7.3 (data-portability: Import, Round-Trip Fidelity). Split in two on purpose:
@@ -75,6 +94,7 @@ class BackupImporter @Inject constructor(
         val armedOccurrenceIds = daos.habitDao.findAllSnapshot()
             .flatMap { daos.reminderOccurrenceDao.findByHabitId(it.id) }
             .map { it.id }
+        val habits = normalizeHabitColors(backup.habits, backup.schemaVersion)
 
         database.withTransaction {
             // reminder_occurrences is deliberately excluded from the file (design.md §8.4) and
@@ -82,7 +102,7 @@ class BackupImporter @Inject constructor(
             // the alarms it referenced are cancelled below, after the transaction commits, since
             // AlarmManager state is independent of the Room row it was armed from.
             daos.habitDao.deleteAll()
-            backup.habits.forEach { insertHabit(it) }
+            habits.forEach { insertHabit(it) }
         }
         settingsStore.setSnoozeDuration(SnoozeDuration.fromMinutes(backup.settings.defaultSnoozeMinutes))
 

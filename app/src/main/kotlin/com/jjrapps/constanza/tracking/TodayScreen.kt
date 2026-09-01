@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -23,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -32,6 +34,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.component.HabitColorDot
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
+import com.jjrapps.constanza.core.ui.theme.ConstanzaShapes
 import com.jjrapps.constanza.domain.model.DayStatus
 import com.jjrapps.constanza.domain.model.EntryStatus
 import java.time.Instant
@@ -121,28 +126,36 @@ private fun TodayContent(
 /** Task 6b.9 (design §12/§13.1): non-blocking — reminders still fire, degraded to a 10-minute
  *  inexact window (design §13.4's measurement), so this is informational, not a gate. One tap
  *  deep-links to [Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM]; the default on a fresh install
- *  targeting API 33+ is denied, so this is the common path, not an edge case. */
+ *  targeting API 33+ is denied, so this is the common path, not an edge case.
+ *
+ *  Wrapped in a tonal [Surface] (design.md decision 7 — the one deliberate structural surface this
+ *  change adds): a banner with no container does not read as a banner, and unlike a per-row `Card`
+ *  this is a single `LazyColumn` `item`, not a repeated row, so it costs no measured-height budget
+ *  anywhere `TodayAdaptiveComposeTest` looks. */
 @Composable
 private fun ExactAlarmBanner() {
     val context = LocalContext.current
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        // `weight(1f)` is load bearing, not styling: without it the text takes whatever width it
-        // wants and `SpaceBetween` pushes the action button clean off the right edge, so the one tap
-        // §13.1 promises becomes unreachable while the banner still looks fine. Found by task G.7's
-        // manual matrix on a 1080dp-wide Pixel 10 — the automated `sw = 600dp` test (6b.8) asserts
-        // the habit rows, not this banner.
-        Text(
-            stringResource(R.string.today_exact_alarm_banner),
-            modifier = Modifier.weight(1f).padding(end = 8.dp),
-        )
-        TextButton(onClick = {
-            val uri = Uri.parse("package:${context.packageName}")
-            context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, uri))
-        }) {
-            Text(stringResource(R.string.today_exact_alarm_banner_action))
+    Surface(color = ConstanzaColors.SurfaceRaised, shape = ConstanzaShapes.medium) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            // `weight(1f)` is load bearing, not styling: without it the text takes whatever width
+            // it wants and `SpaceBetween` pushes the action button clean off the right edge, so the
+            // one tap §13.1 promises becomes unreachable while the banner still looks fine. Found
+            // by task G.7's manual matrix on a 1080dp-wide Pixel 10 — the automated `sw = 600dp`
+            // test (6b.8) asserts the habit rows, not this banner. Preserved verbatim through the
+            // `Surface` wrap above (work unit 4) — this `Row` is not replaced.
+            Text(
+                stringResource(R.string.today_exact_alarm_banner),
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
+            )
+            TextButton(onClick = {
+                val uri = Uri.parse("package:${context.packageName}")
+                context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, uri))
+            }) {
+                Text(stringResource(R.string.today_exact_alarm_banner_action))
+            }
         }
     }
 }
@@ -160,13 +173,20 @@ private fun HabitRollupRow(
     if (row.slots.size <= 1) {
         val slot = row.slots.firstOrNull()
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-            Text(row.habitName, modifier = Modifier.padding(start = 16.dp, top = 8.dp))
+            Row(
+                modifier = Modifier.padding(start = 16.dp, top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                HabitColorDot(row.colorArgb)
+                Text(row.habitName)
+            }
             if (slot != null) SlotRow(row.habitId, slot, zone, onAnswer)
         }
         return
     }
     Column(modifier = Modifier.fillMaxWidth()) {
         ListItem(
+            leadingContent = { HabitColorDot(row.colorArgb) },
             headlineContent = { Text(row.habitName) },
             supportingContent = { Text(stringResource(dayStatusLabel(row.dayStatus))) },
             trailingContent = {

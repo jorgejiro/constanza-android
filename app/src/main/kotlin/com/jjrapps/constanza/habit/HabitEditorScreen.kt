@@ -40,6 +40,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
+import com.jjrapps.constanza.core.ui.theme.Dimens
+import com.jjrapps.constanza.core.ui.theme.HabitPalette
 
 /**
  * Tasks 6a.1 (non-schedule half)/6a.2/6a.3 — container. [habitId] is `null` for creation, an
@@ -118,7 +121,7 @@ fun HabitEditorScreen(
     } else {
         R.string.habit_editor_title_edit
     }
-    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(titleRes)) }) }) { padding ->
+    Scaffold(topBar = { HabitEditorTopBar(titleRes) }, containerColor = ConstanzaColors.Background) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
@@ -172,6 +175,21 @@ fun HabitEditorScreen(
             }
         }
     }
+}
+
+/** Task 6.0 decision: the unit-5 pin to [ConstanzaColors.Background] (`colors =
+ *  TopAppBarDefaults.topAppBarColors(containerColor = ConstanzaColors.Background)`) is REMOVED. Its
+ *  own KDoc justification — "`surfaceContainer` is not one of the roles `ConstanzaColors` repoints" —
+ *  is exactly the gap task 6.0 closes at the theme layer: `Theme.kt`'s `DarkColors` now binds
+ *  `surfaceContainer` to [ConstanzaColors.Surface], so the bar is warm by default across every
+ *  screen, not just this one. Keeping a per-screen override here would silently re-diverge from
+ *  every other top bar in the app (`ProgressScreen`, `SnoozeSettingsScreen`) the moment either of
+ *  those needed a different tone, for no remaining reason. The composable extraction itself is kept
+ *  — it still exists purely to hold [titleRes], the same reason `EditorNameField` is its own
+ *  composable, not to hold a colour override. */
+@Composable
+private fun HabitEditorTopBar(titleRes: Int) {
+    TopAppBar(title = { Text(stringResource(titleRes)) })
 }
 
 /**
@@ -236,20 +254,17 @@ private fun EditorNameField(
     )
 }
 
-private val SWATCH_SIZE = 40.dp
-private val SWATCH_BORDER = 3.dp
-
 @Composable
 private fun ColorSwatchRow(selected: Int, onColorChange: (Int) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        HabitColorPalette.SWATCHES.forEach { swatch ->
+        HabitPalette.ARGB.forEach { swatch ->
             val borderColor = if (swatch == selected) MaterialTheme.colorScheme.primary else Color.Transparent
             Row(
                 modifier = Modifier
-                    .size(SWATCH_SIZE)
+                    .size(Dimens.Swatch)
                     .clip(CircleShape)
                     .background(Color(swatch))
-                    .border(SWATCH_BORDER, borderColor, CircleShape)
+                    .border(Dimens.SwatchBorder, borderColor, CircleShape)
                     .clickable { onColorChange(swatch) },
             ) {}
         }

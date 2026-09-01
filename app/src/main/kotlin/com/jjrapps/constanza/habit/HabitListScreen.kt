@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.component.HabitColorDot
 import com.jjrapps.constanza.domain.model.Habit
 
 /**
@@ -145,6 +146,7 @@ private fun HabitRow(
     onShowProgress: (Long) -> Unit,
 ) {
     ListItem(
+        leadingContent = { HabitColorDot(habit.colorArgb) },
         headlineContent = { Text(habit.name) },
         supportingContent = habit.question?.let { question -> { Text(question) } },
         trailingContent = {

@@ -18,11 +18,17 @@ private const val NO_SLOT = 0L
 /** Task 6b.1 (OA-2, design.md §1's assumption table). One row per habit carrying [dayStatus] —
  *  produced by `:domain`'s [rollupDay], never reimplemented here — expandable to [slots], each
  *  independently answerable. A single-slot habit ([slots] of size 1) reads as one plain row; the
- *  UI decides that presentation, this state only carries the data. */
+ *  UI decides that presentation, this state only carries the data.
+ *
+ *  [colorArgb] backs the habit-colour dot (design.md decision 6, work unit 4, correction C3) and
+ *  deliberately has NO default value: [buildTodayHabitRow] must fill it from the [Habit] it
+ *  already holds, and the compiler — not a silently-passing test — is what catches a forgotten
+ *  mapping if that ever stops being true. */
 data class TodayHabitRow(
     val habitId: Long,
     val habitName: String,
     val dayStatus: DayStatus,
+    val colorArgb: Int,
     val slots: List<TodaySlot>,
 )
 
@@ -83,7 +89,7 @@ fun buildTodayHabitRow(
             toTodaySlot(slot.id, slot.minuteOfDay, domainEntries, habitOccurrences)
         }
     }
-    return TodayHabitRow(habit.id, habit.name, dayStatus, slotRows)
+    return TodayHabitRow(habit.id, habit.name, dayStatus, habit.colorArgb, slotRows)
 }
 
 private fun toTodaySlot(
