@@ -1,6 +1,7 @@
 package com.jjrapps.constanza.tracking
 
 import android.content.Context
+import androidx.lifecycle.viewModelScope
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jjrapps.constanza.core.data.entity.ReminderOccurrenceEntity
@@ -13,6 +14,8 @@ import com.jjrapps.constanza.scheduling.AlarmScheduler
 import com.jjrapps.constanza.scheduling.insertHabitWithSchedule
 import io.mockk.every
 import io.mockk.mockk
+import java.time.Instant
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -22,7 +25,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.time.Instant
 
 private const val ORIGIN_DATE = "2026-08-31"
 private const val EVENING_MINUTE = 20 * 60
@@ -74,8 +76,20 @@ class EntryWriteParityTest {
         )
     }
 
+    /**
+     * The scope is cancelled BEFORE the database closes, and that order is the whole point.
+     * [TodayViewModel.uiState] is `stateIn(viewModelScope, SharingStarted.Eagerly, ...)`, and this
+     * test builds the ViewModel by bare constructor rather than through a `ViewModelProvider`, so
+     * nothing ever clears it. Left running, that eager collector keeps querying a database this
+     * `close()` has already shut, and the resulting `SQLiteConnectionPool` "connection pool has been
+     * closed" surfaces asynchronously — attributed to whichever test happens to be running at the
+     * time, not to this one. Found as an intermittent failure in a class it had nothing to do with.
+     */
     @After
-    fun tearDown() = fixture.close()
+    fun tearDown() {
+        viewModel.viewModelScope.cancel()
+        fixture.close()
+    }
 
     @Test
     fun bothRoutesWriteTheSameEntryCreditingTheOccurrenceOriginDate() = runBlocking {

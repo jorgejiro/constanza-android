@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.lifecycle.viewModelScope
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jjrapps.constanza.R
@@ -18,6 +19,7 @@ import com.jjrapps.constanza.scheduling.AlarmScheduler
 import com.jjrapps.constanza.scheduling.insertHabitWithSchedule
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -64,8 +66,20 @@ class TodayComposeTest {
         )
     }
 
+    /**
+     * The scope is cancelled BEFORE the database closes, and that order is the whole point.
+     * [TodayViewModel.uiState] is `stateIn(viewModelScope, SharingStarted.Eagerly, ...)`, and this
+     * test builds the ViewModel by bare constructor rather than through a `ViewModelProvider`, so
+     * nothing ever clears it. Left running, that eager collector keeps querying a database this
+     * `close()` has already shut, and the resulting `SQLiteConnectionPool` "connection pool has been
+     * closed" surfaces asynchronously — attributed to whichever test happens to be running at the
+     * time, not to this one. Found as an intermittent failure in a class it had nothing to do with.
+     */
     @After
-    fun tearDown() = fixture.close()
+    fun tearDown() {
+        viewModel.viewModelScope.cancel()
+        fixture.close()
+    }
 
     private fun text(resId: Int) = ApplicationProvider.getApplicationContext<Context>().getString(resId)
 

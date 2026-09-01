@@ -566,8 +566,17 @@ pushed past, per the same instruction that converted unit 6a's overshoots into d
       **Done:** `reminding/SnoozeSettingsViewModel.kt`/`SnoozeSettingsScreen.kt`, reached from Today's
       new "Settings" action. Reads/writes `ReminderSettingsStore.snoozeDuration`/`setSnoozeDuration`
       directly — no second source of truth. All seven `SnoozeDuration` values shown as a radio list,
-      default 20 minutes (already `SnoozeDuration.DEFAULT`). **Test debt carried**, same reason as
-      6b.4: a round-trip test through the real DataStore is not yet written.
+      default 20 minutes (already `SnoozeDuration.DEFAULT`).
+      **The "test debt carried" note here was wrong, corrected 2026-09-01.** A round-trip test through
+      a real DataStore already existed before 6b.5 was written: `ReminderSettingsStoreTest`'s
+      `setSnoozeDuration persists and is read back by currentSnoozeDuration`, added in commit `7f1c476`
+      during work unit 5-i, backed by a real temp-file `PreferenceDataStoreFactory` with no mock. This
+      screen reads and writes the very same `ReminderSettingsStore.snoozeDuration`/`setSnoozeDuration`
+      that test exercises, and its own KDoc says there is no second source of truth.
+      Third time in this change a stale claim outlived a correction pass: `85fc7a8` fixed 6b.2/6b.3/6b.4
+      and never revisited this note. Found by the full-change re-verification, which also caught that
+      its own first-pass report had repeated the same false claim — it had searched only filenames
+      containing "Snooze" and so missed the file.
 - [x] 6b.6 Apply single responsive layout to the today screen for multi-slot habits at `sw >= 600dp` and any orientation (ui-adaptive-layout: Today screen scenario).
       **Done — no structural changes needed, same finding as 6a.5's editor.** `TodayScreen.kt` already
       used no fixed widths and a scrolling `LazyColumn`, so verification, not new layout code, is

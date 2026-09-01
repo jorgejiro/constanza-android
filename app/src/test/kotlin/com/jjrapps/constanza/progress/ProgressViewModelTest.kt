@@ -161,6 +161,41 @@ class ProgressViewModelTest {
     }
 
     /**
+     * [ProgressUiState.bestStreak] was the one field of the four with no coverage anywhere in `:app`
+     * — found by the full-change re-verification, not by a failure. The calculator's own arithmetic
+     * is covered in `:domain`'s `StreakCalculatorTest`; what is asserted here is the wiring plus the
+     * archive interaction, which is where a mistake would actually land.
+     *
+     * The shape is deliberate: the best run (three consecutive days) sits entirely before the
+     * archive date, and a later run is cut short by it. So `bestStreak` must report the historical
+     * maximum rather than being clamped down to whatever the tail happens to be, while
+     * `currentStreak` reads the frozen tail. Asserting both in one test is what makes them
+     * distinguishable — a bug that collapsed one into the other would still satisfy either alone.
+     */
+    @Test
+    fun `best streak reports the historical maximum, not the frozen tail`() = runTest {
+        val entries = listOf(
+            entry("2026-09-01", "COMPLETED"),
+            entry("2026-09-02", "COMPLETED"),
+            entry("2026-09-03", "COMPLETED"),
+            entry("2026-09-04", "MISSED"),
+            entry("2026-09-05", "COMPLETED"),
+        )
+        stub(
+            habit(archived = true, archivedAt = LocalDate.parse("2026-09-06")),
+            Schedule.Daily(),
+            entries,
+            today = LocalDate.parse("2026-09-20"),
+        )
+        val viewModel = newViewModel()
+
+        viewModel.load(HABIT_ID)
+
+        assertEquals(3, viewModel.uiState.value.bestStreak, "best streak is the pre-archive maximum")
+        assertEquals(1, viewModel.uiState.value.currentStreak, "current streak is the frozen tail")
+    }
+
+    /**
      * Design decision: a CURRENT streak freezes at the moment of archiving rather than reading
      * live against real "today" — an archived habit is closed history, not an ongoing run. This
      * matters concretely for `N_TIMES_PER_WEEK`: without clamping `today`, every entry-less week
