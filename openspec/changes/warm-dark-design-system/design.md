@@ -147,10 +147,17 @@ db.execSQL(
 ```
 
 Two reasons the args are **bound, never inlined**. First, `0xFF8E24AA.toInt()` is the *negative*
-`-7461206` in the column, while `0xFF8E24AA` written inside SQL is parsed by SQLite as `4287103146`
+`-7461718` in the column, while `0xFF8E24AA` written inside SQL is parsed by SQLite as `4287505578`
 and matches nothing — a migration that runs green and rewrites zero rows. Binding lets Kotlin's
 `Int` conversion be the only place the sign is decided. Second, the map becomes the single source: no
 number is hand-transcribed into SQL at all.
+
+The arithmetic, since this passage previously carried a miscalculation (`-7461206`/`4287103146`)
+that the full-change verification caught: `4287505578 - 2^32 = -7461718`. The wrong pair was
+doc-only — it never reached `AppMigrations.kt`, whose KDoc states the mechanism without repeating
+these figures, nor `tasks.md`, which had the correct pair. Recorded rather than silently swapped,
+because a wrong number in the document that explains a subtle trap is exactly what misleads the
+next reader into thinking they can verify it by hand.
 
 **Rejected: six sequential `UPDATE … WHERE colorArgb = ?` statements.** They are safe here only because
 the legacy and current int sets happen to be disjoint (checked: `00897B/1E88E5/E53935/FB8C00/8E24AA/

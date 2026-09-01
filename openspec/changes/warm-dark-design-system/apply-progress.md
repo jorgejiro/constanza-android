@@ -488,3 +488,156 @@ retint.
 - `:domain` — confirmed untouched (`./gradlew :domain:test` exact-matches baseline 52).
 - `HabitEditorComposeTest.kt`/`HabitEditorRotationComposeTest.kt` — confirmed byte-identical to before
   this unit; only their passing result is new evidence, not their source.
+
+## Unit 6 — Remaining Screens Tonal Pass (PR E) — `feat/warm-dark-screens-tonal`
+
+Status: tasks 6.0, 6.1, 6.2, 6.3, 6.6 done. **6.4 partially proven — flagged loudly, not marked
+complete.** 6.5 not run (manual-only, correctly left unchecked). Branch created off
+`feat/warm-dark-editor-tonal` (tip `60cfcab`, unit 5). Two `feat`/`fix` commits, no PR opened
+(orchestrator's job).
+
+### Task 6.0 — the important one, done first as instructed
+
+`core/ui/theme/Theme.kt`'s `DarkColors` went from 11 bound M3 roles to 21. The five-tone ramp
+(`Background` < `Surface` < `SurfaceRaised` < `SurfaceSelected` < `Outline`) maps onto the five
+`surfaceContainer*` roles, with `surfaceContainerLowest`/`Low` deliberately collapsing onto
+`Background` (nothing in this app's component inventory — `ListItem`, `TopAppBar`,
+`ExposedDropdownMenu`, `AlertDialog`, confirmed by `rg` — needs a container more recessed than the
+screen itself):
+
+| M3 role | Bound to | Reused from |
+|---|---|---|
+| `surfaceContainerLowest` | `Background` | already bound (unit 1) |
+| `surfaceContainerLow` | `Background` | already bound (unit 1) |
+| `surfaceContainer` | `Surface` | already bound (unit 1) |
+| `surfaceContainerHigh` | `SurfaceRaised` | already bound as `surfaceVariant` (unit 1) |
+| `surfaceContainerHighest` | `SurfaceSelected` | already bound as `secondaryContainer` (unit 1) |
+| `outlineVariant` | `Outline` | already bound as `outline` (unit 1) |
+| `primaryContainer` | `SurfaceSelected` | mirrors `secondaryContainer` |
+| `onPrimaryContainer` | `OnBackground` | mirrors `onSecondaryContainer` |
+| `secondary` | `Accent` | mirrors `primary` — one accent, per spec `Accent Reserved For Chrome` |
+| `onSecondary` | `OnAccent` | mirrors `onPrimary` |
+
+**`ConstanzaColors.Outline` deliberately NOT reused as a container fill.** A naive sixth ramp step
+would suggest `surfaceContainerHighest = Outline`, but `FilterChip`'s unselected border already reads
+`colorScheme.outline` — giving its fill the identical value would render an invisible border (fill
+and border blending into one flat colour). Caught before writing the binding, not after.
+
+**Audited and left at M3 default, each with a stated reason (full detail in `Theme.kt`'s own KDoc,
+per the instruction that a silent omission is what caused this gap in the first place):**
+`tertiary*` (zero call sites, `rg -i tertiary` confirms), `error*` beyond the already-consumed
+`colorScheme.error` (M3's baseline error red isn't hue-derived from `primary`, so it needs no
+repointing; no filled `errorContainer` exists), `inverseSurface`/`inverseOnSurface`/`inversePrimary`
+(no `Snackbar` or inverse component anywhere, `rg -i snackbar` confirms), `scrim` (fixed
+black-with-alpha, hue-independent, already appropriate), `surfaceTint` (M3's default is a fixed
+violet constant NOT auto-derived from `primary`, but every `Surface`/`Card`/`TopAppBar`/`Scaffold` in
+this app sets an explicit `containerColor` or reads a now-warm container role at zero
+`tonalElevation`, so nothing currently blends it into a visible pixel — flagged as one to revisit if
+a future `Card` introduces real tonal-elevation blending), `surfaceDim`/`surfaceBright` (zero call
+sites).
+
+**`HabitEditorTopBar`'s unit-5 pin to `Background` — REMOVED, decided explicitly as instructed.**
+Its own KDoc justification ("`surfaceContainer` isn't one of the roles `ConstanzaColors` repoints")
+is exactly the gap this task closes at the theme layer: `surfaceContainer` now resolves to
+`ConstanzaColors.Surface` for every `TopAppBar` in the app, not just the editor's. Keeping a
+per-screen override would have silently re-diverged the editor's bar from `ProgressScreen`'s and
+`SnoozeSettingsScreen`'s (both left at M3 defaults, see 6.1/6.2 below) the moment either needed a
+different tone, for no remaining reason once the root cause is fixed. The `HabitEditorTopBar`
+composable itself is kept — it now exists solely to hold `titleRes`, same as `EditorNameField`.
+`TopAppBarDefaults` import removed as now-unused.
+
+**`ColorContrastTest` extended** with the two literal surface values newly reachable as an M3
+container fill that were bound in unit 1 but never measured: `Surface` (via `surfaceContainer`,
+where `ListItem`'s `HabitColorDot` and habit-name text land on `TodayScreen`/`HabitListScreen`) and
+`SurfaceRaised` (via `surfaceContainerHigh`, backing `AlertDialog` and `ExactAlarmBanner`'s
+`Surface`). 5 new test methods, 12 + 3 = new assertions (2 loop-based across all 6 habit colours,
+3 single).
+
+### Tasks 6.1–6.3 — the same finding, three times, flagged loudly each time
+
+**Zero production code changes needed in `ProgressScreen.kt`, `SnoozeSettingsScreen.kt`, or
+`DataPortabilityScreen.kt`.** Each file was read in full before concluding this, exactly the same
+discipline unit 5 used for `ScheduleEditors.kt`. None contains a `Color(...)` literal, a `Card`, or a
+`Divider`; every themed surface each file touches (`TopAppBar`, `Scaffold`, `RadioButton`,
+`AlertDialog`, `TextButton`) already resolves through `MaterialTheme.colorScheme`, which task 6.0
+just finished making warm end-to-end. This is precisely the outcome task 6.0's own KDoc predicted:
+"if you do the screens first you will patch the same symptom three times locally" — doing the theme
+first meant there was nothing left to patch. `git diff` for all three files is empty; confirmed via
+`git diff --stat` after this unit's commits, not assumed from the read alone.
+
+### Deviation, flagged loudly (detekt, not design) — `fix(test)` commit
+
+`./gradlew check` is the first invocation of the full aggregate anywhere in this SDD change; every
+prior unit's verification only ran `:app:detektMain`/`:domain:detektMain`, which do not analyze test
+sources. The test-inclusive `:app:detekt` failed on first run: 3 `MaxLineLength` violations — one in
+this unit's own `ColorContrastTest` extension, two pre-existing in `OccurrencePlannerTest.kt`
+(last touched by the archived `habit-tracking-mvp` change) and `TodayViewModelTest.kt` (last touched
+by this change's own unit 4, commit `290c727` — unrelated to the tonal-pass work here). All three are
+mechanical line-wraps with zero logic change; fixed together in a separate `fix(test)` commit since
+they block this unit's own explicit gate and the fix carries no behavioural risk.
+
+### Correction to task 6.4's own stated proof — flagged loudly, not silently reconciled
+
+**`./gradlew check` is NOT green.** After the `MaxLineLength` fix, `:app:detekt` and every test task
+pass, but `:app:lintDebug` fails on 3 pre-existing errors, none introduced by this unit and none in a
+file this whole change has ever touched:
+
+| File:line | Lint rule | Last touched by |
+|---|---|---|
+| `reminding/NotificationPoster.kt:52` | `MissingPermission` | `c3e3172` (reminding capability, pre-this-change) |
+| `habit/ScheduleEditors.kt:242` | `NonObservableLocale` (`Locale.getDefault()` in `DayOfWeekPicker`) | `f599c4a` (habit-scheduling, pre-this-change) |
+| `androidTest/.../HabitScheduleKindComposeTest.kt:60` | `ViewModelConstructorInComposable` | `fb94a36` (habit-scheduling test, pre-this-change) |
+
+Each traced via `git log --oneline -1 -- <file>` to a commit outside this SDD change's own history —
+none of units 1–6 ever touched these three lines. Not fixed here: a `MissingPermission` runtime-crash
+guard and a `NonObservableLocale` recomposition fix are genuine behavioural changes to unrelated
+capabilities (notification posting, schedule editing), well outside a tonal-pass unit's rollback
+boundary, and risk-inappropriate to fold into a colour-role change. **Task 6.4 is left unchecked**
+because its stated proof (`check` green) did not pass — the honest state, not a silent downgrade of
+the requirement. This needs its own scoped fix, routed by the orchestrator, before `./gradlew check`
+can ever be green in this repository.
+
+### Verification (real numbers, `--rerun-tasks` used throughout; `JAVA_HOME` pointed at Android
+Studio's bundled JBR as in units 1–5)
+
+| Command | Result |
+|---|---|
+| `./gradlew :app:testDebugUnitTest` | BUILD SUCCESSFUL — 118/118, 0 failures (baseline 113 + 5 new `ColorContrastTest` methods) |
+| `./gradlew :domain:test` | BUILD SUCCESSFUL — 52/52 (exact baseline match; `:domain` confirmed untouched) |
+| `./gradlew :app:connectedDebugAndroidTest` (Galaxy Z Fold 7, serial `RFCY720PJKV`, `mWakefulness=Awake`, `isKeyguardShowing=false` confirmed before running; Pixel 10 not connected, not waited on) | BUILD SUCCESSFUL — 63/63, 0 skipped, 0 failed (exact baseline match — full suite run, not filtered, since task 6.0 changes colours app-wide) |
+| `./gradlew :app:detektMain` | BUILD SUCCESSFUL, 0 issues |
+| `./gradlew :domain:detektMain` | BUILD SUCCESSFUL, 0 issues (untouched) |
+| `./gradlew check` | FAILED — `:app:lintDebug`, 3 pre-existing errors unrelated to this change (see table above). `:app:detekt` (test-inclusive) and every test task inside `check` passed |
+
+### Changed-line footprint (against `feat/warm-dark-editor-tonal`, tip `60cfcab`)
+
+`git diff --shortstat feat/warm-dark-editor-tonal..HEAD`: **5 files changed, 157 insertions(+),
+16 deletions(-)** — 173 total changed lines. Split by commit:
+
+- `8dc2b8e` (`feat(theme)`, task 6.0): 3 files, 125 insertions(+), 10 deletions(-) — 135 lines.
+  Reported separately from the 210-line screens threshold, as instructed: task 6.0 was added after
+  the unit's forecast was made, so its cost is unforecast.
+- `9168a6d` (`fix(test)`, `MaxLineLength`): 3 files, 33 insertions(+), 7 deletions(-) — 40 lines.
+- Tasks 6.1–6.3 (the three screens): **0 lines** — `git diff` empty for all three files, per the
+  finding above.
+
+Well inside the unit's own 210-line stop threshold for the screens (0 of 210 used) and a modest,
+justified unforecast cost for task 6.0.
+
+### Outstanding — not run, not claimed
+
+- **Task 6.5, manual device matrix (final gate)**: notification accent on a real posted reminder
+  (`NotificationPoster.setColor`) showing the migrated colour, and the habit-colour dot across a
+  fold/unfold configuration change. Requires the Pixel 10 (not connected this session) alongside the
+  Galaxy Z Fold 7. **Not run.** Recorded here as an outstanding manual check for the orchestrator to
+  route — do not mark 6.5 complete without it actually running.
+- **Unit 1 task 1.13** (cold-start flash, system-bar icons in light mode) — still unchecked from unit
+  1, untouched this unit, left unchecked per instruction.
+- **Task 6.4's lint gap** (table above) — needs its own scoped fix outside this change's rollback
+  boundary before `./gradlew check` can be green.
+
+### Task 6.6 — confirmed, not assumed
+
+`git diff 543be10..HEAD -- openspec/config.yaml` is empty (`543be10` is unit 3's own
+"docs(tasks): mark work unit 3 tasks complete, merge apply-progress" commit, the last commit to touch
+this file). `G.7-throttling-row` reads byte-for-byte as unit 3 left it.
