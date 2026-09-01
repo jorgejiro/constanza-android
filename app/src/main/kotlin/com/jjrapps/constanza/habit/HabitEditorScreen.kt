@@ -20,7 +20,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -178,17 +177,19 @@ fun HabitEditorScreen(
     }
 }
 
-/** Work unit 5 (design.md decision 7): pins the app bar to [ConstanzaColors.Background] so it reads
- *  as one seamless surface with the [Scaffold] behind it rather than M3's default `surfaceContainer`
- *  tone, which is not one of the roles [ConstanzaColors] repoints in `Theme.kt` and would otherwise
- *  stay cool-toned against the rest of this warm-dark screen. Extracted out of [HabitEditorScreen]
- *  itself to keep that composable under detekt's `LongMethod` threshold. */
+/** Task 6.0 decision: the unit-5 pin to [ConstanzaColors.Background] (`colors =
+ *  TopAppBarDefaults.topAppBarColors(containerColor = ConstanzaColors.Background)`) is REMOVED. Its
+ *  own KDoc justification — "`surfaceContainer` is not one of the roles `ConstanzaColors` repoints" —
+ *  is exactly the gap task 6.0 closes at the theme layer: `Theme.kt`'s `DarkColors` now binds
+ *  `surfaceContainer` to [ConstanzaColors.Surface], so the bar is warm by default across every
+ *  screen, not just this one. Keeping a per-screen override here would silently re-diverge from
+ *  every other top bar in the app (`ProgressScreen`, `SnoozeSettingsScreen`) the moment either of
+ *  those needed a different tone, for no remaining reason. The composable extraction itself is kept
+ *  — it still exists purely to hold [titleRes], the same reason `EditorNameField` is its own
+ *  composable, not to hold a colour override. */
 @Composable
 private fun HabitEditorTopBar(titleRes: Int) {
-    TopAppBar(
-        title = { Text(stringResource(titleRes)) },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = ConstanzaColors.Background),
-    )
+    TopAppBar(title = { Text(stringResource(titleRes)) })
 }
 
 /**

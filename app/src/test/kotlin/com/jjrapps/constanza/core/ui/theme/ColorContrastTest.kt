@@ -77,6 +77,64 @@ class ColorContrastTest {
         assertRatioAtLeast(ConstanzaColors.OnBackgroundMuted, ConstanzaColors.Background, CONTRAST_FLOOR, "OnBackgroundMuted")
     }
 
+    /**
+     * Task 6.0 — `Theme.kt` now binds `surfaceContainer`/`surfaceContainerHigh` to
+     * [ConstanzaColors.Surface]/[ConstanzaColors.SurfaceRaised], so `ListItem` (`TodayScreen`,
+     * `HabitListScreen`) reads [ConstanzaColors.Surface] as its container, with [HabitColorDot]'s
+     * colour and the habit name text drawn on top of it — a surface neither habit colours nor text
+     * were ever measured against before this task. [ConstanzaColors.SurfaceRaised] is included too:
+     * it backs `AlertDialog` (`surfaceContainerHigh`, `DataPortabilityScreen.ImportConfirmDialog`)
+     * and `ExactAlarmBanner`'s explicit `Surface`, both of which carry body text.
+     */
+    @Test
+    fun `every habit colour clears the floor against the surface container`() {
+        HabitColor.entries.forEach { habitColor ->
+            assertRatioAtLeast(
+                foreground = habitColor.composeColor,
+                background = ConstanzaColors.Surface,
+                minimum = CONTRAST_FLOOR,
+                label = "${habitColor.name} on Surface",
+            )
+        }
+    }
+
+    @Test
+    fun `every habit colour clears the floor against the raised surface container`() {
+        HabitColor.entries.forEach { habitColor ->
+            assertRatioAtLeast(
+                foreground = habitColor.composeColor,
+                background = ConstanzaColors.SurfaceRaised,
+                minimum = CONTRAST_FLOOR,
+                label = "${habitColor.name} on SurfaceRaised",
+            )
+        }
+    }
+
+    @Test
+    fun `primary text clears the AA floor on the surface container`() {
+        assertRatioAtLeast(ConstanzaColors.OnBackground, ConstanzaColors.Surface, PRIMARY_TEXT_FLOOR, "OnBackground on Surface")
+    }
+
+    @Test
+    fun `primary text clears the AA floor on the raised surface container`() {
+        assertRatioAtLeast(
+            ConstanzaColors.OnBackground,
+            ConstanzaColors.SurfaceRaised,
+            PRIMARY_TEXT_FLOOR,
+            "OnBackground on SurfaceRaised",
+        )
+    }
+
+    @Test
+    fun `secondary text clears the AA floor on the surface container`() {
+        assertRatioAtLeast(
+            ConstanzaColors.OnBackgroundVariant,
+            ConstanzaColors.Surface,
+            SECONDARY_TEXT_FLOOR,
+            "OnBackgroundVariant on Surface",
+        )
+    }
+
     @Test
     fun `text on the accent is legible`() {
         assertRatioAtLeast(ConstanzaColors.OnAccent, ConstanzaColors.Accent, CONTRAST_FLOOR, "OnAccent on Accent")
