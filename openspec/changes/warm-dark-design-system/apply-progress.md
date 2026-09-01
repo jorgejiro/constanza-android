@@ -291,3 +291,101 @@ before that constraint was known.
 - No screen, no `:domain` file, no other migration file touched (units 4–6's scope; `Migration(2,3)`
   rollback recipe is documentation only, not implemented — correctly, per design.md decision 5, it
   ships only if unit 2 is ever actually rolled back).
+
+## Unit 4 — Habit Colour Identity (PR C) — `feat/warm-dark-colour-identity`
+
+Status: **done**, tasks 4.1–4.9 complete. Branch created off `feat/warm-dark-palette-migration`
+(tip `543be10`, units 2+3), landing as one commit — this unit has no equivalent of unit 2/3's
+"must not split" rule, so one atomic commit was chosen for the same reason: `TodayHabitRow.colorArgb`
+with no default and its call sites move together, or the build breaks partway through history.
+
+### What landed
+
+- `core/ui/component/HabitColorDot.kt` (new package): `HabitColorDot(argb: Int, modifier: Modifier)`
+  — a `Dimens.HabitDotSlot` `Box` containing a tinted-halo circle (`Color(argb).copy(alpha = 0.16f)`)
+  and a solid `Dimens.HabitDot` circle, both `.clip(CircleShape).background(...)`, matching the
+  existing `ColorSwatchRow` drawing convention in `HabitEditorScreen.kt`. Carries
+  `Modifier.testTag(HABIT_COLOR_DOT_TEST_TAG)` and nothing else — no `contentDescription`, per
+  design.md decision 6, stated loudly as deliberate in the KDoc so nobody "fixes" it later.
+- `tracking/TodayModel.kt`: `TodayHabitRow` gains `colorArgb: Int` with no default value, positioned
+  before `slots` (data class field order, no consumer relies on positional construction outside this
+  file); `buildTodayHabitRow`'s one construction site now passes `habit.colorArgb`.
+- `tracking/TodayScreen.kt`: `HabitRollupRow`'s single-slot branch wraps the habit-name `Text` in a
+  `Row(verticalAlignment = CenterVertically)` with the dot; the multi-slot branch's `ListItem` gains
+  `leadingContent = { HabitColorDot(row.colorArgb) }`. `ExactAlarmBanner`'s body is now wrapped in
+  `Surface(color = ConstanzaColors.SurfaceRaised, shape = ConstanzaShapes.medium)` — the existing
+  `Row` (and its load-bearing `weight(1f)` fix) is preserved verbatim inside it, not replaced.
+- `habit/HabitListScreen.kt`: `HabitRow`'s `ListItem` gains
+  `leadingContent = { HabitColorDot(habit.colorArgb) }`.
+- `app/src/test/kotlin/.../TodayViewModelTest.kt`: `habit()` fixture gained a
+  `colorArgb: Int = HABIT_COLOR_ARGB` parameter; one assertion added verifying `row.colorArgb`
+  propagates from the fixture's habit.
+- `app/src/androidTest/kotlin/.../core/ui/component/HabitColorDotComposeTest.kt` (new): two tests —
+  the dot is present on the real `TodayRoute` for a habit due today, and two habits on the real
+  `HabitListRoute` each render their own dot (`dots.size >= 2`). Both assert via
+  `onAllNodesWithTag(HABIT_COLOR_DOT_TEST_TAG, useUnmergedTree = true)`, never a
+  `contentDescription` — satisfies spec `Habit Colour Visible Where Habits Are Listed`.
+
+### Corrections to the task-stated call-site counts — flagged loudly, per instruction
+
+Before editing, `rg -n "TodayHabitRow\("` across the whole main source tree found exactly **one**
+literal `TodayHabitRow(...)` construction (`TodayModel.kt`'s `buildTodayHabitRow` return), not the
+"3 call sites in this file" task 4.2 states, and **zero** in `TodayViewModel.kt`, not the "1 call
+site" task 4.3 states. Design.md's own correction C3 says "8 positional call sites across
+`TodayModel.kt` (3), `TodayViewModel.kt` (1) and `TodayViewModelTest.kt` (4)" — the 4 in the test
+file matches exactly (the file's 4 `buildTodayHabitRow(...)` invocations), so that count is real. The
+3+1 in the two main-source files do not correspond to any literal `TodayHabitRow(...)` construction;
+`buildTodayHabitRow`'s signature (`habit, schedule, slots, snapshot`) was already unchanged by adding
+the field, since it derives `colorArgb` from the `Habit` it already receives. Task 4.3 required no
+code change at all. This is reported as a real discrepancy in the task/design artifacts, not silently
+reconciled by inventing edits to match the stated count.
+
+### Deviation found during verification — test-only, not production code
+
+`HabitColorDotComposeTest`'s habit-list assertion initially failed on the real device
+(`AssertionError: each listed habit must render its own colour dot`, 0 nodes found) while the Today
+assertion passed. Root cause: `HabitListScreen.HabitRow`'s `ListItem` sits under
+`Modifier.clickable { onEditHabit(habit.id) }`, and `clickable` merges descendant semantics into one
+accessibility node for the row — the default merged-tree finder `onAllNodesWithTag` searches cannot
+see the dot's `testTag` once it is folded into that merge. The Today single-slot branch has no such
+merging modifier, which is why it passed without the fix. Resolved with
+`useUnmergedTree = true` on both assertions in the test; no production `HabitColorDot.kt` or screen
+code changed to work around it — this is exactly the kind of accessibility grouping the app wants for
+a real screen reader user, not a defect.
+
+### Verification (real numbers, `--rerun-tasks` used throughout)
+
+| Command | Result |
+|---|---|
+| `./gradlew :app:compileDebugKotlin --rerun-tasks` | BUILD SUCCESSFUL, no new warnings |
+| `./gradlew :app:testDebugUnitTest --tests "*.TodayViewModelTest"` | BUILD SUCCESSFUL — 8 tests, 0 failures |
+| `./gradlew :app:testDebugUnitTest` (full suite) | BUILD SUCCESSFUL — 113 tests, 0 failures (exact match to the stated baseline) |
+| `./gradlew :domain:test` | BUILD SUCCESSFUL — 52 tests, 0 failures (exact match to baseline; `:domain` confirmed untouched) |
+| `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=....HabitColorDotComposeTest` (device: Galaxy Z Fold 7, SM-F966B, API 36, serial `RFCY720PJKV`, `mWakefulness=Awake`, `isKeyguardShowing=false`, confirmed before running) | First run: 1 of 2 failed (the `useUnmergedTree` issue above). After the test-only fix: BUILD SUCCESSFUL — 2 tests, 0 failures |
+| `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=....TodayAdaptiveComposeTest` (same device, run completely unmodified per the non-negotiable) | BUILD SUCCESSFUL — 1 test, 0 failures |
+| `./gradlew :app:connectedDebugAndroidTest` (full instrumented suite, same device) | BUILD SUCCESSFUL — 63 tests, 0 skipped, 0 failed (baseline 61 + 2 new `HabitColorDotComposeTest` tests, exact match, no regression) |
+| `./gradlew :app:detektMain` | BUILD SUCCESSFUL, 0 issues |
+| `./gradlew :domain:detektMain` | BUILD SUCCESSFUL, 0 issues (untouched) |
+
+Instrumented tests used `-Pandroid.testInstrumentationRunnerArguments.class=<FQCN>` (not `--tests`),
+per unit 2's recorded AGP-version note.
+
+### Changed-line footprint
+
+`git diff --cached --shortstat` (all of this unit's files staged together): **6 files changed, 239
+insertions(+), 24 deletions(-)** — 263 total changed lines, all authored (no generated artifact in
+this unit). Well inside the unit's own 460-line stop threshold and inside the 320–460 forecast range
+(at the low end of it) — no stop-and-report was triggered.
+
+### Boundaries respected
+
+- `habit/HabitEditorScreen.kt`, `habit/ScheduleEditors.kt` — untouched (unit 5's scope); `SWATCH_SIZE`/
+  `SWATCH_BORDER` still private in `HabitEditorScreen.kt`, not yet moved to `Dimens` (that move is
+  task 5.1, not this unit's).
+- `progress/ProgressScreen.kt`, `reminding/SnoozeSettingsScreen.kt`,
+  `portability/DataPortabilityScreen.kt` — untouched (unit 6's scope).
+- No migration, `AppDatabase`, `DatabaseModule`, `BackupImporter`/`BackupDto` file touched.
+- `:domain` — confirmed untouched (`./gradlew :domain:test` exact-matches baseline 52).
+- `TodayAdaptiveComposeTest.kt` itself — confirmed byte-identical to before this unit
+  (`git diff --stat` shows no change to that file); only its passing result is new evidence, not its
+  source.
