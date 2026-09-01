@@ -412,9 +412,32 @@ The gate itself is discharged. These follow-ups come out of it and need decision
       `ExactAlarmPermissionReceiver` "downgrades on revoke". The platform sends that broadcast on grant
       only, so nothing arrives to downgrade with — §13.4 finding 3 had already measured this, but §9.3
       still asserted the wrong version. The revoke path is G.5's re-arm, not that receiver.
-- [ ] G.7 Run the four UI-dependent §13.3 rows once 6a and 6b ship: large screen (C1), orientation
+- [x] G.7 Run the four UI-dependent §13.3 rows once 6a and 6b ship: large screen (C1), orientation
       (C1), soft keyboard after a config change (C4), and the `wm size 800dpx1280dp` override. Plus the
       Z Fold 7 OEM-throttling assertion, which no Pixel can make.
+      **Pixel-reachable rows discharged 2026-09-01 — see design.md §13.5.** Large screen and
+      orientation PASS on both the today screen and the habit editor, at native width and under the
+      800dp×1280dp override, portrait and landscape, with every override reset and the reset verified.
+      C4's content half PASSES on a real device rotation. Two findings: the exact-alarm banner's
+      promised tap was rendering **off-screen** (fixed here, with before/after screenshots), and the
+      IME is not re-requested after rotation despite the code trying to (task **6a.9** below).
+      **Z Fold 7 rows remain NOT RUN and are blocked on hardware, not on effort** — native large
+      screen, fold/unfold, and the One UI "put unused apps to sleep" multi-day assertion. §13.3 already
+      says no Pixel substitutes for them: the `wm size` override reproduces a width, never an OEM's own
+      throttling behaviour. They stay open against that device becoming available.
+- [ ] 6a.9 **Added 2026-09-01 from G.7's run — the IME is not restored after rotation.** Task 6a.5
+      requires "re-requesting IME visibility explicitly after rotation" and §5.7 C4 requires the editor
+      not to assume the keyboard survives. Measured on the habit editor with the keyboard up:
+      `mInputShown` goes `true` → `false` across a real rotation, and **no field is focused afterwards**.
+      Typed content is preserved, so 6a.7's guarantee is intact — this is the keyboard half only.
+      `EditorNameField` tries: `wasFocused` is `rememberSaveable`, and a `LaunchedEffect(Unit)` calls
+      `requestFocus()` plus `keyboardController?.show()` when it is set. The flag is already `false` by
+      then, because `onFocusChanged { wasFocused = it.isFocused }` fires with `false` during teardown
+      and overwrites it before it is saved. Focus not being restored either is what rules out a mere
+      keyboard-controller timing problem.
+      **This needs a product decision, not just a patch:** latching the flag on focus-gain would
+      restore the keyboard but would also re-open one the user had deliberately dismissed. Decide what
+      should happen when the user dismissed it on purpose, then implement to that.
 
 ## Phase 6a: Habit CRUD UI (Work Unit 6a) — depends on 3, 4a
 

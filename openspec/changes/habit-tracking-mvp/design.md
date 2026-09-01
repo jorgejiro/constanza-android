@@ -1331,6 +1331,63 @@ attributed, so it is recorded as unattributed rather than assigned to this app.
   inside the observation window. Finding 2 explains why every attempt to observe the sweep moved it;
   the reconcile worker's own anchor, as that finding's correction records, was never moved at all.
 
+### 13.5 Discharge record — the UI rows of the delivery matrix (task G.7)
+
+Run 2026-09-01 on the Pixel 10 (`55221FDCR005RD`, released Android 17, API 37) against `main` with
+work units 1–7 merged. **The Pixel-reachable rows are discharged; the Z Fold 7 rows are not, and
+cannot be from this device.** Every override was reset afterwards and the reset verified.
+
+| §13.3 row | Result |
+|---|---|
+| Large screen — C1, today screen | **PASS** at `wm size 800dpx1280dp`. Title, both top-bar actions, banner and habit row all render with no clipping or overlap. |
+| Large screen — C1, habit editor | **PASS** at the same override. Name, question, notes, the six colour swatches, the frequency dropdown, the "Remind me" toggle with its hour/minute fields, and Save all render intact. |
+| Orientation — C1 | **PASS** at both widths, portrait and landscape, with no clipping or overlap. |
+| Soft keyboard after a config change — C4 | **Content PASSES, IME re-request FAILS.** See finding 2. |
+| Z Fold 7: native large screen, fold/unfold | **NOT RUN** — the device is not available here. No Pixel substitutes: §13.3 says so, and the `wm size` override reproduces the width, never One UI's own behaviour. |
+| Z Fold 7: OEM throttling survival | **NOT RUN** — needs that device *and* a multi-day idle window. |
+
+#### Finding 1 — the exact-alarm banner's action was off-screen, and the banner looked fine
+
+`ExactAlarmBanner`'s `Row` used `SpaceBetween` with an unconstrained `Text`, so the text claimed the
+full width and pushed the `TextButton` past the right edge. The banner rendered perfectly; the **one
+tap to `ACTION_REQUEST_SCHEDULE_EXACT_ALARM` that §13.1 promises was simply unreachable** — on a
+1080px-wide phone, the ordinary case.
+
+Fixed here with `Modifier.weight(1f)` on the text, proven by before-and-after screenshots: the "Fix"
+action is absent in the first and present in the second.
+
+Worth recording *why the automated suite missed it*. Task 6b.8's `sw = 600dp` test asserts the habit
+rows do not clip; it says nothing about the banner, and no test asserts that the banner's action is
+visible at all. A promised affordance that renders off-screen fails no assertion — which is precisely
+the class of defect a manual matrix exists to catch, and the second time in this change that a
+promised tap turned out to be unreachable (the first was the show-archived row's label in unit 6a).
+
+#### Finding 2 — the IME is not restored after rotation, though the code tries to
+
+Measured on the habit editor with text typed into the name field and the keyboard up:
+
+| Observation | Before rotation | After rotation |
+|---|---|---|
+| `dumpsys input_method` `mInputShown` | `true` | **`false`** |
+| Typed content | `MeditateXYZ` | **`MeditateXYZ`** — preserved |
+| Any field focused | yes | **none** |
+
+So **C4's content half holds** — task 6a.7's no-content-loss guarantee survives a real device
+rotation, not only `StateRestorationTester` — but task 6a.5's "re-request IME visibility explicitly
+after rotation" does not happen.
+
+`EditorNameField` intends to: it keeps `wasFocused` in `rememberSaveable` and, in a
+`LaunchedEffect(Unit)`, calls `focusRequester.requestFocus()` and `keyboardController?.show()` when
+that flag is set. The evidence says the flag is already `false` by then, because
+`onFocusChanged { wasFocused = it.isFocused }` fires with `false` while the Activity is torn down and
+overwrites the value before it is saved. That focus is *also* not restored is what distinguishes this
+from a keyboard-controller timing problem: had the flag survived, `requestFocus()` would have put the
+caret back even if the keyboard had not appeared.
+
+Not fixed here. A latch-on-focus-gain would restore the keyboard but would also re-open one the user
+had deliberately dismissed, so the correct behaviour is a product decision rather than a mechanical
+change. Recorded as **task 6a.9** with this measurement.
+
 ## 14. Module and file layout
 
 | Path | Action | Contents |

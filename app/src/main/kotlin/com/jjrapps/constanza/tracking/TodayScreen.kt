@@ -129,7 +129,15 @@ private fun ExactAlarmBanner() {
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(stringResource(R.string.today_exact_alarm_banner), modifier = Modifier.padding(end = 8.dp))
+        // `weight(1f)` is load bearing, not styling: without it the text takes whatever width it
+        // wants and `SpaceBetween` pushes the action button clean off the right edge, so the one tap
+        // §13.1 promises becomes unreachable while the banner still looks fine. Found by task G.7's
+        // manual matrix on a 1080dp-wide Pixel 10 — the automated `sw = 600dp` test (6b.8) asserts
+        // the habit rows, not this banner.
+        Text(
+            stringResource(R.string.today_exact_alarm_banner),
+            modifier = Modifier.weight(1f).padding(end = 8.dp),
+        )
         TextButton(onClick = {
             val uri = Uri.parse("package:${context.packageName}")
             context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, uri))
