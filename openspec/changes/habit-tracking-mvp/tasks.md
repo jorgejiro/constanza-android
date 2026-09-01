@@ -302,8 +302,40 @@ Not a PR. Runs only once Phases 4a, 4b, and 5 are merged — the reminder pipeli
 handling must exist first. This discharges the **remaining** half of design §5.4's gate; the
 documentation half was already discharged 2026-08-31 (design §5.7) and MUST NOT be re-done.
 
-- [ ] G.1 Run the design §13.3 manual matrix on a real or emulator **API 37** image: exact-alarm revoke, `dumpsys alarm` inspection, Doze `force-idle`, deferred expedited work via `jobscheduler run -f`, timezone-changed broadcast, `POST_NOTIFICATIONS` revoke, reboot re-arm, snooze-across-midnight.
-- [ ] G.2 Record the results as an amendment to `design.md` §5.4/§13.3. Any deviation is a design change, not an implementation detail. The change is not done until this gate passes.
+- [x] G.1 Run the design §13.3 manual matrix on a real or emulator **API 37** image: exact-alarm revoke, `dumpsys alarm` inspection, Doze `force-idle`, deferred expedited work via `jobscheduler run -f`, timezone-changed broadcast, `POST_NOTIFICATIONS` revoke, reboot re-arm, snooze-across-midnight.
+      Run 2026-08-31/09-01 on the Pixel 10, now on a **released** Android 17 (`preview_sdk 0`,
+      `codename REL`), not the beta §13.3 assumed. Seven of the eight scenarios PASS, including
+      end-to-end delivery through deep Doze and D3's snooze-across-real-midnight rule in both
+      directions. The eighth — `jobscheduler run -f` — is an invalid recipe, not a product failure.
+      Four of §13.3's recipes do not work on a user build; replacements are recorded in §13.4.
+      Required a seeding harness (`app/src/androidTest/.../seed/`, `@SeedOnly`-excluded) because
+      nothing in the product can create a habit until 6a.
+- [x] G.2 Record the results as an amendment to `design.md` §5.4/§13.3. Any deviation is a design change, not an implementation detail. The change is not done until this gate passes.
+      Recorded as **§13.4**, with §5.4's checklist updated. Nothing found contradicts §5.5, so
+      `targetSdk = 37` does not need the mitigation §5.4 held in reserve. §13.3's own recipes are what
+      failed. The gate raised four findings, tracked as G.3–G.6 below rather than folded in silently.
+
+The gate itself is discharged. These follow-ups come out of it and need decisions, not just edits:
+
+- [ ] G.3 Decide what `notifiedAtEpochMs` means when the post was suppressed. Today it is recorded even
+      though nothing reached the user (§13.4 finding 1), so any future reader treating it as "the user
+      was told" would be wrong. Either stop writing it on the suppressed branch or rename it to say
+      what it actually records.
+- [ ] G.4 Stop `WorkScheduler.scheduleAll()` re-anchoring the periodic workers on every cold start
+      (§13.4 finding 2). Measured: a process start at 00:04:55 pushed the midnight sweep to
+      `Delay=+23h29m59s`, skipping the boundary. A user opening the app often enough can postpone the
+      hourly reconcile and the sweep indefinitely — starving the net §5.5 calls the correctness
+      guarantee. `UPDATE` was chosen so tuning `ReconcilePeriodHours` reaches existing installs, so the
+      fix must keep that without resetting the anchor each launch.
+- [ ] G.5 Decide whether an exact-alarm revoke should re-plan instead of waiting out the hourly net
+      (§13.4 finding 3). Delivery is "late, not lost" as designed, but nothing re-arms on app open, so
+      every reminder after a revoke rests entirely on the reconcile period.
+- [ ] G.6 Name the reboot-to-first-unlock blind window in §9.3 (§13.4 finding 4). Zero alarms are armed
+      in that window and it is the correct consequence of reading Room from credential-encrypted
+      storage — but the design should say so rather than leave it implicit.
+- [ ] G.7 Run the four UI-dependent §13.3 rows once 6a and 6b ship: large screen (C1), orientation
+      (C1), soft keyboard after a config change (C4), and the `wm size 800dpx1280dp` override. Plus the
+      Z Fold 7 OEM-throttling assertion, which no Pixel can make.
 
 ## Phase 6a: Habit CRUD UI (Work Unit 6a) — depends on 3, 4a
 

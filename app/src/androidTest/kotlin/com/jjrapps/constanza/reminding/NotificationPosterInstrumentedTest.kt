@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationManagerCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -17,6 +18,8 @@ import org.junit.runner.RunWith
 private const val OCCURRENCE_ID = 9001L
 private const val EXPECTED_ACTION_COUNT = 3
 private const val HABIT_COLOR_ARGB = -14575885
+private const val GRANT_TIMEOUT_MS = 5_000L
+private const val GRANT_POLL_INTERVAL_MS = 50L
 
 /**
  * reminder-response: Notification Actions (task 5.1). Posts a REAL notification through
@@ -49,6 +52,14 @@ class NotificationPosterInstrumentedTest {
             context.packageName,
             Manifest.permission.POST_NOTIFICATIONS,
         )
+        // `grantRuntimePermission` returns before `NotificationManager` reflects the new state, so
+        // the grant is awaited rather than assumed. Granting without waiting is what made this
+        // class fail intermittently on a freshly installed APK — roughly one run in three on a
+        // physical Pixel 10 — while passing whenever the grant had already settled.
+        val deadline = System.currentTimeMillis() + GRANT_TIMEOUT_MS
+        while (!manager.areNotificationsEnabled() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(GRANT_POLL_INTERVAL_MS)
+        }
     }
 
     @Test
@@ -60,7 +71,28 @@ class NotificationPosterInstrumentedTest {
 
         poster.postReminder(OCCURRENCE_ID, "Meditate", "Did you meditate today?", HABIT_COLOR_ARGB)
 
-        val posted = manager.activeNotifications.first { it.id == OCCURRENCE_ID.toInt() }
+        val posted = awaitPosted(OCCURRENCE_ID)
         assertEquals(EXPECTED_ACTION_COUNT, posted.notification.actions?.size)
+    }
+
+    /**
+     * `NotificationManager.notify` is a `oneway` Binder call, so a posted notification is not
+     * guaranteed to appear in `activeNotifications` by the time `notify` returns. Reading it
+     * immediately is what made this class fail intermittently on a physical Pixel 10 —
+     * `NoSuchElementException` from the id lookup, with notifications verifiably enabled — so the
+     * post's visibility is awaited rather than assumed.
+     */
+    private fun awaitPosted(occurrenceId: Long): StatusBarNotification {
+        val id = occurrenceId.toInt()
+        val deadline = System.currentTimeMillis() + GRANT_TIMEOUT_MS
+        var found = manager.activeNotifications.firstOrNull { it.id == id }
+        while (found == null && System.currentTimeMillis() < deadline) {
+            Thread.sleep(GRANT_POLL_INTERVAL_MS)
+            found = manager.activeNotifications.firstOrNull { it.id == id }
+        }
+        return requireNotNull(found) {
+            "No notification with id $id appeared within ${GRANT_TIMEOUT_MS}ms of postReminder, " +
+                "while areNotificationsEnabled() was true"
+        }
     }
 }
