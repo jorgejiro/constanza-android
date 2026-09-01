@@ -18,6 +18,7 @@ import org.junit.After
 import org.junit.Before
 import java.time.DayOfWeek
 import java.time.Instant
+import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -26,12 +27,14 @@ import kotlin.test.assertTrue
 
 private const val EXISTING_HABIT_ID = 7L
 private val NOW = Instant.parse("2026-09-01T08:00:00Z")
+private val TODAY = LocalDate.parse("2026-09-01")
 
 /**
- * Task 6a.2/6a.3 (habit-management: Creation requires a name, Habit Editing). [habitRepository]
- * is mocked with explicit stubs everywhere a branch depends on its return value — a relaxed mock
- * would silently return `null`/defaults and mask exactly the create-vs-update branch this suite
- * tests (a lesson from this project's notification-response work).
+ * Task 6a.2/6a.3/6a.1 (habit-management: Creation requires a name, Habit Editing; habit-scheduling:
+ * Six Frequency Kinds, Reminder Slots for TIMES_PER_DAY). [habitRepository] is mocked with explicit
+ * stubs everywhere a branch depends on its return value — a relaxed mock would silently return
+ * `null`/defaults and mask exactly the create-vs-update branch this suite tests (a lesson from this
+ * project's notification-response work).
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class HabitEditorViewModelTest {
@@ -39,6 +42,7 @@ class HabitEditorViewModelTest {
     private val habitRepository = mockk<HabitRepository>()
     private val timeProvider = mockk<TimeProvider> {
         every { now() } returns NOW
+        every { today() } returns TODAY
     }
 
     @Before
@@ -144,7 +148,7 @@ class HabitEditorViewModelTest {
         )
         coEvery { habitRepository.findById(EXISTING_HABIT_ID) } returns existing
         coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns Schedule.Weekly(DayOfWeek.TUESDAY)
-        coEvery { habitRepository.update(any(), any()) } returns Unit
+        coEvery { habitRepository.update(any(), any(), any()) } returns Unit
         val viewModel = newViewModel()
         viewModel.startEdit(EXISTING_HABIT_ID)
 
@@ -152,8 +156,170 @@ class HabitEditorViewModelTest {
         viewModel.save()
 
         coVerify(exactly = 1) {
-            habitRepository.update(match { it.name == "Read daily" }, Schedule.Weekly(DayOfWeek.TUESDAY))
+            habitRepository.update(match { it.name == "Read daily" }, Schedule.Weekly(DayOfWeek.TUESDAY), emptyList())
         }
-        coVerify(exactly = 0) { habitRepository.create(any(), any()) }
+        coVerify(exactly = 0) { habitRepository.create(any(), any(), any()) }
+    }
+
+    // --- Task 6a.1, slice ii-a: schedule-kind picker and per-kind parameter editors ---
+
+    @Test
+    fun `switching to WEEKLY seeds Monday and switching to N_TIMES_PER_WEEK seeds a default quota`() = runTest {
+        val viewModel = newViewModel()
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.WEEKLY))
+        assertEquals(Schedule.Weekly(DayOfWeek.MONDAY), viewModel.uiState.value.schedule)
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.N_TIMES_PER_WEEK))
+        assertEquals(3, (viewModel.uiState.value.schedule as Schedule.NTimesPerWeek).times)
+    }
+
+    @Test
+    fun `switching to EVERY_N_DAYS seeds today as the anchor and switching away clears the anchor text`() = runTest {
+        val viewModel = newViewModel()
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.EVERY_N_DAYS))
+        val everyNDays = viewModel.uiState.value.schedule as Schedule.EveryNDays
+        assertEquals(TODAY, everyNDays.anchor)
+        assertEquals(TODAY.toString(), viewModel.uiState.value.anchorDateText)
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.DAILY))
+        assertEquals("", viewModel.uiState.value.anchorDateText)
+    }
+
+    @Test
+    fun `N_TIMES_PER_WEEK times cannot go below 1`() = runTest {
+        val viewModel = newViewModel()
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.N_TIMES_PER_WEEK))
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.TimesPerWeek(0))
+
+        assertEquals(1, (viewModel.uiState.value.schedule as Schedule.NTimesPerWeek).times)
+    }
+
+    @Test
+    fun `MONTHLY day of month is clamped to the 1 to 31 schema bound`() = runTest {
+        val viewModel = newViewModel()
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.MONTHLY))
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.DayOfMonth(99))
+
+        assertEquals(31, (viewModel.uiState.value.schedule as Schedule.Monthly).dayOfMonth)
+    }
+
+    @Test
+    fun `EVERY_N_DAYS n cannot go below 1`() = runTest {
+        val viewModel = newViewModel()
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.EVERY_N_DAYS))
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.EveryNDays(0))
+
+        assertEquals(1, (viewModel.uiState.value.schedule as Schedule.EveryNDays).n)
+    }
+
+    @Test
+    fun `a schedule param action for a non-matching schedule kind is a no-op`() = runTest {
+        val viewModel = newViewModel() // starts as DAILY
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.TimesPerWeek(5))
+
+        assertEquals(Schedule.Daily(DayOfWeek.MONDAY), viewModel.uiState.value.schedule)
+    }
+
+    // --- Task 6a.1, slice ii-a: TIMES_PER_DAY reminder-slot editor ---
+
+    @Test
+    fun `adding a slot to a TIMES_PER_DAY schedule appends an enabled slot and clears the slots error`() = runTest {
+        val viewModel = newViewModel()
+        viewModel.onNameChange("Stretch")
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.TIMES_PER_DAY))
+        viewModel.save() // no slots yet — triggers slotsError
+        assertTrue(viewModel.uiState.value.slotsError)
+
+        viewModel.onSlotAction(SlotAction.Add)
+
+        val slots = viewModel.uiState.value.slots
+        assertEquals(1, slots.size)
+        assertTrue(slots.single().enabled)
+        assertFalse(viewModel.uiState.value.slotsError)
+    }
+
+    @Test
+    fun `removing a slot by index drops only that slot`() = runTest {
+        val viewModel = newViewModel()
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.TIMES_PER_DAY))
+        viewModel.onSlotAction(SlotAction.Add)
+        viewModel.onSlotAction(SlotAction.Add)
+
+        viewModel.onSlotAction(SlotAction.Remove(0))
+
+        assertEquals(1, viewModel.uiState.value.slots.size)
+    }
+
+    @Test
+    fun `disabling a slot flips only its enabled flag`() = runTest {
+        val viewModel = newViewModel()
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.TIMES_PER_DAY))
+        viewModel.onSlotAction(SlotAction.Add)
+
+        viewModel.onSlotAction(SlotAction.SetEnabled(0, false))
+
+        assertFalse(viewModel.uiState.value.slots.single().enabled)
+    }
+
+    @Test
+    fun `changing a slot's time is bounded to a single day and reaches only the targeted slot`() = runTest {
+        val viewModel = newViewModel()
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.TIMES_PER_DAY))
+        viewModel.onSlotAction(SlotAction.Add)
+        viewModel.onSlotAction(SlotAction.Add)
+
+        viewModel.onSlotAction(SlotAction.SetTime(1, MINUTES_PER_DAY_TEST + 30))
+
+        val slots = viewModel.uiState.value.slots
+        assertEquals(480, slots[0].minuteOfDay)
+        assertEquals(MINUTES_PER_DAY_TEST - 1, slots[1].minuteOfDay)
+    }
+
+    @Test
+    fun `save is blocked for TIMES_PER_DAY with zero slots`() = runTest {
+        val viewModel = newViewModel()
+        viewModel.onNameChange("Stretch")
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.TIMES_PER_DAY))
+
+        viewModel.save()
+
+        assertTrue(viewModel.uiState.value.slotsError)
+        coVerify(exactly = 0) { habitRepository.create(any(), any(), any()) }
+    }
+
+    @Test
+    fun `save is blocked for an unparsable EVERY_N_DAYS anchor`() = runTest {
+        val viewModel = newViewModel()
+        viewModel.onNameChange("Water plants")
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.EVERY_N_DAYS))
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.AnchorDate("not-a-date"))
+        viewModel.save()
+
+        assertTrue(viewModel.uiState.value.anchorDateError)
+        coVerify(exactly = 0) { habitRepository.create(any(), any(), any()) }
+    }
+
+    @Test
+    fun `a valid TIMES_PER_DAY save passes its slots through to the repository`() = runTest {
+        coEvery { habitRepository.create(any(), any(), any()) } returns 1L
+        val viewModel = newViewModel()
+        viewModel.onNameChange("Stretch")
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.TIMES_PER_DAY))
+        viewModel.onSlotAction(SlotAction.Add)
+
+        viewModel.save()
+
+        coVerify(exactly = 1) {
+            habitRepository.create(any(), any(), match { it.size == 1 && it.single().enabled })
+        }
     }
 }
+
+private const val MINUTES_PER_DAY_TEST = 24 * 60
