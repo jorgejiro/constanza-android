@@ -1,0 +1,133 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
+package com.jjrapps.constanza.habit
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.jjrapps.constanza.R
+import com.jjrapps.constanza.domain.model.Habit
+
+/**
+ * Task 6a.4 (habit-management: Habit Archiving) — container. No navigation library is used
+ * (design.md §14 defers that to a future work unit once a second stack of screens exists);
+ * [onCreateHabit]/[onEditHabit] are hoisted callbacks the single-Activity host wires to its own
+ * in-memory route state.
+ */
+@Composable
+fun HabitListRoute(
+    onCreateHabit: () -> Unit,
+    onEditHabit: (Long) -> Unit,
+    viewModel: HabitListViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsState()
+    HabitListScreen(
+        state = state,
+        onToggleShowArchived = viewModel::toggleShowArchived,
+        onArchiveToggle = viewModel::setArchived,
+        onCreateHabit = onCreateHabit,
+        onEditHabit = onEditHabit,
+    )
+}
+
+/** Presentational: state in, callbacks out, no dependencies of its own. */
+@Composable
+fun HabitListScreen(
+    state: HabitListUiState,
+    onToggleShowArchived: () -> Unit,
+    onArchiveToggle: (Long, Boolean) -> Unit,
+    onCreateHabit: () -> Unit,
+    onEditHabit: (Long) -> Unit,
+) {
+    Scaffold(
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.habit_list_title)) }) },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onCreateHabit) {
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.habit_list_add_habit))
+            }
+        },
+    ) { padding ->
+        Box(modifier = Modifier.padding(padding)) {
+            HabitListContent(state, onToggleShowArchived, onArchiveToggle, onEditHabit)
+        }
+    }
+}
+
+@Composable
+private fun HabitListContent(
+    state: HabitListUiState,
+    onToggleShowArchived: () -> Unit,
+    onArchiveToggle: (Long, Boolean) -> Unit,
+    onEditHabit: (Long) -> Unit,
+) {
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item { ShowArchivedRow(state.showArchived, onToggleShowArchived) }
+        if (state.habits.isEmpty()) {
+            item {
+                val emptyRes = if (state.showArchived) {
+                    R.string.habit_list_empty_archived
+                } else {
+                    R.string.habit_list_empty_active
+                }
+                Text(stringResource(emptyRes), modifier = Modifier.padding(16.dp))
+            }
+        }
+        items(state.habits, key = { it.id }) { habit ->
+            HabitRow(habit, onArchiveToggle, onEditHabit)
+        }
+    }
+}
+
+@Composable
+private fun ShowArchivedRow(showArchived: Boolean, onToggleShowArchived: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(stringResource(R.string.habit_list_show_archived))
+        Switch(checked = showArchived, onCheckedChange = { onToggleShowArchived() })
+    }
+}
+
+@Composable
+private fun HabitRow(habit: Habit, onArchiveToggle: (Long, Boolean) -> Unit, onEditHabit: (Long) -> Unit) {
+    ListItem(
+        headlineContent = { Text(habit.name) },
+        supportingContent = habit.question?.let { question -> { Text(question) } },
+        trailingContent = {
+            TextButton(onClick = { onArchiveToggle(habit.id, !habit.archived) }) {
+                Text(
+                    stringResource(
+                        if (habit.archived) R.string.habit_list_unarchive else R.string.habit_list_archive,
+                    ),
+                )
+            }
+        },
+        modifier = Modifier.fillMaxWidth().clickable { onEditHabit(habit.id) },
+    )
+}
