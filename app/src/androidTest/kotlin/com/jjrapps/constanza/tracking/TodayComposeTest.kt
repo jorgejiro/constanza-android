@@ -92,6 +92,7 @@ class TodayComposeTest {
         val habitId = fixture.habitRepository.create(newHabit("Stretch"), Schedule.TimesPerDay(), slots)
 
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
+        awaitNodeWithText(text(R.string.today_expand))
         composeTestRule.onNodeWithText(text(R.string.today_expand)).performClick()
         composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes))[0].performClick()
         composeTestRule.waitUntil(WAIT_TIMEOUT_MS) {
@@ -132,6 +133,7 @@ class TodayComposeTest {
         val slotId = fixture.insertEnabledSlot(habitId, EVENING_MINUTE)
 
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
+        awaitNodeWithText(text(R.string.today_answer_skip))
         composeTestRule.onNodeWithText(text(R.string.today_answer_skip)).performClick()
         composeTestRule.waitUntil(WAIT_TIMEOUT_MS) {
             composeTestRule.onAllNodesWithText(EntryStatus.SKIPPED.name, substring = true)
@@ -143,4 +145,22 @@ class TodayComposeTest {
         assertEquals(fixture.timeProvider.today().toString(), entry.date)
         assertEquals(slotId, entry.slotId)
     }
+
+    /**
+     * `performClick()` waits for the composition to be idle, which is NOT the same as waiting for
+     * the row to exist: [TodayViewModel.uiState] is fed by Room Flows through `combine`, so an idle
+     * composition can simply be one that has not received the first emission yet. Clicking then
+     * either misses the node or hits a row whose occurrence handle is still null.
+     *
+     * That is not theoretical — it failed exactly once in a full-suite run while passing four times
+     * out of four in isolation, because the full suite loads the device enough to lose the race.
+     * Await the node, never assume it; the same discipline the notification-post visibility and the
+     * WorkManager enqueue assertions in this project already needed.
+     */
+    private fun awaitNodeWithText(label: String) {
+        composeTestRule.waitUntil(WAIT_TIMEOUT_MS) {
+            composeTestRule.onAllNodesWithText(label).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
 }
