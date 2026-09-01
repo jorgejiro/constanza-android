@@ -44,50 +44,53 @@ import com.jjrapps.constanza.domain.model.Habit
 fun HabitListRoute(
     onCreateHabit: () -> Unit,
     onEditHabit: (Long) -> Unit,
+    onShowProgress: (Long) -> Unit = {},
     viewModel: HabitListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
     HabitListScreen(
         state = state,
-        onToggleShowArchived = viewModel::toggleShowArchived,
-        onArchiveToggle = viewModel::setArchived,
-        onCreateHabit = onCreateHabit,
-        onEditHabit = onEditHabit,
+        actions = HabitListActions(
+            onToggleShowArchived = viewModel::toggleShowArchived,
+            onArchiveToggle = viewModel::setArchived,
+            onCreateHabit = onCreateHabit,
+            onEditHabit = onEditHabit,
+            onShowProgress = onShowProgress,
+        ),
     )
 }
 
+/** Bundles [HabitListScreen]'s callbacks, keeping it under detekt's `LongParameterList`
+ *  threshold — same reasoning as [HabitEditorActions]. */
+data class HabitListActions(
+    val onToggleShowArchived: () -> Unit,
+    val onArchiveToggle: (Long, Boolean) -> Unit,
+    val onCreateHabit: () -> Unit,
+    val onEditHabit: (Long) -> Unit,
+    val onShowProgress: (Long) -> Unit = {},
+)
+
 /** Presentational: state in, callbacks out, no dependencies of its own. */
 @Composable
-fun HabitListScreen(
-    state: HabitListUiState,
-    onToggleShowArchived: () -> Unit,
-    onArchiveToggle: (Long, Boolean) -> Unit,
-    onCreateHabit: () -> Unit,
-    onEditHabit: (Long) -> Unit,
-) {
+fun HabitListScreen(state: HabitListUiState, actions: HabitListActions) {
     Scaffold(
         topBar = { TopAppBar(title = { Text(stringResource(R.string.habit_list_title)) }) },
         floatingActionButton = {
-            FloatingActionButton(onClick = onCreateHabit) {
+            FloatingActionButton(onClick = actions.onCreateHabit) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.habit_list_add_habit))
             }
         },
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
-            HabitListContent(state, onToggleShowArchived, onArchiveToggle, onEditHabit)
+            HabitListContent(state, actions)
         }
     }
 }
 
 @Composable
-private fun HabitListContent(
-    state: HabitListUiState,
-    onToggleShowArchived: () -> Unit,
-    onArchiveToggle: (Long, Boolean) -> Unit,
-    onEditHabit: (Long) -> Unit,
-) {
+private fun HabitListContent(state: HabitListUiState, actions: HabitListActions) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        item { ShowArchivedRow(state.showArchived, onToggleShowArchived) }
+        item { ShowArchivedRow(state.showArchived, actions.onToggleShowArchived) }
         if (state.habits.isEmpty()) {
             item {
                 val emptyRes = if (state.showArchived) {
@@ -99,7 +102,7 @@ private fun HabitListContent(
             }
         }
         items(state.habits, key = { it.id }) { habit ->
-            HabitRow(habit, onArchiveToggle, onEditHabit)
+            HabitRow(habit, actions.onArchiveToggle, actions.onEditHabit, actions.onShowProgress)
         }
     }
 }
@@ -135,17 +138,27 @@ private fun ShowArchivedRow(showArchived: Boolean, onToggleShowArchived: () -> U
 }
 
 @Composable
-private fun HabitRow(habit: Habit, onArchiveToggle: (Long, Boolean) -> Unit, onEditHabit: (Long) -> Unit) {
+private fun HabitRow(
+    habit: Habit,
+    onArchiveToggle: (Long, Boolean) -> Unit,
+    onEditHabit: (Long) -> Unit,
+    onShowProgress: (Long) -> Unit,
+) {
     ListItem(
         headlineContent = { Text(habit.name) },
         supportingContent = habit.question?.let { question -> { Text(question) } },
         trailingContent = {
-            TextButton(onClick = { onArchiveToggle(habit.id, !habit.archived) }) {
-                Text(
-                    stringResource(
-                        if (habit.archived) R.string.habit_list_unarchive else R.string.habit_list_archive,
-                    ),
-                )
+            Row {
+                TextButton(onClick = { onShowProgress(habit.id) }) {
+                    Text(stringResource(R.string.habit_list_progress))
+                }
+                TextButton(onClick = { onArchiveToggle(habit.id, !habit.archived) }) {
+                    Text(
+                        stringResource(
+                            if (habit.archived) R.string.habit_list_unarchive else R.string.habit_list_archive,
+                        ),
+                    )
+                }
             }
         },
         modifier = Modifier.fillMaxWidth().clickable { onEditHabit(habit.id) },
