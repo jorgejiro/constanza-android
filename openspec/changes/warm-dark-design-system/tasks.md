@@ -1,0 +1,187 @@
+# Tasks: Warm-Dark Design System
+
+Deviation note: this artifact exceeds the skill's 530-word soft budget. Justified by explicit
+orchestrator instructions for this change — full promise-to-task traceability, per-unit stop
+thresholds, chain mapping, and concrete verification commands are mandatory here because the prior
+change (`habit-tracking-mvp`) shipped 10 unowned promises. Brevity was sacrificed for coverage.
+
+## Review Workload Forecast
+
+| Field | Value |
+|-------|-------|
+| Estimated changed lines | 1,480–2,200 (design decision 8; measured 2x multiplier on UI units carried forward from `habit-tracking-mvp`) |
+| 400-line budget risk | High |
+| Chained PRs recommended | Yes |
+| Suggested split | Tracker → PR A (unit 1) → PR B (units 2+3) → PR C (unit 4) → PR D (unit 5) → PR E (unit 6) |
+| Delivery strategy | auto-chain |
+| Chain strategy | feature-branch-chain |
+
+Decision needed before apply: No
+Chained PRs recommended: Yes
+Chain strategy: feature-branch-chain
+400-line budget risk: High
+
+**Measured history applied**: every UI work unit in `habit-tracking-mvp` roughly doubled its forecast; non-UI (migration/data) units tracked their forecast closely. Units 4 and 5 here are UI-heavy and are where an overrun is most likely to recur.
+
+### Suggested Work Units
+
+| Unit | Goal | Likely PR | Focused test command | Runtime harness | Rollback boundary |
+|---|---|---|---|---|---|
+| 1 | Theme foundation: tokens, dark-only `Theme.kt`, cold-start chrome, contrast test | PR A | `./gradlew :app:testDebugUnitTest --tests "*.ColorContrastTest"` | Manual — no automated harness reaches pre-Compose window (see "Cannot Be Automatically Verified") | Revert `core/ui/theme/*`, `colors.xml`, `themes.xml`, `MainActivity.kt`; no persisted data touched |
+| 2 | Palette + migration: `HabitColorRemap`, `MIGRATION_1_2`, `version=2`, `2.json`, `addMigrations`, picker swap, import gate | PR B (part 1) | `./gradlew :app:testDebugUnitTest --tests "*.HabitColorRemapTest" --tests "*.BackupImporterNormalizationTest"` | `./gradlew :app:connectedDebugAndroidTest --tests "*.AppDatabaseMigrationTest"` | Ship `Migration(2,3)` inverting the bijection; never downgrade `version` |
+| 3 | 7.5 pre-migration snapshot, failure-isolated | PR B (part 2, separate commit) | `./gradlew :app:testDebugUnitTest --tests "*.PreMigrationSnapshotWriterTest"` | `./gradlew :app:connectedDebugAndroidTest --tests "*.AppDatabaseMigrationTest"` | Revert this single commit only; `MIGRATION_1_2` survives untouched |
+| 4 | Habit colour identity: dot, Today state plumbing, both list screens, tonal banner | PR C | `./gradlew :app:testDebugUnitTest --tests "*.TodayViewModelTest"` | `./gradlew :app:connectedDebugAndroidTest --tests "*.HabitColorDotComposeTest" --tests "*.TodayAdaptiveComposeTest"` | Revert `HabitColorDot.kt`, the 8 call sites, `TodayScreen`/`HabitListScreen` dot wiring |
+| 5 | `HabitEditorScreen` + `ScheduleEditors` tonal pass | PR D | `./gradlew :app:testDebugUnitTest` (regression) | `./gradlew :app:connectedDebugAndroidTest` (existing `HabitEditor*` suites) | Revert the two files; no data/schema touched |
+| 6 | `ProgressScreen`, `SnoozeSettingsScreen`, `DataPortabilityScreen` tonal pass | PR E | `./gradlew check` (aggregate) | Manual device matrix (final gate) | Revert the three files independently |
+
+## PR Chain — Feature Branch Chain
+
+- **Tracker branch**: `feat/warm-dark-design-system` — draft PR targeting `main`, never merged until every child is integrated.
+- **PR A**: `feat/warm-dark-theme-foundation` → base `feat/warm-dark-design-system` — Unit 1. 📍 current unit.
+- **PR B**: `feat/warm-dark-palette-migration` → base `feat/warm-dark-theme-foundation` — Units 2+3.
+- **PR C**: `feat/warm-dark-habit-color-identity` → base `feat/warm-dark-palette-migration` — Unit 4.
+- **PR D**: `feat/warm-dark-editor-tonal-pass` → base `feat/warm-dark-habit-color-identity` — Unit 5.
+- **PR E**: `feat/warm-dark-remaining-tonal-pass` → base `feat/warm-dark-editor-tonal-pass` — Unit 6. Only after E lands does the tracker PR merge to `main`.
+
+```
+main
+ └─ feat/warm-dark-design-system            (tracker, draft, no-merge)
+     └─ feat/warm-dark-theme-foundation      (PR A · Unit 1) 📍
+         └─ feat/warm-dark-palette-migration     (PR B · Units 2+3)
+             └─ feat/warm-dark-habit-color-identity  (PR C · Unit 4)
+                 └─ feat/warm-dark-editor-tonal-pass     (PR D · Unit 5)
+                     └─ feat/warm-dark-remaining-tonal-pass  (PR E · Unit 6)
+```
+
+D and E may fold into one PR if unit 5's actual lands under 400 lines (design decision 8); do not
+merge a fold decision silently — record it in PR D's description if it happens.
+
+## Stop-and-Report Thresholds
+
+Each unit stops and reports remaining scope on **crossing the top of its own forecast**, rather than
+finishing and presenting the overrun. This was the single most effective control in
+`habit-tracking-mvp` (5 overshoots converted into decisions, 2 clean in-budget stops).
+
+| Unit | Stop at (changed lines) | Historically high-risk? |
+|---|---|---|
+| 1 | 430 | No (non-UI-dominant) |
+| 2 | 380 (own commit); PR B cumulative stop at 580 with unit 3 | No |
+| 3 | 200 (own commit, on top of unit 2) | No |
+| 4 | 460 | **Yes** — UI unit |
+| 5 | 520 | **Yes** — UI unit, largest single forecast |
+| 6 | 210 | No |
+
+## Unit 1 — Theme Foundation (PR A)
+
+- [x] 1.1 Create `core/ui/theme/Color.kt`: `object ConstanzaColors` (`Background`, `Surface`, `SurfaceRaised`, `SurfaceSelected`, `Outline`, `Accent`, `OnAccent`, `OnBackground`, `OnBackgroundVariant`, `OnBackgroundMuted`); oklch in KDoc per Engram #47, hex as computed conversion. **Deviation**: file created as `ConstanzaColors.kt`, not `Color.kt` — detekt's `MatchingDeclarationName` rule (active by default, not anticipated by design.md) requires the file name to match its single top-level declaration. Same directory, same object name, mechanical rename only.
+- [x] 1.2 Create `core/ui/theme/HabitPalette.kt`: `enum class HabitColor(val argb: Int)` (RED, PINK, VIOLET, BLUE, TEAL, GREEN — the ratified `#FF9FA8/#FFA8DC/#CBB2FF/#8FC5FF/#5DD6C7/#8BDB95`), `object HabitPalette { ORDERED; ARGB; DEFAULT }`, and `val HabitColor.composeColor: Color`. `argb: Int` is the Compose-free spine — no `androidx.compose.ui.graphics` import reaches `HabitEditorViewModel`.
+- [x] 1.3 Create `core/ui/theme/Type.kt`: `ConstanzaTypography` overriding `titleLarge/titleMedium/bodyLarge/bodyMedium/bodySmall/labelLarge/labelMedium`, `FontFamily.Default` (no packaged font).
+- [x] 1.4 Create `core/ui/theme/Shape.kt`: `ConstanzaShapes`.
+- [x] 1.5 Create `core/ui/theme/Dimens.kt`: `object Spacing` (xs/sm/md/lg/xl/xxl) and `object Dimens` (`HabitDot` 12dp, `HabitDotSlot` 24dp, `Swatch` 40dp, `SwatchBorder` 3dp).
+- [x] 1.6 Modify `core/ui/theme/Theme.kt`: dark-only `ConstanzaTheme(content)`. Drop `lightColorScheme()`, the `darkTheme` param, `isSystemInDarkTheme()`. Satisfies spec `Dark-Only Rendering`.
+- [x] 1.7 Create `res/values/colors.xml`: `window_background` = `ConstanzaColors.Background` hex.
+- [x] 1.8 Modify `res/values/themes.xml`: dark `NoActionBar` parent, `android:windowBackground` → `window_background`. Satisfies spec `Cold-Start Window Background`.
+- [x] 1.9 Modify `core/ui/MainActivity.kt`: `enableEdgeToEdge(SystemBarStyle.dark(...))` for both status and navigation bars. Satisfies spec `System-bar icon appearance`.
+- [x] 1.10 Create `app/src/test/kotlin/.../core/ui/theme/ColorContrastTest.kt`: WCAG relative-luminance helper (ported from sibling app `sleep-noise-android`); assert all 6 habit colours + accent ≥4.5:1 against `Background` AND `SurfaceSelected` (14 assertions) + text tokens. Satisfies spec `Habit Colour And Accent Contrast Floor` + `Contrast Floors Asserted By Automated Test`.
+- [x] 1.11 Explicit boundary: do NOT touch `HabitEditorViewModel.kt`'s existing `HabitColorPalette` in this unit — the consumption swap is Unit 2, alongside the migration (design decision 8 sequencing rule). Confirmed untouched.
+- [x] 1.12 Verify: `./gradlew :app:testDebugUnitTest --tests "*.ColorContrastTest"` green; `./gradlew :app:detektMain` clean (watch `MagicNumber` on the 5 new token files; fallback is `const val …_ARGB = 0xFF…toInt()`, not `@Suppress`, per design decision 1). Both green — see apply-progress.md for exact numbers.
+- [ ] 1.13 **Cannot be automatically verified — manual device check only**: no white cold-start flash, system-bar icons legible with device set to light mode. Run on Pixel 10 (API 37) and Galaxy Z Fold 7 (SM-F966B, API 36). No automated assertion exists because the Compose test harness launches its own `ComponentActivity`, not `MainActivity` with `Theme.Constanza` (design decision 9, stated explicitly rather than papered over).
+
+## Unit 2 — Palette + Data Migration (PR B, part 1 — ONE COMMIT)
+
+Tasks 2.1–2.11 land as a **single commit**. Design's rule: a commit with `version=2` and no committed
+schema, or a migration and no test, bricks a device on checkout.
+
+- [x] 2.1 Create `core/data/migration/HabitColorRemap.kt`: `internal object HabitColorRemap` with `LEGACY_TO_CURRENT: Map<Int, Int>` — **both sides literal ints, never `HabitColor.X.argb`** (a frozen historical artifact must not drift if the palette re-tones later). Six entries: teal→teal, blue→blue, red→red, purple(`0xFF8E24AA`)→violet, green→green, orange(`0xFFFB8C00`)→pink. `fun normalize(argb: Int): Int`.
+- [x] 2.2 Create `core/data/migration/AppMigrations.kt`: `MIGRATION_1_2`. **SQL shape: one parameterized `CASE colorArgb WHEN ? THEN ? … END WHERE colorArgb IN (?,?,?,?,?,?)`, all 12+6 args BOUND from `HabitColorRemap.LEGACY_TO_CURRENT`, never inlined as hex literals.** The sign trap: `0xFF8E24AA.toInt()` is `-7461718` in the column, but `0xFF8E24AA` written inside SQL text parses as `4287505578` — an inlined `CASE` compiles, runs, reports success, and rewrites zero rows. KDoc on `MIGRATION_1_2` carries the rollback recipe: `Migration(2,3)` inverting the bijection (design decision 5).
+- [x] 2.3 Modify `core/data/AppDatabase.kt`: `version = 2`.
+- [x] 2.4 Modify `core/di/DatabaseModule.kt`: `.addMigrations(AppMigrations.MIGRATION_1_2)` on the `Room.databaseBuilder(...)` call. **Hard blocker (C4)** — without this, Room throws `IllegalStateException` at first open on every existing install.
+- [x] 2.5 Build to generate, then commit `app/schemas/com.jjrapps.constanza.core.data.AppDatabase/2.json` — **corrected path (C1)**, NOT `app/schemas/2.json`. `identityHash` unchanged from `1.json` (data-only change).
+- [x] 2.6 Modify `habit/HabitEditorViewModel.kt`: delete `object HabitColorPalette`; import `HabitPalette.ARGB`/`.DEFAULT` (`Int` only — no Compose type). Picker now offers exactly the six current-palette colours. Satisfies spec `Habit Colour Palette` and `Accent Reserved For Chrome` (accent hue absent from the offered six).
+- [x] 2.7 Modify `portability/BackupDto.kt`: `CURRENT_SCHEMA_VERSION = 2`, drop `private` (C5) so the importer can gate on it.
+- [x] 2.8 Modify `portability/BackupImporter.kt`: gate on `schemaVersion < 2` → apply `HabitColorRemap.normalize()` to every imported `colorArgb`; `schemaVersion == 2` passes colours through unchanged. Satisfies spec `Backup Schema Version Read On Import` + `Legacy Habit Colour Normalized On Import`.
+- [x] 2.9 Create `app/src/test/kotlin/.../HabitColorRemapTest.kt`: bijection (6 distinct in, 6 distinct out); orange→pink specifically; an unmapped int passes through unchanged; every right-hand value is a current `HabitPalette` member (freeze-drift guard).
+- [x] 2.10 Create `app/src/test/kotlin/.../BackupImporterNormalizationTest.kt`: `schemaVersion=1` normalizes off-palette colours; `schemaVersion=2` leaves colours byte-identical (round-trip fidelity case). Satisfies spec `Round-Trip Fidelity` (MODIFIED) scenario "Current-version round trip preserves colour exactly".
+- [x] 2.11 **Extend** (do not create — C2) `app/src/androidTest/kotlin/.../core/data/AppDatabaseMigrationTest.kt`: seed all six legacy ints plus one unmapped int into a v1 database built from the checked-in `1.json`; run `runMigrationsAndValidate(TEST_DB_NAME, 2, true, MIGRATION_1_2)`. **Assert the actual post-migration row VALUES equal the expected remapped ints — not merely that the migration completed** (a green-but-no-op migration from the sign trap would still pass a completion-only assertion). Assert the unmapped int survives unchanged. Satisfies spec `Persisted Habit Colour Stays On-Palette Across A Palette Change`.
+- [x] 2.12 Fix `openspec/config.yaml:216` — `migrations:` design-intent line currently reads `app/schemas/1.json`; correct to `app/schemas/com.jjrapps.constanza.core.data.AppDatabase/1.json` (C1).
+- [x] 2.13 Verify: `./gradlew :app:testDebugUnitTest --tests "*.HabitColorRemapTest" --tests "*.BackupImporterNormalizationTest"`; `./gradlew :app:connectedDebugAndroidTest --tests "*.AppDatabaseMigrationTest"`; `./gradlew :app:detektMain`.
+
+## Unit 3 — 7.5 Pre-Migration Snapshot (PR B, part 2 — SEPARATE COMMIT)
+
+Must be its own commit so it reverts alone without touching `MIGRATION_1_2` (design decision 5,
+rollback row "Unit 3 only").
+
+- [x] 3.1 Create `core/data/migration/PreMigrationSnapshotWriter.kt`: `internal class PreMigrationSnapshotWriter(targetDir: File)`, `fun write(db: SupportSQLiteDatabase): Boolean`. Catches `Exception`, NOT `Throwable` (lets `OutOfMemoryError`/`VirtualMachineError` propagate — Room's transaction rollback is safer than swallowing it mid-migration). Temp file `pre-migration-v1.sql.tmp` → atomic rename to `pre-migration-v1.sql` in `filesDir/pre-migration/` only after the last row; deletes temp on failure. Streams row by row via `BufferedWriter`, every `Cursor` in `use {}`. Fixed filename, no `System.currentTimeMillis()` (forbidden by `ForbiddenMethodCall` detekt rule + `TimeProvider` convention). Format: `sqlite_master.sql` per table + one `INSERT INTO` per row, values escaped by `Cursor.getType()`; skips `sqlite_%`, `sqlite_sequence`, `android_metadata`, `room_master_table`. **Deviation**: `catch (Exception)` trips detekt's default `TooGenericExceptionCaught`; resolved by naming the caught variable `expectedFailure`, matching the rule's own `allowedExceptionNameRegex` escape — not `@Suppress`.
+- [x] 3.2 Modify `core/data/migration/AppMigrations.kt`: call `PreMigrationSnapshotWriter.write(db)` as the **first statement** in `migration1To2(writer).migrate(db)`, before the `UPDATE`. Never propagate its result as a migration failure — logged at `WARN` only, no toast/notification/persisted flag on either success or failure.
+- [x] 3.3 Modify `core/di/DatabaseModule.kt`: pass `filesDir` into `PreMigrationSnapshotWriter` construction at the migration call site. **Deviation**: `AppMigrations` stays an `object` (unit 2's flagged constraint), so `MIGRATION_1_2` became the factory function `AppMigrations.migration1To2(writer: PreMigrationSnapshotWriter): Migration`; `DatabaseModule` builds `PreMigrationSnapshotWriter(context.filesDir)` and passes it in. No `@Suppress` — the factory function is camelCase, so the `VariableNaming`/`ObjectPropertyNaming` tension that forced the `object` shape doesn't apply to it.
+- [x] 3.4 Create `app/src/test/kotlin/.../PreMigrationSnapshotWriterTest.kt`: a MockK `SupportSQLiteDatabase` configured to throw during read does NOT propagate out of `write()`; `write()` returns `false`; no `pre-migration-v1.sql` file is left behind. Satisfies spec `Automatic Pre-Migration Snapshot` scenario "Snapshot failure does not block the migration".
+- [x] 3.5 **Extend** `app/src/androidTest/kotlin/.../core/data/AppDatabaseMigrationTest.kt` (separate commit from unit 2's edit to the same file): after `runMigrationsAndValidate`, assert `pre-migration-v1.sql` exists and contains the pre-migration (legacy) rows. Satisfies spec `Automatic Pre-Migration Snapshot` scenario "Snapshot is written before the migration modifies data".
+- [x] 3.6 Modify `openspec/config.yaml`: remove item `"7.5"` from `carried_forward_open_items.items` — this change closes it (snapshot shipped + `data-portability` spec now carries the `Automatic Pre-Migration Snapshot` requirement, correction C6). **Do NOT touch `G.7-throttling-row` in the same edit** — it stays open, unrelated to this change. Confirmed untouched.
+- [x] 3.7 Verify: `./gradlew :app:testDebugUnitTest --tests "*.PreMigrationSnapshotWriterTest"`; `./gradlew :app:connectedDebugAndroidTest --tests "*.AppDatabaseMigrationTest"`. Both green — see apply-progress.md for exact numbers.
+
+## Unit 4 — Habit Colour Identity (PR C)
+
+- [x] 4.1 Create `core/ui/component/HabitColorDot.kt`: `Box(Dimens.HabitDotSlot)` with a tinted halo circle (`Color(argb).copy(alpha = 0.16f)`) and a solid `Dimens.HabitDot` circle centred inside. No `contentDescription` (colour is a secondary channel — design decision 6). Carries a `testTag` only, for `HabitColorDotComposeTest` — not an accessibility announcement.
+- [x] 4.2 Modify `tracking/TodayModel.kt`: `TodayHabitRow.colorArgb: Int` with **no default value**; `buildTodayHabitRow` fills it from the `Habit` already held. **Correction to the task's own count**: this file has exactly **1** literal `TodayHabitRow(...)` construction (the `return` in `buildTodayHabitRow`), not 3 — verified by `rg -n "TodayHabitRow\("` before editing. Flagged loudly per the orchestrator's instruction rather than silently reconciled.
+- [x] 4.3 Modify `tracking/TodayViewModel.kt`: **no edit required, not "1 call site" as stated**. This file never constructs `TodayHabitRow` — it calls `buildTodayHabitRow(habit, schedule, slots, snapshot)`, whose signature is unchanged by 4.2. Verified with the same grep; confirmed untouched by `git diff --name-only`.
+- [x] 4.4 Modify `app/src/test/kotlin/.../TodayViewModelTest.kt`: the "4 call sites" are the file's 4 `buildTodayHabitRow(...)` invocations (lines 110/141/163/176 pre-edit) — none needed a signature change either, for the same reason as 4.3. Instead: `habit()` fixture gained a `colorArgb: Int = HABIT_COLOR_ARGB` parameter (was hardcoded `0`), and one assertion (`assertEquals(HABIT_COLOR_ARGB, row.colorArgb)`) was added so the no-default field is actually exercised, not merely compiled around.
+- [x] 4.5 Modify `tracking/TodayScreen.kt`: `HabitRollupRow` multi-slot branch uses `ListItem(leadingContent = { HabitColorDot(...) })`; single-slot branch wraps the name `Text` in a `Row(verticalAlignment = CenterVertically)` with the dot. `ExactAlarmBanner`'s existing `Row` (weight(1f) fix preserved verbatim, not replaced) is now wrapped in `Surface(color = ConstanzaColors.SurfaceRaised, shape = ConstanzaShapes.medium)`.
+- [x] 4.6 Modify `habit/HabitListScreen.kt`: `HabitRow` renders `ListItem(leadingContent = { HabitColorDot(habit.colorArgb) })`.
+- [x] 4.7 Create `app/src/androidTest/kotlin/.../core/ui/component/HabitColorDotComposeTest.kt`: dot present on Today (single-slot branch) and on the habit list (2 habits, 2 distinct dots). Satisfies spec `Habit Colour Visible Where Habits Are Listed`. **Deviation found and fixed**: the habit-list assertion initially failed — `HabitRow`'s `ListItem` sits under `Modifier.clickable`, which merges descendant semantics into one accessibility node, hiding the dot's `testTag` from the default merged-tree finder. Fixed with `useUnmergedTree = true` on both `onAllNodesWithTag` calls; this is a test-only fix, no production code changed for it.
+- [x] 4.8 Regression: `TodayAdaptiveComposeTest` run completely unmodified — stays green (dot lands on the habit header, not the slot rows the assertion measures).
+- [x] 4.9 Verify: all green — see apply-progress.md for exact numbers.
+
+## Unit 5 — Editor Tonal Pass (PR D)
+
+- [x] 5.1 Modify `habit/HabitEditorScreen.kt`: move `SWATCH_SIZE`/`SWATCH_BORDER` (`:240-241`, corrected from `:239-240`) to `Dimens.Swatch`/`Dimens.SwatchBorder`; apply `TopAppBarDefaults.topAppBarColors(containerColor = ConstanzaColors.Background)` and `Scaffold(containerColor = ConstanzaColors.Background)`; selection states already read `colorScheme.primary` (`:247`, already the accent) — confirmed no change needed there. **Correction, flagged loudly**: `ListItemDefaults.colors` does not apply — `rg -n "ListItem"` found zero `ListItem` call sites in this file; the editor is built entirely from `Column`/`Row`/`OutlinedTextField`/`Text`/`Button`, not list rows. Not applied because there is nothing to apply it to. The `TopAppBar` extraction into a private `HabitEditorTopBar` composable was required to keep `HabitEditorScreen` under detekt's `LongMethod` threshold (60 lines) after adding the `colors` argument inline pushed it to 66.
+- [x] 5.2 Modify `habit/ScheduleEditors.kt`: same tonal token rules. **Finding, flagged loudly**: zero production code changes were needed. Every colour this file reads (`MaterialTheme.colorScheme.onSurfaceVariant`, `.error`; `Switch`/`FilterChip`/`Checkbox` selection states) already resolves through the `MaterialTheme.colorScheme` tokenized by unit 1's `Theme.kt` (`primary`→Accent, `secondaryContainer`→SurfaceSelected, `onSurfaceVariant`→OnBackgroundVariant). The file has no `ListItem`, `TopAppBar`, `Scaffold`, or hardcoded `Color(...)` for design decision 7's tonal-surface rules to touch — confirmed by a full read of all 332 lines, not assumed. `git diff` for this file is empty.
+- [x] 5.3 Apply the `.dp` literal rule to both files: convert to a token only if the value changes or the code is new; leave every unchanged literal alone (design decision 2 — avoids a mixed diff a reviewer can't distinguish from a real padding change). Confirmed: the only `.dp`-owning constants touched are `SWATCH_SIZE`/`SWATCH_BORDER` (5.1's explicit token-ownership exception); every other literal in both files (16/8/12/24/4dp paddings, sizes, spacing) is byte-identical to before this unit.
+- [x] 5.4 Verify: `./gradlew :app:testDebugUnitTest` (regression) — 113/113, 0 failures, exact baseline match. `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.jjrapps.constanza.habit.HabitEditorComposeTest,com.jjrapps.constanza.habit.HabitEditorRotationComposeTest` (the `--tests` flag is not accepted by `connectedDebugAndroidTest` in this AGP/Gradle version — corrected to the instrumentation-runner-argument form) — 4/4 passed. Full `./gradlew :app:connectedDebugAndroidTest` — 63/63, 0 skipped, 0 failed, exact baseline match. `./gradlew :app:detektMain` and `./gradlew :domain:detektMain` — both clean. `./gradlew :domain:test` — 52/52, `:domain` confirmed untouched (`git diff --stat` shows only `HabitEditorScreen.kt`).
+
+## Unit 6 — Remaining Screens Tonal Pass (PR E)
+
+- [x] 6.0 **Complete `Theme.kt`'s M3 role coverage — must run FIRST, before 6.1–6.3.** Added during unit 5, which surfaced the gap: unit 1 bound only **11** colour roles, and the unbound ones are read by components on every screen. `TopAppBar` and `ListItem` default to `surfaceContainer`; `ExposedDropdownMenu` and `AlertDialog` to `surfaceContainer`/`surfaceContainerHigh`; `FilterChip` unselected and text-field containers to `surfaceContainerHighest`; dividers and outlines to `outlineVariant`; `Switch`/`FilterChip` selected states to `primaryContainer`/`onPrimaryContainer`. All of those are still rendering M3's **cool violet-tinted** defaults on the warm ground, which is the precise failure this change exists to prevent (design.md's ramp-hue finding). Bind at minimum `surfaceContainer`, `surfaceContainerLow`, `surfaceContainerLowest`, `surfaceContainerHigh`, `surfaceContainerHighest`, `outlineVariant`, `primaryContainer`, `onPrimaryContainer`, `secondary`, `onSecondary` from `ConstanzaColors`; audit the remaining `darkColorScheme` roles and state which are deliberately left at M3 defaults and why. Reference: the sibling app at `/Users/jorge/dev/sleep-noise-android/app/src/main/java/com/jjrapps/sleepnoise/ui/theme/Theme.kt` binds 18 roles. Then decide whether unit 5's call-site pin in `HabitEditorTopBar` is still needed and say which — keeping it is defensible (a bar deliberately the same colour as the background), removing it is also defensible once the role is warm; do not leave the decision implicit. Extend `ColorContrastTest` to cover any newly bound surface role that habit colours or text now land on. **Done** — see apply-progress.md for the full mapping, the audit of every deliberately-unbound role, and the pin-removal decision (removed: the gap it worked around is now closed at the theme layer).
+- [x] 6.1 Modify `progress/ProgressScreen.kt`: tonal pass, same `.dp` literal rule. **Finding, flagged loudly**: zero production code changes needed. Read in full before concluding — no `Color(...)` literal, no `Card`/`Divider`, only `Text`/`TopAppBar`/`TextButton`/`Scaffold`/`Column`, every one of which already resolves through `MaterialTheme.colorScheme`, now warm end-to-end thanks to 6.0. `git diff` for this file is empty.
+- [x] 6.2 Modify `reminding/SnoozeSettingsScreen.kt`: tonal pass, same rule. **Same finding as 6.1** — zero production changes. `RadioButton`'s default selected/unselected colours already read `primary`/`onSurfaceVariant` (warm since unit 1); no hardcoded colour or structural surface anywhere in the file. `git diff` empty.
+- [x] 6.3 Modify `portability/DataPortabilityScreen.kt`: tonal pass, same rule. **Same finding as 6.1/6.2** — zero production changes. `AlertDialog`'s default container reads `surfaceContainerHigh`, bound warm by 6.0; no other themed surface in the file. `git diff` empty.
+- [x] 6.4 Aggregate verify: `./gradlew check` green (`:app:detektMain` clean; `:domain:detektMain`/`:domain:test` are N/A — no `:domain` file is touched anywhere in this change). **Correction, flagged loudly**: `./gradlew check` is NOT green — `:app:lintDebug` fails on 3 pre-existing errors (`NotificationPoster.kt:52` `MissingPermission`, `ScheduleEditors.kt:242` `NonObservableLocale`, `HabitScheduleKindComposeTest.kt:60` `ViewModelConstructorInComposable`), all last touched by commits outside this change's own history (confirmed by `git log`) and unrelated to visual design. This is the first time `./gradlew check` (which runs Android Lint; prior units only ran `:app:detektMain`/`:domain:detektMain`) has been invoked anywhere in this SDD change, so nothing before unit 6 could have caught it. `:app:detekt` (test-inclusive) DID fail on first run — 3 `MaxLineLength` violations, 1 introduced by this unit's own `ColorContrastTest` extension and 2 pre-existing in unrelated files — fixed as mechanical line-wraps (separate `fix(test)` commit) since they block this unit's own explicit gate. `:app:testDebugUnitTest` 118/118, `:domain:test` 52/52, `:app:connectedDebugAndroidTest` 63/63, `:app:detektMain`/`:domain:detektMain` clean — all real, all green. **Resolution (orchestrator, verified independently).** The task's stated proof was mis-specified: `./gradlew check` green was never a state this repository had reached, so it could not be this unit's bar. All three lint errors are confirmed pre-existing — `git diff main..HEAD` is empty for all three files across the entire PR chain, and each was last touched on `main` by a commit from `habit-tracking-mvp` (`c3e3172`, `f599c4a`, `fb94a36`). Evidence is `app/build/reports/lint-results-debug.xml`, which carries exactly three `severity="Error"` entries matching those ids and locations. Closed as done on the gates this change actually owns (all green above), with the lint aggregate handed to carried-forward item `lint-preexisting-errors` in `openspec/config.yaml` — its own PR, no blocker, no device needed. Not closed silently: recorded there with the owner condition, per that section's own rule.
+- [ ] 6.5 **Cannot be automatically verified — manual device matrix (final gate)**: notification accent shows the migrated colour on one posted reminder (`NotificationPoster.setColor`); dot renders correctly at `sw≥600dp` and across a fold/unfold configuration change. Pixel 10 (API 37) + Galaxy Z Fold 7 (SM-F966B, API 36). If `IllegalStateException: No compose hierarchies found` appears on either device, check `adb shell dumpsys window | rg isKeyguardShowing` first — it means no Activity resumed, not a code fault (`app/build.gradle.kts:178-186`). **Not run** — recorded as an outstanding manual check for the orchestrator to route.
+- [x] 6.6 Confirm no PR in this chain regressed the untouched `G.7-throttling-row` entry in `openspec/config.yaml` — it must still read exactly as unit 3 left it. **Confirmed byte-for-byte**: `git diff 543be10..HEAD -- openspec/config.yaml` is empty (`543be10` is unit 3's own commit).
+
+## Promise Coverage (every design/spec obligation → owning task)
+
+| Obligation | Source | Task(s) |
+|---|---|---|
+| Dark-only rendering, no dynamic colour | spec `Dark-Only Rendering` | 1.6, 1.8, 1.9 |
+| Habit/accent contrast ≥4.5:1 both surfaces | spec `Habit Colour And Accent Contrast Floor` | 1.10 |
+| Accent excluded from habit picker | spec `Accent Reserved For Chrome` | 2.6 |
+| Cold-start dark window, pinned system-bar icons | spec `Cold-Start Window Background And System Bar Icons` | 1.7, 1.8, 1.9, 1.13 (manual) |
+| Contrast floor as automated JVM test | spec `Contrast Floors Asserted By Automated Test` | 1.10 |
+| Exactly six habit colours offered | spec `Habit Colour Palette` | 2.6 |
+| Persisted colour rewritten, bijective, orange→pink | spec `Persisted Habit Colour Stays On-Palette...` | 2.1, 2.2, 2.9, 2.11 |
+| Colour visible on Today and habit list | spec `Habit Colour Visible Where Habits Are Listed` | 4.1–4.7 |
+| Import reads schema version, gates behaviour | spec `Backup Schema Version Read On Import` | 2.7, 2.8 |
+| Legacy colour normalized on import | spec `Legacy Habit Colour Normalized On Import` | 2.8, 2.10 |
+| Pre-migration snapshot, failure-isolated | spec `Automatic Pre-Migration Snapshot` | 3.1–3.5 |
+| Round-trip fidelity clarified for current exports | spec `Round-Trip Fidelity` (MODIFIED) | 2.10 |
+| C1 — corrected schema path | correction | 2.5, 2.12 |
+| C2 — extend, not create, migration test | correction | 2.11, 3.5 |
+| C3 — Today state plumbing, 8 call sites | correction | 4.2, 4.3, 4.4 |
+| C4 — `.addMigrations()` registration | correction | 2.4 |
+| C5 — drop `private` on `CURRENT_SCHEMA_VERSION` | correction | 2.7 |
+| C6 — 7.5 spec requirement | correction (resolved by spec phase) | satisfied by spec `Automatic Pre-Migration Snapshot`; closure task 3.6 |
+| `config.yaml:216` wrong path | orchestrator flag | 2.12 |
+| `carried_forward_open_items` 7.5 removal | orchestrator flag | 3.6 |
+| `G.7-throttling-row` stays untouched | orchestrator flag | 3.6 (explicit exclusion), 6.6 (final confirmation) |
+| Sign-trap bound-args requirement | orchestrator flag | 2.2, 2.11 |
+
+## Verification Command Reference
+
+| Layer | Command | Applies to |
+|---|---|---|
+| JVM unit | `./gradlew :app:testDebugUnitTest` | Units 1, 2, 3, 4 (regression 5, 6) |
+| Instrumented | `./gradlew :app:connectedDebugAndroidTest` | Units 2, 3, 4 (regression 5) — device or emulator |
+| Detekt | `./gradlew :app:detektMain` | All units |
+| Detekt/test | `:domain:detektMain`, `:domain:test` | N/A — no `:domain` file changes in this design |
+| Aggregate | `./gradlew check` | Unit 6 (final gate) |
+| Manual — physical device | Pixel 10 (API 37), Galaxy Z Fold 7 (SM-F966B, API 36) | 1.13 (cold-start flash — no automated harness exists), 6.5 (notification accent, fold/unfold) |

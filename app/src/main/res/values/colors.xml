@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        The pre-Compose window background (used by themes.xml's android:windowBackground). Must
+        match ConstanzaColors.Background exactly, or the cold-start frame flashes a different colour
+        than the first Compose frame (spec "Cold-Start Window Background And System Bar Icons").
+    -->
+    <color name="window_background">#110B06</color>
+</resources>

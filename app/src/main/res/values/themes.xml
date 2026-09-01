@@ -3,7 +3,13 @@
     <!--
         Minimal launch theme for the Activity window before Compose takes over. Compose content
         itself is themed with Material 3 (core/ui/theme/Theme.kt); this XML theme only needs to be
-        a valid NoActionBar window background — no extra AppCompat/Material XML library needed.
+        a valid dark NoActionBar window background — no extra AppCompat/Material XML library needed.
+
+        Dark parent + window_background together are what fix the white cold-start flash: without
+        both, the first frame drawn before Compose attaches is Android's light default (spec
+        "Cold-Start Window Background And System Bar Icons").
     -->
-    <style name="Theme.Constanza" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.Constanza" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
 </resources>

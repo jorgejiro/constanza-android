@@ -1,8 +1,11 @@
 package com.jjrapps.constanza.core.ui
 
+import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +38,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Pins both system bars to dark-background icon style regardless of the device's
+        // system-wide light/dark setting — spec "Cold-Start Window Background And System Bar
+        // Icons", scenario "System-bar icons stay legible when the device is set to light mode".
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(AndroidColor.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(AndroidColor.TRANSPARENT),
+        )
         lifecycle.addObserver(replanOnResumeObserver)
         setContent {
             ConstanzaTheme {

@@ -14,10 +14,16 @@ import com.jjrapps.constanza.core.data.entity.ReminderSlotEntity
 import com.jjrapps.constanza.core.data.entity.ScheduleEntity
 
 /**
- * `version = 1`, `exportSchema = true` from the first commit (design.md §8): every version is
- * diffable and reversible. `fallbackToDestructiveMigration()` is never called anywhere in this
- * app. `room.schemaLocation` is set to `app/schemas/` in `app/build.gradle.kts` (work unit 1);
- * the generated `app/schemas/1.json` is committed alongside this class.
+ * `exportSchema = true` from the first commit (design.md §8): every version is diffable and
+ * reversible. `fallbackToDestructiveMigration()` is never called anywhere in this app.
+ * `room.schemaLocation` is set to `app/schemas/` in `app/build.gradle.kts` (work unit 1); each
+ * generated `app/schemas/com.jjrapps.constanza.core.data.AppDatabase/<version>.json` is committed
+ * alongside this class.
+ *
+ * `version = 2` (warm-dark-design-system, work unit 2): a data-only habit-colour repaint via
+ * `AppMigrations.MIGRATION_1_2`, registered in `DatabaseModule`. No column, table, or index
+ * changed, so `2.json`'s `identityHash` is unchanged from `1.json` — asserted by
+ * `AppDatabaseMigrationTest`, not merely expected.
  */
 @Database(
     entities = [
@@ -27,7 +33,7 @@ import com.jjrapps.constanza.core.data.entity.ScheduleEntity
         EntryEntity::class,
         ReminderOccurrenceEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

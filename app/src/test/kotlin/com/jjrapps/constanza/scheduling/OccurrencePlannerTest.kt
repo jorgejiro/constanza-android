@@ -50,8 +50,16 @@ class OccurrencePlannerTest {
         every { alarmScheduler.schedule(any(), any()) } returns true
     }
 
-    private fun habit(archived: Boolean = false) =
-        HabitEntity(id = HABIT_ID, name = "H", question = null, colorArgb = 0, notes = null, archived = archived, archivedAt = null, createdAt = "2026-01-01T00:00:00Z")
+    private fun habit(archived: Boolean = false) = HabitEntity(
+        id = HABIT_ID,
+        name = "H",
+        question = null,
+        colorArgb = 0,
+        notes = null,
+        archived = archived,
+        archivedAt = null,
+        createdAt = "2026-01-01T00:00:00Z",
+    )
 
     private fun daily() = ScheduleEntity(
         habitId = HABIT_ID, kind = "DAILY", timesPerWeek = null, dayOfWeek = null,

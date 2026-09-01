@@ -39,6 +39,7 @@ private val TODAY: LocalDate = LocalDate.parse("2026-09-01")
 private val FIXED_INSTANT: Instant = Instant.parse("2026-09-01T08:00:00Z")
 private val ZONE: ZoneId = ZoneId.of("UTC")
 private const val HABIT_ID = 7L
+private const val HABIT_COLOR_ARGB = 0xFF5DD6C7.toInt() // HabitColor.TEAL, arbitrary for this test
 private const val MORNING_SLOT_ID = 1L
 private const val EVENING_SLOT_ID = 2L
 private const val OCCURRENCE_ID = 11L
@@ -48,8 +49,8 @@ private const val SNOOZE_UNTIL_MS = 1_800_000_000_000L
 private const val STATE_ARMED = "ARMED"
 private const val STATE_SNOOZED = "SNOOZED"
 
-private fun habit(id: Long = HABIT_ID, name: String = "Read") = Habit(
-    id = id, name = name, question = null, colorArgb = 0, notes = null,
+private fun habit(id: Long = HABIT_ID, name: String = "Read", colorArgb: Int = HABIT_COLOR_ARGB) = Habit(
+    id = id, name = name, question = null, colorArgb = colorArgb, notes = null,
     archived = false, archivedAt = null, createdAt = FIXED_INSTANT, sortOrder = 0,
 )
 
@@ -112,6 +113,9 @@ class TodayViewModelTest {
         assertEquals(DayStatus.PARTIAL, row.dayStatus)
         assertEquals(listOf(EntryStatus.COMPLETED, EntryStatus.UNKNOWN), row.slots.map { it.status })
         assertEquals(listOf(null, OCCURRENCE_ID), row.slots.map { it.occurrenceId })
+        // TodayHabitRow.colorArgb (task 4.2, correction C3) has no default — this is the guard that
+        // buildTodayHabitRow actually fills it from the Habit it holds, not merely that it compiles.
+        assertEquals(HABIT_COLOR_ARGB, row.colorArgb)
     }
 
     /**
@@ -213,10 +217,14 @@ class TodayViewModelTest {
      *  which would silently arm the banner branch in every test that is not about it. */
     @Test
     fun `the banner state mirrors canScheduleExactAlarms, both when denied and when granted`() = runTest {
-        val deniedViewModel = buildViewModel(alarmScheduler = mockk { every { canScheduleExactAlarms() } returns false })
+        val deniedViewModel = buildViewModel(
+            alarmScheduler = mockk { every { canScheduleExactAlarms() } returns false },
+        )
         assertTrue(deniedViewModel.uiState.first().canScheduleExactAlarms.not())
 
-        val grantedViewModel = buildViewModel(alarmScheduler = mockk { every { canScheduleExactAlarms() } returns true })
+        val grantedViewModel = buildViewModel(
+            alarmScheduler = mockk { every { canScheduleExactAlarms() } returns true },
+        )
         assertTrue(grantedViewModel.uiState.first().canScheduleExactAlarms)
     }
 
