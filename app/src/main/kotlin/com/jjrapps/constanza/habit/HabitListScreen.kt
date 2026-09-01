@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.FloatingActionButton
@@ -27,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jjrapps.constanza.R
@@ -102,15 +104,33 @@ private fun HabitListContent(
     }
 }
 
+/**
+ * The whole row toggles, not just the switch. `toggleable` sits before `padding` so the padded
+ * surface is part of the target, and the switch takes `onCheckedChange = null` so it reports state
+ * without handling the click twice — the standard Material pattern for a labelled setting.
+ *
+ * This is also what makes the row one merged semantics node carrying both the label and the toggle
+ * state, instead of a clickable switch beside an inert `Text`. That earlier shape gave a screen
+ * reader an orphan label and a control with no name, shrank the target to the switch alone, and made
+ * `onNodeWithText(label).performClick()` a no-op — which is how `HabitListArchiveComposeTest` found
+ * it. The test was right and the row was wrong.
+ */
 @Composable
 private fun ShowArchivedRow(showArchived: Boolean, onToggleShowArchived: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = showArchived,
+                onValueChange = { onToggleShowArchived() },
+                role = Role.Switch,
+            )
+            .padding(16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(stringResource(R.string.habit_list_show_archived))
-        Switch(checked = showArchived, onCheckedChange = { onToggleShowArchived() })
+        Switch(checked = showArchived, onCheckedChange = null)
     }
 }
 
