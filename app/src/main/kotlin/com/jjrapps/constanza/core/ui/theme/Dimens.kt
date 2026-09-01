@@ -1,0 +1,30 @@
+package com.jjrapps.constanza.core.ui.theme
+
+import androidx.compose.ui.unit.dp
+
+/**
+ * The app's spacing scale (design.md decision 2). A `.dp` literal in screen code becomes one of
+ * these tokens only if its value changes or the code touching it is new during the tonal pass;
+ * every unchanged literal is deliberately left alone so a screen's diff stays readable.
+ */
+object Spacing {
+    val xs = 4.dp
+    val sm = 8.dp
+    val md = 12.dp
+    val lg = 16.dp
+    val xl = 24.dp
+    val xxl = 32.dp
+}
+
+/**
+ * Fixed component dimensions shared across screens. [HabitDot]/[HabitDotSlot] are the habit colour
+ * dot (design.md decision 6, work unit 4); [Swatch]/[SwatchBorder] are the colour picker swatch,
+ * moved here from `HabitEditorScreen.kt`'s private constants (work unit 5) so the editor and both
+ * list screens agree on one number instead of each holding a private copy.
+ */
+object Dimens {
+    val HabitDot = 12.dp
+    val HabitDotSlot = 24.dp
+    val Swatch = 40.dp
+    val SwatchBorder = 3.dp
+}
