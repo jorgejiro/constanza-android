@@ -425,49 +425,26 @@ The gate itself is discharged. These follow-ups come out of it and need decision
       screen, fold/unfold, and the One UI "put unused apps to sleep" multi-day assertion. §13.3 already
       says no Pixel substitutes for them: the `wm size` override reproduces a width, never an OEM's own
       throttling behaviour. They stay open against that device becoming available.
-- [ ] 6a.9 **Added 2026-09-01 from G.7's run — the IME is not restored after rotation.** Task 6a.5
+- [x] 6a.9 **Added 2026-09-01 from G.7's run — the IME is not restored after rotation.** Task 6a.5
       requires "re-requesting IME visibility explicitly after rotation" and §5.7 C4 requires the editor
-      not to assume the keyboard survives. Measured on the habit editor with the keyboard up:
-      `mInputShown` goes `true` → `false` across a real rotation, and **no field is focused afterwards**.
-      Typed content is preserved, so 6a.7's guarantee is intact — this is the keyboard half only.
-      `EditorNameField` tries: `wasFocused` is `rememberSaveable`, and a `LaunchedEffect(Unit)` calls
-      `requestFocus()` plus `keyboardController?.show()` when it is set. The flag is already `false` by
-      then, because `onFocusChanged { wasFocused = it.isFocused }` fires with `false` during teardown
-      and overwrites it before it is saved. Focus not being restored either is what rules out a mere
-      keyboard-controller timing problem.
-      **This needs a product decision, not just a patch:** latching the flag on focus-gain would
-      restore the keyboard but would also re-open one the user had deliberately dismissed. Decide what
-      should happen when the user dismissed it on purpose, then implement to that.
-
-## Phase 6a: Habit CRUD UI (Work Unit 6a) — depends on 3, 4a
-
-**Split into slice i (a habit can be created, edited and archived) and slice ii (a habit can be
-scheduled), 2026-09-01 — orchestrator decision, not a task-content change.** The forecast put
-whole-unit 6a at ~660 lines against a 700 budget with **low confidence, because no Compose unit had
-shipped yet**, and understated the work: no Compose UI test dependencies, no ViewModel/Hilt-Compose
-dependencies, and no `HabitRepository` create/update/archive/observe surface existed before this
-slice — none of that was in any numbered task. The seam is behavioural: **slice i ships a working
-create/edit/archive/list feature with the schedule fixed to `DAILY`; slice ii adds the schedule-kind
-picker and the `TIMES_PER_DAY` slot editor.** Slice i measured 668 production / 538 test = 1,206
-changed lines — well over the 700 target despite the split, driven by three infrastructure gaps
-(Compose test deps, ViewModel-Compose/Hilt-navigation-Compose deps, and the `HabitRepository`
-surface) landing in the same slice as the feature that needed them, plus this being the first
-Compose unit in the project (no prior pattern to reuse). Recorded here rather than silently
-absorbed, per this change's own "unowned work" lesson (§13.4).
-
-**Slice ii itself was split into ii-a and ii-b, 2026-09-01 — a ~650-line budget stop mid-batch, not
-a task-content change.** ii-a covers the schedule half of 6a.1 (the six-kind picker, each kind's
-parameter editor, and the `TIMES_PER_DAY` slot editor) plus wiring it through `HabitEditorViewModel`
-and the save path. Measured 612 production / 180 test = 792 changed lines against the ~650 stop
-point — over, because production alone (the picker, six parameter editors, the slot editor,
-`HabitRepository`/`ReminderSlotDao` slot CRUD) already measured 612 changed lines, within 40 of the
-stop point before any test was written; ViewModel unit tests covering all six kinds' defaults/
-bounds and the slot editor's add/remove/enable/reschedule flow were kept in-batch as the cheapest
-real coverage per line, and the batch was stopped there rather than also writing 6a.6's instrumented
-six-kind proof. **ii-b picks up
-6a.6 (moved here) plus the originally-scoped 6a.5/6a.7** (single responsive layout + rotation
-verification).
-
+      not to assume the keyboard survives. G.7 measured `mInputShown` going `true` → `false` across a
+      real rotation with **no field focused afterwards** (design.md §13.5, finding 2).
+      **Ratified by the user: latch on focus gain.** `EditorNameField`'s old per-field boolean was
+      written as `onFocusChanged { wasFocused = it.isFocused }`, so the teardown's own
+      `onFocusChanged(false)` cleared it before it could be saved. The latch now never clears, which
+      means a keyboard the user dismissed on purpose does come back after a rotation — the accepted
+      trade-off.
+      **Generalized so it cannot steal focus.** A bare per-field latch would have recorded "this field
+      held focus at some point", so rotating while typing in Notes would have thrown the caret back to
+      Name. The saveable state records **which** field gained focus last — the one that had it when the
+      rotation happened — and `focusRestoring` is shared by all three text fields.
+      Verified on the device, focusing **Notes** rather than Name precisely to catch stealing:
+      `mInputShown` `true` → `true`, focus back on Notes, content preserved. Guarded by
+      `HabitEditorRotationComposeTest.rotatingRestoresFocusToTheFieldThatHadIt`, which fails with
+      `Failed to assert the following: (Focused = 'true')` when the clearing behaviour is reinstated.
+      The keyboard half is not asserted in that test and says why: `StateRestorationTester` rebuilds
+      the composition without recreating the Activity, so there is no real IME to observe — it holds
+      the saved-state mechanism that was actually broken.
 - [x] 6a.1 Implement the habit editor: name, question, colour, notes, schedule-kind picker for all six kinds, slot editor for `TIMES_PER_DAY` (habit-management: Habit Creation, Habit Editing; habit-scheduling: Six Frequency Kinds, Reminder Slots for TIMES_PER_DAY). **Slice i:** name/question/colour/notes fields, with every new habit's schedule fixed to `DAILY` and an existing habit's schedule preserved unchanged when editing. **Slice ii-a:** the schedule-kind picker for all six kinds and the `TIMES_PER_DAY` slot editor (add/remove/enable a slot's `minuteOfDay`). **Not built by ii-a — no numbered task owns it:** the single configurable reminder time habit-scheduling requires for the other five kinds ("Every other frequency kind MUST have exactly one configurable reminder time, not per-slot times"); flagged rather than silently built or skipped.
 - [x] 6a.2 Enforce name-required validation blocking save (habit-management: Creation requires a name). Blank AND whitespace-only names are both rejected.
 - [x] 6a.3 Wire schedule-edit save to the `HabitRepository` transaction that triggers `replanAll()` (habit-management: Editing reschedules reminders — depends on 4a.5). **Corrected:** that transaction is `ScheduleEditor`'s (task 4a.5), not a second one in `HabitRepository` — `HabitRepository.create`/`update` delegate to `ScheduleEditor.updateSchedule`, composing Room transactions rather than duplicating the replan wiring.

@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -102,8 +103,9 @@ data class HabitEditorActions(
  *  block slice ii-b's C1/C4 adaptive verification (ui-adaptive-layout). [onScheduleParamChange]/
  *  [onSlotAction] are single sealed-action callbacks (task 6a.1, slice ii-a) rather than one lambda
  *  per field — the same `LongParameterList`-avoidance reasoning as [HabitEditorActions], without
- *  needing a wrapper data class for either. The name field's own IME re-request (task 6a.5) lives
- *  in [EditorNameField], kept separate so this function stays under detekt's `LongMethod`. */
+ *  needing a wrapper data class for either. IME and caret restoration across a configuration change
+ *  (tasks 6a.5/6a.9) is [focusRestoring], applied to all three text fields and sharing one saveable
+ *  record of which field held focus. */
 @Composable
 fun HabitEditorScreen(
     state: HabitEditorUiState,
@@ -123,18 +125,33 @@ fun HabitEditorScreen(
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
-            EditorNameField(name = state.name, onNameChange = actions.onNameChange, nameError = state.nameError)
+            // Shared across all three text fields on purpose (task 6a.9): it holds WHICH field
+            // gained focus last, so a rotation restores the caret and keyboard where the user was
+            // rather than always to the name field.
+            val focusedFieldId = rememberSaveable { mutableStateOf<String?>(null) }
+            EditorNameField(
+                name = state.name,
+                onNameChange = actions.onNameChange,
+                nameError = state.nameError,
+                focusedFieldId = focusedFieldId,
+            )
             OutlinedTextField(
                 value = state.question,
                 onValueChange = actions.onQuestionChange,
                 label = { Text(stringResource(R.string.habit_editor_question_label)) },
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .then(focusRestoring(FIELD_QUESTION, focusedFieldId)),
             )
             OutlinedTextField(
                 value = state.notes,
                 onValueChange = actions.onNotesChange,
                 label = { Text(stringResource(R.string.habit_editor_notes_label)) },
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .then(focusRestoring(FIELD_NOTES, focusedFieldId)),
             )
             Text(
                 stringResource(R.string.habit_editor_color_label),
@@ -158,26 +175,51 @@ fun HabitEditorScreen(
 }
 
 /**
- * Task 6a.5 (ui-adaptive-layout: Soft Keyboard Visibility Not Assumed Across Configuration Change).
- * Self-contained — owns its own [FocusRequester] and `rememberSaveable` focus flag — so
- * [HabitEditorScreen] does not need to. Android 17 does not restore IME visibility across an
- * unhandled configuration change, and this app declares no `android:configChanges` (design.md §5.7
- * C4), so a rotation always destroys and recreates the composition; [wasFocused] survives that
- * because it is `rememberSaveable`, not plain `remember`, and the [LaunchedEffect] below
- * re-requests both focus and keyboard visibility once on the fresh composition rather than
- * assuming either persisted.
+ * Task 6a.5 / 6a.9 (ui-adaptive-layout: Soft Keyboard Visibility Not Assumed Across Configuration
+ * Change). Android 17 does not restore IME visibility across an unhandled configuration change, and
+ * this app declares no `android:configChanges` (design.md §5.7 C4), so a rotation always destroys
+ * and recreates the composition.
+ *
+ * **Latch on focus gain, ratified 2026-09-01 (task 6a.9).** The earlier shape kept a per-field
+ * boolean written as `onFocusChanged { wasFocused = it.isFocused }`, which never worked: the callback
+ * fires with `false` while the Activity is torn down and overwrote the flag before it was saved, so
+ * the keyboard never came back and neither did the caret. Task G.7 measured that on the device —
+ * `mInputShown` `true` → `false`, and no field focused afterwards (design.md §13.5, finding 2).
+ *
+ * The latch never clears, which is the ratified behaviour: a keyboard the user dismissed on purpose
+ * does come back after a rotation. What it deliberately does **not** do is steal focus. A bare
+ * per-field latch would have said "this field held focus at some point", so rotating while typing in
+ * Notes would have thrown the caret back to Name. This latch records **which** field gained focus
+ * last — the one that had it when the rotation happened — so restoration lands where the user was.
  */
+/** Field ids for task 6a.9's focus latch. Stable strings rather than an enum so the
+ *  `rememberSaveable` holding one needs no custom Saver. */
+private const val FIELD_NAME = "name"
+private const val FIELD_QUESTION = "question"
+private const val FIELD_NOTES = "notes"
+
 @Composable
-private fun EditorNameField(name: String, onNameChange: (String) -> Unit, nameError: Boolean) {
+private fun focusRestoring(fieldId: String, focusedFieldId: MutableState<String?>): Modifier {
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
-    var wasFocused by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        if (wasFocused) {
+        if (focusedFieldId.value == fieldId) {
             focusRequester.requestFocus()
             keyboardController?.show()
         }
     }
+    return Modifier
+        .focusRequester(focusRequester)
+        .onFocusChanged { if (it.isFocused) focusedFieldId.value = fieldId }
+}
+
+@Composable
+private fun EditorNameField(
+    name: String,
+    onNameChange: (String) -> Unit,
+    nameError: Boolean,
+    focusedFieldId: MutableState<String?>,
+) {
     OutlinedTextField(
         value = name,
         onValueChange = onNameChange,
@@ -190,8 +232,7 @@ private fun EditorNameField(name: String, onNameChange: (String) -> Unit, nameEr
         },
         modifier = Modifier
             .fillMaxWidth()
-            .focusRequester(focusRequester)
-            .onFocusChanged { wasFocused = it.isFocused },
+            .then(focusRestoring(FIELD_NAME, focusedFieldId)),
     )
 }
 
