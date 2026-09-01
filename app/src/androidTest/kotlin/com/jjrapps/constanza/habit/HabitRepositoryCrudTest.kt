@@ -3,6 +3,7 @@ package com.jjrapps.constanza.habit
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -83,20 +84,58 @@ class HabitRepositoryCrudTest {
             Schedule.Weekly(today.plusDays(WEEKLY_DAY_OFFSET).dayOfWeek),
         )
         val stored = requireNotNull(repository.findById(id))
-        fixture.insertEnabledSlot(id)
+        val slotId = fixture.insertEnabledSlot(id)
         assertTrue(
             "no reschedule trigger has fired since the slot appeared, so nothing may be armed yet",
             fixture.armedOccurrenceDates(id).isEmpty(),
         )
 
-        repository.update(stored, Schedule.Daily())
+        // Passed through update()'s own slots parameter (not left as an untouched external row):
+        // syncSlots must run before the replan for this to see it (task 6a.8 ordering fix), the same
+        // shape the real editor's save() call always uses.
+        val slot = ReminderSlot(id = slotId, habitId = id, minuteOfDay = MORNING_MINUTE_OF_DAY, enabled = true)
+        repository.update(stored, Schedule.Daily(), listOf(slot))
 
         assertEquals(Schedule.Daily(), repository.findScheduleFor(id))
         val armed = fixture.armedOccurrenceDates(id)
         val dailyHorizon = listOf(today, today.plusDays(1), today.plusDays(2)).map(LocalDate::toString)
         assertTrue(
-            "update must run replanAll() inside its own transaction; armed dates were $armed",
+            "update must run replanAll() inside its own transaction, seeing the just-synced slot; " +
+                "armed dates were $armed",
             armed.containsAll(dailyHorizon),
         )
     }
+
+    /** Task 6a.8 (habit-scheduling, ratified 2026-09-01): the single reminder time for a
+     *  non-`TIMES_PER_DAY` kind is exactly one [ReminderSlot] in [HabitRepository.create]'s `slots`
+     *  list — the same round trip `TIMES_PER_DAY`'s own slots already take, just capped at one. */
+    @Test
+    fun creatingADailyHabitWithAReminderTimeArmsAnOccurrence() = runBlocking {
+        val slot = ReminderSlot(id = 0L, habitId = 0L, minuteOfDay = MORNING_MINUTE_OF_DAY, enabled = true)
+
+        val id = repository.create(newHabit(name = "Stretch"), Schedule.Daily(), listOf(slot))
+
+        assertTrue(
+            "a habit saved with a reminder time must arm at least one occurrence",
+            fixture.armedOccurrenceDates(id).isNotEmpty(),
+        )
+    }
+
+    /** Pins the other half of the same ratified decision: a reminder-less habit MUST still be
+     *  accepted, and MUST arm nothing — not a validation error, not a silently-armed default time.
+     *  [com.jjrapps.constanza.scheduling.OccurrencePlanner.planHabit]'s own
+     *  `enabledSlots.isEmpty()` early return is what makes the second assertion true; this proves it
+     *  end to end through the same [HabitRepository.create] path the editor calls. */
+    @Test
+    fun creatingADailyHabitWithNoReminderTimeIsAcceptedAndArmsNothing() = runBlocking {
+        val id = repository.create(newHabit(name = "Stretch"), Schedule.Daily())
+
+        assertEquals("Stretch", requireNotNull(repository.findById(id)).name)
+        assertTrue(
+            "a habit saved with no reminder time (D7/OA-3) must arm nothing",
+            fixture.armedOccurrenceDates(id).isEmpty(),
+        )
+    }
 }
+
+private const val MORNING_MINUTE_OF_DAY = 480

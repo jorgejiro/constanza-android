@@ -6,7 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.jjrapps.constanza.core.ui.theme.ConstanzaTheme
 import com.jjrapps.constanza.habit.HabitEditorRoute
@@ -45,15 +45,21 @@ class MainActivity : ComponentActivity() {
  * Task 6a's navigation decision: no navigation library. A list plus one editor is small enough
  * that hoisted [ConstanzaRoute] state in this single Activity is defensible and cheaper than
  * adding a navigation dependency — work unit 6b adds more screens and can revisit (design.md §14).
+ *
+ * [java.io.Serializable] (task 6a.7, ui-adaptive-layout): this Activity declares no
+ * `android:configChanges`, so a rotation destroys and recreates it (§5.7 C1/C4). Without a
+ * [androidx.compose.runtime.saveable.Saver]-compatible route type, plain `remember`'d navigation
+ * state does not survive that recreation and the app would silently drop back to the habit list
+ * mid-edit — a worse content loss than anything inside the editor screen itself.
  */
-private sealed interface ConstanzaRoute {
+private sealed interface ConstanzaRoute : java.io.Serializable {
     data object HabitList : ConstanzaRoute
     data class HabitEditor(val habitId: Long?) : ConstanzaRoute
 }
 
 @Composable
 private fun ConstanzaApp() {
-    var route by remember { mutableStateOf<ConstanzaRoute>(ConstanzaRoute.HabitList) }
+    var route by rememberSaveable { mutableStateOf<ConstanzaRoute>(ConstanzaRoute.HabitList) }
     when (val current = route) {
         is ConstanzaRoute.HabitList -> HabitListRoute(
             onCreateHabit = { route = ConstanzaRoute.HabitEditor(habitId = null) },
