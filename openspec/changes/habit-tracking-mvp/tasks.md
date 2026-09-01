@@ -629,13 +629,18 @@ Work unit 6b (tasks 6b.1–6b.10) is now fully complete across both slices.
 
 ## Phase 7: Data Portability (Work Unit 7) — depends on 3 only
 
-- [ ] 7.1 Define `:app`-only export DTOs mirroring §8.4's JSON shape; set up `kotlinx-serialization-json` (design D9).
-- [ ] 7.2 Implement export: read Room + DataStore settings, serialize to `constanza-backup-<yyyyMMdd-HHmmss>.json` via SAF `ACTION_CREATE_DOCUMENT` (data-portability: Export).
-- [ ] 7.3 Implement import: full parse-and-validate before any write; refuse a newer `formatVersion`; on success, replace-all in one Room transaction with ID remapping, then cancel all alarms, truncate `reminder_occurrences`, and `replanAll()` (data-portability: Import, Round-Trip Fidelity).
-- [ ] 7.4 Implement the destructive-import confirmation dialog gating the import call (data-portability: Declined confirmation changes nothing).
-- [ ] 7.5 Wire an automatic pre-migration export hook, invoked before any future Room migration runs (proposal rollback plan).
-- [ ] 7.6 [Instrumented] Round-trip test: export → wipe → import restores all habits/schedules/slots/entries, incl. archived history, byte-equivalent (data-portability: Round-Trip Fidelity).
-- [ ] 7.7 [Instrumented] Malformed-file rejection test: existing dataset untouched (data-portability: Malformed file leaves data intact).
+- [x] 7.1 Define `:app`-only export DTOs mirroring §8.4's JSON shape; set up `kotlinx-serialization-json` (design D9).
+- [x] 7.2 Implement export: read Room + DataStore settings, serialize to `constanza-backup-<yyyyMMdd-HHmmss>.json` via SAF `ACTION_CREATE_DOCUMENT` (data-portability: Export).
+- [x] 7.3 Implement import: full parse-and-validate before any write; refuse a newer `formatVersion`; on success, replace-all in one Room transaction with ID remapping, then cancel all alarms, truncate `reminder_occurrences`, and `replanAll()` (data-portability: Import, Round-Trip Fidelity).
+- [x] 7.4 Implement the destructive-import confirmation dialog gating the import call (data-portability: Declined confirmation changes nothing).
+- [ ] 7.5 Wire an automatic pre-migration export hook, invoked before any future Room migration runs (proposal rollback plan). NOT STARTED — deferred, crossed the ~600-line budget stop before reaching it; see apply-progress for what a real v2 migration would need.
+- [x] 7.6 [Instrumented] Round-trip test: export → wipe → import restores all habits/schedules/slots/entries, incl. archived history, byte-equivalent (data-portability: Round-Trip Fidelity).
+- [x] 7.7 [Instrumented] Malformed-file rejection test: existing dataset untouched (data-portability: Malformed file leaves data intact).
+
+Work unit 7 (tasks 7.1-7.4, 7.6-7.7) is complete — every `data-portability` MUST (export, replace-all
+import with atomicity/ID remapping, destructive confirmation, malformed-file rejection) is implemented
+and verified. Task 7.5 (pre-migration export hook) is carried as debt: crossed the ~600-line budget
+stop before reaching it. Only task G.7's device-matrix rows remain in the whole change after this.
 
 ## Note on document size
 
