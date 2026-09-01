@@ -92,6 +92,12 @@ interface EntryDao {
     @Query("SELECT * FROM entries WHERE date = :date")
     fun observeByDate(date: String): Flow<List<EntryEntity>>
 
+    /** Task 6b.4: the progress screen's reactive entry source — a single habit's full history,
+     *  the input [com.jjrapps.constanza.domain.StreakCalculator]/
+     *  [com.jjrapps.constanza.domain.ComplianceCalculator] both compute over. */
+    @Query("SELECT * FROM entries WHERE habitId = :habitId")
+    fun observeByHabitId(habitId: Long): Flow<List<EntryEntity>>
+
     @Query("DELETE FROM entries WHERE habitId = :habitId AND slotId = :slotId")
     suspend fun deleteBySlot(habitId: Long, slotId: Long)
 }

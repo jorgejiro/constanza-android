@@ -11,6 +11,8 @@ import androidx.compose.runtime.setValue
 import com.jjrapps.constanza.core.ui.theme.ConstanzaTheme
 import com.jjrapps.constanza.habit.HabitEditorRoute
 import com.jjrapps.constanza.habit.HabitListRoute
+import com.jjrapps.constanza.progress.ProgressRoute
+import com.jjrapps.constanza.reminding.SnoozeSettingsRoute
 import com.jjrapps.constanza.scheduling.ReplanOnResumeObserver
 import com.jjrapps.constanza.tracking.TodayRoute
 import dagger.hilt.android.AndroidEntryPoint
@@ -23,9 +25,8 @@ import javax.inject.Inject
  * The one non-UI thing it does is register design.md §5.5/§13.1's `onResume()` re-check
  * (task G.5). The decision logic lives in [ReplanOnResumeObserver], not here.
  *
- * **Still deferred, and no numbered 6b task owns it** (flagged, not silently dropped, per
- * design.md §13.4's unowned-promise pattern): §13.1's non-blocking banner explaining that
- * reminders may arrive late, with one tap to `ACTION_REQUEST_SCHEDULE_EXACT_ALARM`.
+ * §13.1's non-blocking exact-alarm banner (task 6b.9) lives on the Today screen itself —
+ * [com.jjrapps.constanza.tracking.TodayScreen] — not here.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -58,26 +59,42 @@ private sealed interface ConstanzaRoute : java.io.Serializable {
     data object Today : ConstanzaRoute
     data object HabitList : ConstanzaRoute
     data class HabitEditor(val habitId: Long?) : ConstanzaRoute
+    data class Progress(val habitId: Long) : ConstanzaRoute
+    data object Settings : ConstanzaRoute
 }
 
 /** Task 6b.1: Today is the daily-use home screen; [ConstanzaRoute.HabitList] is reached from its
- *  "Manage habits" action and returns here rather than staying its own top-level destination. */
+ *  "Manage habits" action and returns here rather than staying its own top-level destination.
+ *  Task 6b.4/6b.5 add two more leaf screens the same way: [ConstanzaRoute.Progress] from
+ *  [com.jjrapps.constanza.habit.HabitListRoute]'s per-habit "Progress" action, and
+ *  [ConstanzaRoute.Settings] from Today's own "Settings" action. */
 @Composable
 private fun ConstanzaApp() {
     var route by rememberSaveable { mutableStateOf<ConstanzaRoute>(ConstanzaRoute.Today) }
     when (val current = route) {
         is ConstanzaRoute.Today -> TodayRoute(
             onManageHabits = { route = ConstanzaRoute.HabitList },
+            onOpenSettings = { route = ConstanzaRoute.Settings },
         )
 
         is ConstanzaRoute.HabitList -> HabitListRoute(
             onCreateHabit = { route = ConstanzaRoute.HabitEditor(habitId = null) },
             onEditHabit = { habitId -> route = ConstanzaRoute.HabitEditor(habitId) },
+            onShowProgress = { habitId -> route = ConstanzaRoute.Progress(habitId) },
         )
 
         is ConstanzaRoute.HabitEditor -> HabitEditorRoute(
             habitId = current.habitId,
             onDone = { route = ConstanzaRoute.HabitList },
+        )
+
+        is ConstanzaRoute.Progress -> ProgressRoute(
+            habitId = current.habitId,
+            onBack = { route = ConstanzaRoute.HabitList },
+        )
+
+        is ConstanzaRoute.Settings -> SnoozeSettingsRoute(
+            onBack = { route = ConstanzaRoute.Today },
         )
     }
 }

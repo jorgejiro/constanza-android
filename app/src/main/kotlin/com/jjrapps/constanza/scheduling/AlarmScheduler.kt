@@ -42,6 +42,11 @@ class AlarmScheduler @Inject constructor(
         alarmManager.cancel(pendingIntentFor(occurrenceId))
     }
 
+    /** Task 6b.9 (design §12/§13.1): the same eligibility check [schedule] re-runs on every call,
+     *  exposed here so the UI can explain a degraded (inexact) delivery mode instead of silently
+     *  living with it. */
+    fun canScheduleExactAlarms(): Boolean = alarmManager.canScheduleExactAlarms()
+
     /** design.md §8.2: `occurrence.id` IS the `PendingIntent` request code, with no second id
      *  scheme. `FLAG_IMMUTABLE` on every `PendingIntent` (design.md §12) is mandatory at API 31+
      *  and is never relaxed. */

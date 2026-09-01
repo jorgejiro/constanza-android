@@ -40,6 +40,10 @@ androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-
 # ViewModel + Hilt-ViewModel-in-Compose wiring (work unit 6a). hilt-navigation-compose shares
 # androidx.hilt's release train with hilt-work/hilt-compiler above, so it reuses that version ref.
 androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleViewmodelCompose" }
+# Task 6b.9: LocalLifecycleOwner (moved out of androidx.compose.ui) and the ON_RESUME re-check
+# helpers for the exact-alarm banner. Was already resolved transitively at this exact version;
+# declared explicitly rather than relying on an undeclared transitive resolution.
+androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycleViewmodelCompose" }
 androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltWork" }
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }

@@ -12,6 +12,7 @@ import com.jjrapps.constanza.domain.model.Habit
 import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
 import com.jjrapps.constanza.habit.HabitRepository
+import com.jjrapps.constanza.scheduling.AlarmScheduler
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -207,9 +208,42 @@ class TodayViewModelTest {
         }
     }
 
+    /** Task 6b.9 — [alarmScheduler] backs the exact-alarm banner. Explicitly stubbed for the same
+     *  reason as every other collaborator here: a relaxed mock answers `false` for a `Boolean`,
+     *  which would silently arm the banner branch in every test that is not about it. */
+    @Test
+    fun `the banner state mirrors canScheduleExactAlarms, both when denied and when granted`() = runTest {
+        val deniedViewModel = buildViewModel(alarmScheduler = mockk { every { canScheduleExactAlarms() } returns false })
+        assertTrue(deniedViewModel.uiState.first().canScheduleExactAlarms.not())
+
+        val grantedViewModel = buildViewModel(alarmScheduler = mockk { every { canScheduleExactAlarms() } returns true })
+        assertTrue(grantedViewModel.uiState.first().canScheduleExactAlarms)
+    }
+
+    /** Task 6b.9 — the `onResume` re-check re-reads the permission rather than caching the
+     *  construction-time value, since the user can grant it from system Settings and return with
+     *  no Room write to react to. */
+    @Test
+    fun `refreshExactAlarmPermission re-reads a permission granted after construction`() = runTest {
+        val alarmScheduler = mockk<AlarmScheduler> {
+            every { canScheduleExactAlarms() } returns false andThen true
+        }
+        val viewModel = buildViewModel(alarmScheduler = alarmScheduler)
+        assertTrue(viewModel.uiState.first().canScheduleExactAlarms.not())
+
+        viewModel.refreshExactAlarmPermission()
+
+        assertTrue(viewModel.uiState.first().canScheduleExactAlarms)
+    }
+
     private fun twoSlots() = listOf(slot(MORNING_SLOT_ID, MORNING_MINUTE), slot(EVENING_SLOT_ID, EVENING_MINUTE))
 
-    private fun buildViewModel(entryWriter: EntryWriter = mockk(relaxUnitFun = true)): TodayViewModel {
+    private fun buildViewModel(
+        entryWriter: EntryWriter = mockk(relaxUnitFun = true),
+        alarmScheduler: AlarmScheduler = mockk {
+            every { canScheduleExactAlarms() } returns true
+        },
+    ): TodayViewModel {
         val habitRepository = mockk<HabitRepository> {
             every { observeAll() } returns MutableStateFlow(listOf(habit()))
             coEvery { findScheduleFor(HABIT_ID) } returns Schedule.Daily()
@@ -226,6 +260,6 @@ class TodayViewModelTest {
             every { today() } returns TODAY
             every { zone() } returns ZONE
         }
-        return TodayViewModel(habitRepository, entryDao, occurrenceDao, entryWriter, timeProvider)
+        return TodayViewModel(habitRepository, entryDao, occurrenceDao, entryWriter, alarmScheduler, timeProvider)
     }
 }
