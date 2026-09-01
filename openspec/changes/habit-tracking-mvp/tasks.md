@@ -488,7 +488,20 @@ verification).
 ## Phase 6b: Today Screen, Progress & Settings UI (Work Unit 6b) — depends on 3, 5
 
 - [ ] 6b.1 Implement the today screen: due habits, independent per-slot rows (habit-entry-tracking: Slot Independence, Day-Level Rollup and Per-Slot Display).
+      **OA-2 ratified 2026-09-01, as revised (design.md §1's assumption table):** one row per habit carrying
+      the day rollup, **expandable** to that habit's per-slot rows, each independently answerable. A
+      single-slot habit reads as one plain row. Not a flat always-expanded per-slot list, and not a
+      day-level-only control — the latter was proposed, then withdrawn once it turned out to leave a user who
+      missed one slot's notification with no in-app way to answer that slot.
 - [ ] 6b.2 Wire in-app Yes/No/Skip to write `Entry` through the same write path as notification actions (habit-entry-tracking: Entry States, Slot Independence).
+      **Owns an extraction this task's wording assumes already exists.** There is no shared entry-write
+      component: `AnswerWorker` calls `entryDao.upsert(...)` inline, so "the same write path" has to be made
+      into one before it can be shared. Extract it so the notification action and the in-app answer provably
+      run the same code, rather than two paths that merely look alike — `SKIPPED` is in-app only (ratified
+      decision 4 and the spec both say it is never settable from a notification), so the shared path must
+      admit it without letting the notification route reach it.
+      Recorded explicitly because this is the **seventh** case in this change of work that a task's prose
+      assumed was already built (see design.md §13.4); the previous six each shipped a dead or hollow path.
 - [ ] 6b.3 Render pending/snoozed state ("pending, snoozed until HH:mm") by reading `reminder_occurrences` (design §7 D3).
 - [ ] 6b.4 Implement the progress view: current/best streak and compliance, calling `StreakCalculator`/`ComplianceCalculator` with `windowDays = 30`. **[Provisional — OA-4, unconfirmed]** (habit-progress: Streak Calculation, Compliance Calculation).
 - [ ] 6b.5 Implement the snooze-default setting screen bound to the DataStore entry from 5.6 (reminder-response: Snooze Configuration and Re-arm).
