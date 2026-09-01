@@ -862,13 +862,56 @@ All five converge on one idempotent entry point, `OccurrencePlanner.replanAll()`
 | `ACTION_TIMEZONE_CHANGED` | `TimeChangeReceiver` | Wall-clock `RTC_WAKEUP` targets must be recomputed. |
 | `ACTION_DATE_CHANGED` / `ACTION_TIME_CHANGED` (`TIME_SET`) | `TimeChangeReceiver` | Also a redundant midnight-sweep trigger. |
 | In-app schedule edit | `HabitRepository` (same transaction as the write) | Replan is part of the edit, not a follow-up. |
-| `ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED` | `ExactAlarmPermissionReceiver` | Not one of the five, but mandatory: upgrades inexact alarms to exact on grant, downgrades on revoke. |
+| `ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED` | `ExactAlarmPermissionReceiver` | Not one of the five, but mandatory: upgrades inexact alarms to exact **on grant**. It does **not** fire on revoke — the platform sends this broadcast on grant only, so nothing arrives to downgrade with. An earlier version of this row claimed it downgraded on revoke; that was wrong, and §13.4 finding 3 records the measurement. The revoke path is covered by `OccurrenceResolver.reconcile()`'s re-arm and the `onResume()` re-check instead (task G.5). |
 
 DST edge cases are resolved deterministically by computing targets as
 `ZonedDateTime.of(date, time, zone).toInstant()`: a spring-forward nonexistent local time shifts
 forward by the gap, and a fall-back ambiguous time resolves to the earlier offset and fires once.
 Both are `java.time`'s documented default resolution, and the `TIMEZONE_CHANGED`/`TIME_SET` replan
 covers the transition itself.
+
+### 9.4 The reboot-to-first-unlock blind window (task G.6)
+
+Between a reboot and the device's first unlock, **this app has no armed alarms at all.** Measured on
+the Pixel 10 (API 37) while discharging the delivery matrix, §13.4 finding 4:
+
+| Observation | Value |
+|---|---|
+| `getprop sys.boot_completed` | `1` — the boot itself finished |
+| `dumpsys user` | `Started users state: [0=RUNNING_LOCKED]` |
+| `dumpsys window` | `Keyguard=true` |
+| `run-as … ls /data/data/…` | `couldn't stat /data/user/0/…: No such file or directory` |
+| pending alarms for the app's uid | **none** |
+
+After the unlock, `RUNNING_UNLOCKED`, `BOOT_COMPLETED` was delivered, and eight alarms came back
+`window=0 exactAllowReason=permission`.
+
+Two platform facts make this window unavoidable given the storage decision above. `AlarmManager`
+alarms do not survive a reboot, so every one of them must be re-armed from scratch; and the app
+cannot re-arm them before it can read `reminder_occurrences`, which lives in credential-encrypted
+storage and is therefore unreadable — the data directory is not even `stat`-able — until the user
+unlocks. `BOOT_COMPLETED` is withheld until then, which is exactly why §9.3 selects it over
+`LOCKED_BOOT_COMPLETED`.
+
+**Its length is not bounded by anything the app controls.** A device that reboots for an OS update at
+03:00 and is not picked up until 08:00 spends five hours with no reminder armed. This is not a rare
+path: an unattended overnight reboot is the normal way system updates land.
+
+**Reminders in that window are late, not lost**, and only because of the recovery task G.5 added: an
+occurrence whose time falls inside it stays `ARMED` with no alarm behind it, and the first
+`OccurrenceResolver.reconcile()` pass after unlock sees `state == ARMED && scheduledAt < now` and
+fires it immediately. The `onResume()` re-check makes that instant if the user opens the app. Before
+G.5 the same window leaned entirely on the hourly pass. This is the same "late, not lost" guarantee
+§5.5 makes for every other delivery hazard, and it is stated here so nobody has to re-derive it.
+
+**The escape hatch, deliberately not taken.** Closing the window would mean handling
+`LOCKED_BOOT_COMPLETED` and keeping a minimal "which alarms should exist" projection in
+**device-encrypted** storage, readable before first unlock. That buys back the window at the cost of
+a second storage area holding habit-derived data outside the credential-encrypted boundary, plus a
+standing obligation to keep it in sync with the real table. This design does not adopt it: the MVP's
+guarantee is late-not-lost rather than never-late, and the schedule of a user's habits is exactly the
+kind of data that should stay behind the lock. Recorded as an option rather than a plan, so a future
+decision to revisit it starts from the tradeoff and not from scratch.
 
 ## 10. `:domain` contracts
 
@@ -941,7 +984,7 @@ clock — `today` and `answeredAt` are always parameters (§4).
 | Condition | Detection | Behaviour |
 |---|---|---|
 | Exact alarm not permitted at schedule time | `canScheduleExactAlarms()` before **every** scheduling call, and again in `onResume()` | `setWindow(RTC_WAKEUP, target, 10 min)`; `occ.exact = 0`; a non-blocking banner explains reminders may arrive late, with one tap to `ACTION_REQUEST_SCHEDULE_EXACT_ALARM`. Nothing crashes, nothing is lost. |
-| Exact-alarm permission revoked while running | `ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED` receiver | `replanAll()` re-arms every future occurrence in inexact mode. |
+| Exact-alarm permission revoked while running | `OccurrenceResolver.reconcile()`'s re-arm, and the `onResume()` re-check (task G.5) | The platform cancels every alarm and stops the process, and sends the state-changed broadcast **on grant only** — so no receiver fires here. Recovery re-arms every future `ARMED` occurrence in inexact mode from persisted state. This row previously credited that receiver, which never sees a revoke (§13.4 finding 3). |
 | Exact-alarm permission granted later | same receiver | `replanAll()` upgrades armed inexact alarms to exact. |
 | `POST_NOTIFICATIONS` denied (API 33+) | `areNotificationsEnabled()` | No post. Occurrence stays unresolved — **never** written `missed`, because a suppressed notification is the app's failure, not the user's. Today screen is a complete fallback. Requested contextually after the first habit with a reminder; after two denials the system blocks the dialog, so the only path offered is a deep link to system settings. |
 | API 31–32 | `SDK_INT < 33` | The runtime request is **skipped entirely** — the permission does not exist and notifications are implicitly granted. Both branches converge on the enabled/importance check, which is what still matters on 31–32 because the user can mute the channel. (Mandatory consequence 3.) |
