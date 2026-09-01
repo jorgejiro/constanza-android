@@ -13,15 +13,16 @@ import java.time.LocalDate
  * Mandated function 2 (design.md §10): collapses a multi-slot day into one [DayStatus],
  * independent of any UI (habit-entry-tracking: Day-Level Rollup and Per-Slot Display).
  *
- * **OA-2 was ratified 2026-09-01** (design.md §1), but it settled the *screen shape* — one row per
- * habit carrying this rollup, expandable to per-slot rows — and **not** the precedence below.
+ * **OA-2 was ratified 2026-09-01** (design.md §1): one row per habit carrying this rollup,
+ * expandable to per-slot rows.
  *
- * **Still this implementation's own assumption, now visible to users (task 6b.10):** a missed slot
- * outranks partial completion, which outranks a still-fully-pending day. No spec mandates that
- * order. It used to be invisible; with the ratified collapsed row it is the single word a user reads
- * for the whole day, so a three-slot day with two completions and one miss reads `ANY_MISSED` rather
- * than `PARTIAL`. That is a product choice about whether the collapsed row leads with the failure or
- * with the progress, and it deserves a deliberate answer rather than inheriting one.
+ * **Task 6b.10, ratified 2026-09-01: `PARTIAL` leads with the progress.** `ANY_MISSED` is reserved
+ * for a day with NO completion at all; a day with at least one completed slot and at least one
+ * missed slot reads `PARTIAL`, not `ANY_MISSED`. The collapsed row is the single word a user reads
+ * for the whole day, the per-slot detail is one tap away, and [com.jjrapps.constanza.domain.ComplianceCalculator]
+ * already carries the real numbers — the row need not act as judge of a day that is not yet a total
+ * loss. This SUPERSEDES the earlier assumption (missed outranks partial), recorded here rather than
+ * silently overwritten so the history is visible.
  */
 fun rollupDay(
     schedule: Schedule,
@@ -35,9 +36,10 @@ fun rollupDay(
     val statuses = statusesForDate(date, slots, entries)
     return when {
         statuses.all { it == EntryStatus.UNKNOWN } -> DayStatus.PENDING
-        statuses.any { it == EntryStatus.MISSED } -> DayStatus.ANY_MISSED
         statuses.all { it == EntryStatus.COMPLETED } -> DayStatus.ALL_COMPLETED
         statuses.all { it == EntryStatus.SKIPPED } -> DayStatus.ALL_SKIPPED
+        statuses.none { it == EntryStatus.COMPLETED } && statuses.any { it == EntryStatus.MISSED } ->
+            DayStatus.ANY_MISSED
         else -> DayStatus.PARTIAL
     }
 }

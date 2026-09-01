@@ -100,14 +100,27 @@ An occurrence with a live snooze that is never answered MUST still resolve to `M
 
 ### Requirement: Day-Level Rollup and Per-Slot Display
 
-(Orchestrator assumption pending user confirmation at spec review: both the rollup function and the per-slot UI are treated as required and non-overlapping, per decision 2's slot independence.)
+(Ratified 2026-09-01: both the rollup function and the per-slot UI are required and non-overlapping, per decision 2's slot independence.)
 
 The `:domain` module MUST expose a pure function that collapses all of a habit's `Entry` rows for a single date into one day-level status, independent of any UI. Separately, the today screen MUST display each due occurrence's state per slot rather than only the collapsed day-level status.
+
+**Rollup precedence (ratified 2026-09-01, task 6b.10):** the collapsed status MUST lead with progress, not failure. A day with at least one `COMPLETED` slot and at least one `MISSED` slot MUST report a partially-completed status, never a missed-day status. A missed-day status MUST be reported only when a day has no `COMPLETED` slot at all and at least one `MISSED` slot. The full precedence, most to least specific: all slots `UNKNOWN` reports pending; all slots `COMPLETED` reports fully-completed; all slots `SKIPPED` reports fully-skipped; no `COMPLETED` slot and at least one `MISSED` slot reports missed; every other mix (including any `COMPLETED` slot alongside any `MISSED` slot) reports partial completion.
 
 #### Scenario: Day rollup reports partial completion
 - GIVEN a 3-slot day with 2 `COMPLETED` and 1 `UNKNOWN`
 - WHEN the day-level rollup function evaluates that date
 - THEN it reports a partially-completed day status
+
+#### Scenario: A missed slot alongside a completed slot reports partial, not missed
+- GIVEN a 3-slot day with 2 `COMPLETED` and 1 `MISSED`
+- WHEN the day-level rollup function evaluates that date
+- THEN it reports a partially-completed day status, not a missed-day status, because at least one
+  slot completed
+
+#### Scenario: No completion at all still reports a missed day
+- GIVEN a 3-slot day where every slot is `MISSED`
+- WHEN the day-level rollup function evaluates that date
+- THEN it reports a missed-day status, because zero slots completed
 
 #### Scenario: Today screen shows independent slot rows
 - GIVEN a 3-slot habit due today
