@@ -545,9 +545,34 @@ pushed past, per the same instruction that converted unit 6a's overshoots into d
       rather than a new parallel list; a shared `ReminderOccurrenceState` type is a real refactor to
       propose, not smuggle into this task. **No dedicated test exercises a live `SNOOZED` occurrence
       yet** (see 6b.2's test-debt note) — carried to the follow-up batch.
-- [ ] 6b.4 Implement the progress view: current/best streak and compliance, calling `StreakCalculator`/`ComplianceCalculator` with `windowDays = 30`. **[Stale marker — OA-4 was ratified 2026-09-01, design.md §1; not this slice's task to fix]** (habit-progress: Streak Calculation, Compliance Calculation).
-- [ ] 6b.5 Implement the snooze-default setting screen bound to the DataStore entry from 5.6 (reminder-response: Snooze Configuration and Re-arm).
-- [ ] 6b.6 Apply single responsive layout to the today screen for multi-slot habits at `sw >= 600dp` and any orientation (ui-adaptive-layout: Today screen scenario).
+- [x] 6b.4 Implement the progress view: current/best streak and compliance, calling `StreakCalculator`/`ComplianceCalculator` with `windowDays = 30`. **[Stale marker resolved — OA-4 ratified 2026-09-01, design.md §1]** (habit-progress: Streak Calculation, Compliance Calculation).
+      **Done:** `progress/ProgressViewModel.kt`/`ProgressScreen.kt`, reached from `HabitListScreen`'s
+      new per-habit "Progress" action (no navigation library, task 6a's own decision — a fourth leaf
+      screen the same shape as `HabitEditor`). Neither calculator is reimplemented; the ViewModel only
+      supplies the `Entry` history (new `EntryDao.observeByHabitId`, reactive) and the `Schedule` both
+      already read. **Test debt carried, not silently dropped** (crossed the ~600-line stop instruction
+      before writing it): a dedicated streak/compliance rendering test for `ProgressViewModel`/
+      `ProgressUiState` — the calculators themselves are already covered at `:domain` level
+      (`StreakCalculatorTest`/`ComplianceCalculatorTest`), so this gap is the UI-layer wiring only, not
+      the arithmetic.
+- [x] 6b.5 Implement the snooze-default setting screen bound to the DataStore entry from 5.6 (reminder-response: Snooze Configuration and Re-arm).
+      **Done:** `reminding/SnoozeSettingsViewModel.kt`/`SnoozeSettingsScreen.kt`, reached from Today's
+      new "Settings" action. Reads/writes `ReminderSettingsStore.snoozeDuration`/`setSnoozeDuration`
+      directly — no second source of truth. All seven `SnoozeDuration` values shown as a radio list,
+      default 20 minutes (already `SnoozeDuration.DEFAULT`). **Test debt carried**, same reason as
+      6b.4: a round-trip test through the real DataStore is not yet written.
+- [x] 6b.6 Apply single responsive layout to the today screen for multi-slot habits at `sw >= 600dp` and any orientation (ui-adaptive-layout: Today screen scenario).
+      **Done — no structural changes needed, same finding as 6a.5's editor.** `TodayScreen.kt` already
+      used no fixed widths and a scrolling `LazyColumn`, so verification, not new layout code, is
+      what this task added. Verified two ways: (1) task 6b.8's automated `DeviceConfigurationOverride.
+      WindowSize` test asserts a real multi-slot habit's slot rows do not overlap at `sw = 600dp`; (2)
+      design §13.3's confirmed `adb shell wm size 800dpx1280dp` device-level override, launched on the
+      connected Pixel 10 — screenshot confirmed the TopAppBar's two actions and the exact-alarm banner
+      (task 6b.9, also visually confirmed live on-device this way) render without clipping or overlap,
+      then `wm size reset` restored the device. Orientation was not separately device-tested this slice
+      (unlike 6a.5, this screen holds no `remember`'d local state that a rotation could lose — expansion
+      state lives in the ViewModel, which survives configuration change), so this is judgment, not
+      device evidence, for the orientation half specifically.
 - [x] 6b.7 [Compose UI test] Answer one slot of a multi-slot habit; verify the sibling slot stays `UNKNOWN`.
       **Done:** `tracking/TodayComposeTest.kt`, `answeringOneSlotLeavesTheSiblingSlotUnknown`. Drives
       the real `TodayRoute` UI (not a mocked argument capture): creates a two-slot `TIMES_PER_DAY`
@@ -555,8 +580,14 @@ pushed past, per the same instruction that converted unit 6a's overshoots into d
       exactly one `Entry` row exists — for the tapped slot only — since `UNKNOWN` is never persisted
       (design.md §8.1), "one row, right slot" IS the slot-independence assertion. Passed on the
       connected Pixel 10 (API 37), keyguard confirmed down first.
-- [ ] 6b.8 [Compose UI test] Render the today screen at `sw = 600dp` with a multi-slot habit due; verify no clipping/overlap.
-- [ ] 6b.9 **Slice ii. Added 2026-09-01 — the exact-alarm banner, finally given a number.** §13.1's
+- [x] 6b.8 [Compose UI test] Render the today screen at `sw = 600dp` with a multi-slot habit due; verify no clipping/overlap.
+      **Done:** `tracking/TodayAdaptiveComposeTest.kt`, `todayScreenRendersAMultiSlotHabitWithoutClippingAtSw600dp`.
+      Uses `DeviceConfigurationOverride.WindowSize(DpSize(600.dp, 1000.dp))` — the documented Compose UI
+      testing API for exercising a specific window size in isolation — rather than the device-level `wm
+      size` recipe, which is a separate manual matrix run (task G.7). Creates a real two-slot habit,
+      expands the row, and asserts both slot time labels are displayed with non-overlapping vertical
+      bounds, plus that both slots' answer buttons render. Passed on the connected Pixel 10.
+- [x] 6b.9 **Slice ii. Added 2026-09-01 — the exact-alarm banner, finally given a number.** §13.1's
       failure table and §12 both promise a non-blocking banner explaining that reminders may arrive late,
       with one tap to `ACTION_REQUEST_SCHEDULE_EXACT_ALARM`. Task G.5 deferred it to work unit 6b, and no
       task in 6b.1–6b.8 ever owned it. It surfaces when `canScheduleExactAlarms()` is false — the default
@@ -564,7 +595,19 @@ pushed past, per the same instruction that converted unit 6a's overshoots into d
       reminders still work, degraded to a ten-minute inexact window (design §13.4's measurement).
       **Eighth instance of the unowned-promise pattern** — and the second caught before shipping rather
       than after, because the implementer flagged it instead of absorbing it.
-- [ ] 6b.10 **Slice ii. Added 2026-09-01 — decide `rollupDay`'s classification precedence.** Today a
+      **Done:** `AlarmScheduler.canScheduleExactAlarms()` (delegates to the existing `AlarmManager`
+      check already used by `schedule()`), surfaced through `TodayViewModel.uiState.canScheduleExactAlarms`
+      and re-read on `ON_RESUME` (`TodayRoute`'s new `DisposableEffect`/`LifecycleEventObserver`, since
+      the user can grant the permission from system Settings and return with no Room write to react to).
+      `TodayScreen`'s new `ExactAlarmBanner` renders as the first `LazyColumn` item when denied, with a
+      "Fix" action launching `ACTION_REQUEST_SCHEDULE_EXACT_ALARM`. **Confirmed live on a fresh install**
+      via the same `wm size` device screenshot used for 6b.6 — the banner rendered correctly, incidentally
+      proving `canScheduleExactAlarms()` really is false by default on this device as the task's own
+      prose predicted. Covered at `:app:testDebugUnitTest` level (`TodayViewModelTest`'s two new tests:
+      banner state mirrors the permission both denied and granted; `refreshExactAlarmPermission` re-reads
+      a permission granted after construction) rather than a further Compose UI test, since the branch
+      and the resume re-check are both ViewModel-level state, cheaper and just as direct to prove there.
+- [x] 6b.10 **Slice ii. Added 2026-09-01 — decide `rollupDay`'s classification precedence.** Today a
       missed slot outranks partial completion, which outranks a fully-pending day. No spec mandates that
       order; it is `DayRollup.kt`'s own assumption, and it was harmless while invisible. **OA-2's ratified
       collapsed row makes it the single word a user reads for a whole day**, so a three-slot day with two
@@ -572,12 +615,17 @@ pushed past, per the same instruction that converted unit 6a's overshoots into d
       whether the row leads with the failure or the progress. Decide it deliberately, amend
       `habit-entry-tracking` with the answer, and update `DayRollup.kt`'s KDoc — which currently records
       the open question rather than pretending OA-2 settled it.
+      **Decided: `PARTIAL` leads with the progress.** `ANY_MISSED` is now reserved for a day with NO
+      completion at all; a day with any completed slot plus a missed one reads `PARTIAL`. Reasoning
+      recorded in `DayRollup.kt`'s KDoc and the amended `habit-entry-tracking` requirement: the collapsed
+      row is the single word a user reads for a whole day, the per-slot detail is one tap away, and
+      `ComplianceCalculator` already carries the real numbers, so the row need not act as judge. Existing
+      test `any missed slot rolls up to ANY_MISSED even when others completed` encoded the OLD precedence
+      and is updated in place (renamed, assertion flipped to `PARTIAL`), not deleted — plus two new tests:
+      the day that did NOT change meaning (all missed, no completions → still `ANY_MISSED`) and a
+      no-completion mix of missed/skipped/unknown (still `ANY_MISSED`).
 
-**Flagged — eighth unowned-promise instance (see design.md §13.4, learning obs #35):**
-design.md §12/§1298 name a non-blocking "reminders may arrive late" banner with one tap to
-`ACTION_REQUEST_SCHEDULE_EXACT_ALARM`, explicitly "deferred to work unit 6b" — but no task in
-6b.1–6b.8 owns it. Not built this slice (out of scope for 6b.1/6b.2/6b.3/6b.7); flagged rather
-than silently absorbed or dropped, matching `MainActivity`'s own KDoc note.
+Work unit 6b (tasks 6b.1–6b.10) is now fully complete across both slices.
 
 ## Phase 7: Data Portability (Work Unit 7) — depends on 3 only
 
