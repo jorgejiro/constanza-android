@@ -15,7 +15,9 @@ import dagger.assisted.AssistedInject
  * this class stays a thin `WorkManager` adapter, matching [BootReceiver]/[TimeChangeReceiver]'s
  * existing thin-wrapper pattern. Also runs [OccurrenceResolver.sweepMidnight] on every pass — the
  * third of design.md §9.2's three redundant midnight triggers (the other two are
- * [MidnightSweepWorker]'s own periodic schedule and `TimeChangeReceiver`'s `ACTION_DATE_CHANGED`).
+ * [MidnightSweepWorker]'s own midnight-anchored chain and `TimeChangeReceiver`'s
+ * `ACTION_DATE_CHANGED`) — which is also the safety net behind that chain being self-rescheduled
+ * (task G.4).
  *
  * `minSdk = 31` means this expedited periodic worker maps to an expedited `JobScheduler` job, never
  * a foreground service (design.md §5.5/§5.6).
