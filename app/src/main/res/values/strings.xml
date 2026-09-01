@@ -58,4 +58,25 @@
          (task 6a.8, ratified 2026-09-01). -->
     <string name="habit_editor_reminder_time_switch">Remind me</string>
     <string name="habit_editor_reminder_time_none">No reminder set. You can still track this habit in the app.</string>
+
+    <!-- habit-entry-tracking: Today screen, expandable per-habit rollup rows (task 6b.1, OA-2). -->
+    <string name="today_title">Today</string>
+    <string name="today_manage_habits">Manage habits</string>
+    <string name="today_empty">Nothing due today.</string>
+    <string name="today_status_all_completed">All done</string>
+    <string name="today_status_partial">In progress</string>
+    <string name="today_status_any_missed">Missed something</string>
+    <string name="today_status_all_skipped">Skipped</string>
+    <string name="today_status_pending">Pending</string>
+    <string name="today_expand">Show times</string>
+    <string name="today_collapse">Hide times</string>
+
+    <!-- reminder-response: pending/snoozed rendering by reading reminder_occurrences (task 6b.3, design D3). -->
+    <string name="today_slot_pending">Pending</string>
+    <string name="today_slot_pending_snoozed_until">Pending, snoozed until %1$s</string>
+
+    <!-- habit-entry-tracking: in-app Entry write path, SKIPPED is in-app only (task 6b.2). -->
+    <string name="today_answer_yes">Yes</string>
+    <string name="today_answer_no">No</string>
+    <string name="today_answer_skip">Skip</string>
 </resources>
