@@ -418,13 +418,27 @@ The gate itself is discharged. These follow-ups come out of it and need decision
 
 ## Phase 6a: Habit CRUD UI (Work Unit 6a) — depends on 3, 4a
 
-- [ ] 6a.1 Implement the habit editor: name, question, colour, notes, schedule-kind picker for all six kinds, slot editor for `TIMES_PER_DAY` (habit-management: Habit Creation, Habit Editing; habit-scheduling: Six Frequency Kinds, Reminder Slots for TIMES_PER_DAY).
-- [ ] 6a.2 Enforce name-required validation blocking save (habit-management: Creation requires a name).
-- [ ] 6a.3 Wire schedule-edit save to the `HabitRepository` transaction that triggers `replanAll()` (habit-management: Editing reschedules reminders — depends on 4a.5).
-- [ ] 6a.4 Implement archive/un-archive and a habit list with an archived filter (habit-management: Habit Archiving, Un-archiving does not back-fill).
-- [ ] 6a.5 Apply single responsive layout (no dedicated tablet layout) to the editor; verify at `sw >= 600dp` and both orientations, re-requesting IME visibility explicitly after rotation (ui-adaptive-layout: Minimal Adaptive Resilience, Soft Keyboard Visibility).
-- [ ] 6a.6 [Compose UI test] Create each of the six schedule kinds; verify the persisted `Habit` + `Schedule`.
-- [ ] 6a.7 [Compose UI test] Rotate the editor mid-input; verify no content loss.
+**Split into slice i (a habit can be created, edited and archived) and slice ii (a habit can be
+scheduled), 2026-09-01 — orchestrator decision, not a task-content change.** The forecast put
+whole-unit 6a at ~660 lines against a 700 budget with **low confidence, because no Compose unit had
+shipped yet**, and understated the work: no Compose UI test dependencies, no ViewModel/Hilt-Compose
+dependencies, and no `HabitRepository` create/update/archive/observe surface existed before this
+slice — none of that was in any numbered task. The seam is behavioural: **slice i ships a working
+create/edit/archive/list feature with the schedule fixed to `DAILY`; slice ii adds the schedule-kind
+picker and the `TIMES_PER_DAY` slot editor.** Slice i measured 668 production / 538 test = 1,206
+changed lines — well over the 700 target despite the split, driven by three infrastructure gaps
+(Compose test deps, ViewModel-Compose/Hilt-navigation-Compose deps, and the `HabitRepository`
+surface) landing in the same slice as the feature that needed them, plus this being the first
+Compose unit in the project (no prior pattern to reuse). Recorded here rather than silently
+absorbed, per this change's own "unowned work" lesson (§13.4).
+
+- [ ] 6a.1 Implement the habit editor: name, question, colour, notes, schedule-kind picker for all six kinds, slot editor for `TIMES_PER_DAY` (habit-management: Habit Creation, Habit Editing; habit-scheduling: Six Frequency Kinds, Reminder Slots for TIMES_PER_DAY). **Slice i done:** name/question/colour/notes fields, with every new habit's schedule fixed to `DAILY` and an existing habit's schedule preserved unchanged when editing. **Slice ii remaining:** the schedule-kind picker for all six kinds and the `TIMES_PER_DAY` slot editor.
+- [x] 6a.2 Enforce name-required validation blocking save (habit-management: Creation requires a name). Blank AND whitespace-only names are both rejected.
+- [x] 6a.3 Wire schedule-edit save to the `HabitRepository` transaction that triggers `replanAll()` (habit-management: Editing reschedules reminders — depends on 4a.5). **Corrected:** that transaction is `ScheduleEditor`'s (task 4a.5), not a second one in `HabitRepository` — `HabitRepository.create`/`update` delegate to `ScheduleEditor.updateSchedule`, composing Room transactions rather than duplicating the replan wiring.
+- [x] 6a.4 Implement archive/un-archive and a habit list with an archived filter (habit-management: Habit Archiving, Un-archiving does not back-fill).
+- [ ] 6a.5 **Slice ii.** Apply single responsive layout (no dedicated tablet layout) to the editor; verify at `sw >= 600dp` and both orientations, re-requesting IME visibility explicitly after rotation (ui-adaptive-layout: Minimal Adaptive Resilience, Soft Keyboard Visibility).
+- [ ] 6a.6 **Slice ii.** [Compose UI test] Create each of the six schedule kinds; verify the persisted `Habit` + `Schedule`.
+- [ ] 6a.7 **Slice ii.** [Compose UI test] Rotate the editor mid-input; verify no content loss.
 
 ## Phase 6b: Today Screen, Progress & Settings UI (Work Unit 6b) — depends on 3, 5
 
