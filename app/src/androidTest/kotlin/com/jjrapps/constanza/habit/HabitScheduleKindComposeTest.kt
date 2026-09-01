@@ -53,12 +53,12 @@ class HabitScheduleKindComposeTest {
      *  currently selected kind's label, `Daily` at the start of every test) and selects the target. */
     private fun createHabit(name: String, targetKindLabelRes: Int?, beforeSave: () -> Unit = {}) {
         var done = false
+        // Constructed outside `setContent`, not inside it: a view model built in the composable
+        // lambda is rebuilt on every recomposition, so the editor would silently lose the state
+        // each test is driving. Hoisting it gives the whole test one stable instance.
+        val viewModel = HabitEditorViewModel(fixture.habitRepository, fixture.timeProvider)
         composeTestRule.setContent {
-            HabitEditorRoute(
-                habitId = null,
-                onDone = { done = true },
-                viewModel = HabitEditorViewModel(fixture.habitRepository, fixture.timeProvider),
-            )
+            HabitEditorRoute(habitId = null, onDone = { done = true }, viewModel = viewModel)
         }
         composeTestRule.onNodeWithText(text(R.string.habit_editor_name_label)).performTextInput(name)
         if (targetKindLabelRes != null) {
