@@ -22,32 +22,6 @@ carried_forward_open_items:
     decision. Item 7.5 was closed this way by warm-dark-design-system, which
     wrote the app's first Room migration and so met its owner condition.
   items:
-    - id: "lint-preexisting-errors"
-      title: "Three pre-existing Android Lint errors block ./gradlew check"
-      status: blocked
-      origin: >
-        Surfaced by warm-dark-design-system task 6.4, which was the first task
-        anywhere in this repository to run the full `./gradlew check` aggregate.
-        Earlier work only ever ran `:app:detektMain` and `:domain:detektMain`,
-        so nothing before it could have caught these.
-      reason: >
-        All three errors are pre-existing and sit in files that
-        warm-dark-design-system never touches (verified: `git diff main..HEAD`
-        is empty for all three across the whole PR chain). Fixing them inside
-        that change would have expanded a change already running 2-3x its
-        review budget, into files outside its scope. They belong in their own
-        small PR.
-      items:
-        - "MissingPermission — app/src/main/kotlin/com/jjrapps/constanza/reminding/NotificationPoster.kt:52. The manager.notify call. Worth a real look rather than a suppression: NotificationPoster does gate on canPost() (added by task G.3), so the call is guarded in fact, but lint cannot prove it through the helper. The fix is either an inline permission check lint can see or an annotation that documents the existing guard."
-        - "NonObservableLocale — app/src/main/kotlin/com/jjrapps/constanza/habit/ScheduleEditors.kt:242. Reading locale in a non-observable way inside a composable, so the schedule editor will not recompose on a locale change."
-        - "ViewModelConstructorInComposable — app/src/androidTest/kotlin/com/jjrapps/constanza/habit/HabitScheduleKindComposeTest.kt:60. Test-only, lowest of the three."
-      why_it_matters: >
-        `./gradlew check` is the natural aggregate gate for CI, and while these
-        three stand it cannot be made a required check. The MissingPermission
-        one is on the notification path of a reminder app, which is the one
-        place a silently-dropped post costs a user the whole feature.
-      owner_condition: "Its own PR, independent of any design or feature work. No blocker — it needs no device, no decision and no other change to land first."
-
     - id: "G.7-throttling-row"
       title: "One UI \"put unused apps to sleep\" survival row (Galaxy Z Fold 7)"
       status: blocked
