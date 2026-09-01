@@ -526,14 +526,15 @@ pushed past, per the same instruction that converted unit 6a's overshoots into d
       (former inline `entryDao.upsert` call site) is now a thin adapter over
       `EntryWriter.answerOccurrence`; its existing idempotency and origin-date-crediting tests
       (`AnswerWorkerTest`) pass unchanged through the new seam.
-      **Test debt carried to a follow-up batch** (crossed the ~600-line stop before writing these):
-      an explicit comparative assertion that both routes produce the same `Entry` for equivalent
-      inputs (currently proven only implicitly — one shared code path, both callers' existing tests
-      green); a direct test that `InAppEntryStatus.SKIPPED` reaches storage (exercised in production
-      code and reachable from `TodayScreen`'s "Skip" button, but no dedicated test taps it); unit
-      tests for `TodayViewModel`'s rollup/expansion state and `TodayModel`'s pending/snoozed
-      rendering in isolation (covered today only via the one end-to-end `TodayComposeTest`, which
-      exercises `COMPLETED` and never drives a live `SNOOZED` occurrence).
+      **Test debt closed 2026-09-01, commit `639e200`** (crossed the ~600-line stop before writing
+      these, carried rather than dropped): an explicit comparative assertion that both routes
+      produce the same `Entry` for equivalent inputs — landed as `EntryWriteParityTest`, asserting
+      both routes credit the occurrence's origin date against real Room; a direct test that
+      `InAppEntryStatus.SKIPPED` reaches storage — landed in `TodayComposeTest`; unit tests for
+      `TodayViewModel`'s rollup/expansion state and `TodayModel`'s pending/snoozed rendering in
+      isolation — landed as `TodayViewModelTest` (192 lines, JVM level), including
+      `only a SNOOZED occurrence surfaces a snooze deadline, an armed one reads plain pending`,
+      which also closes 6b.3's carried debt below. All three pass.
 - [x] 6b.3 Render pending/snoozed state ("pending, snoozed until HH:mm") by reading `reminder_occurrences` (design §7 D3).
       **Done:** `TodayModel.toTodaySlot` reads `ReminderOccurrenceDao.observeUnresolved()` (a new
       reactive twin of the existing `findUnresolved()` — same SQL predicate, so the today screen's
@@ -543,8 +544,10 @@ pushed past, per the same instruction that converted unit 6a's overshoots into d
       `SnoozeWorker.kt`, `OccurrencePlanner.kt`, `OccurrenceResolver.kt`, `ReminderFireWorker.kt`) —
       one more literal `"SNOOZED"` comparison was added consistent with that existing convention
       rather than a new parallel list; a shared `ReminderOccurrenceState` type is a real refactor to
-      propose, not smuggle into this task. **No dedicated test exercises a live `SNOOZED` occurrence
-      yet** (see 6b.2's test-debt note) — carried to the follow-up batch.
+      propose, not smuggle into this task. **Test debt closed 2026-09-01, commit `639e200`**
+      (see 6b.2's note): `TodayViewModelTest`'s
+      `only a SNOOZED occurrence surfaces a snooze deadline, an armed one reads plain pending`
+      now exercises a live `SNOOZED` occurrence.
 - [x] 6b.4 Implement the progress view: current/best streak and compliance, calling `StreakCalculator`/`ComplianceCalculator` with `windowDays = 30`. **[Stale marker resolved — OA-4 ratified 2026-09-01, design.md §1]** (habit-progress: Streak Calculation, Compliance Calculation).
       **Done:** `progress/ProgressViewModel.kt`/`ProgressScreen.kt`, reached from `HabitListScreen`'s
       new per-habit "Progress" action (no navigation library, task 6a's own decision — a fourth leaf
