@@ -98,6 +98,7 @@ dependencies {
     // Work unit 6a: container/presentational ViewModels (HabitListViewModel, HabitEditorViewModel)
     // and hiltViewModel() in a single-Activity, no-navigation-library setup (design.md §14).
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.hilt.navigation.compose)
 
     implementation(libs.androidx.room.runtime)

@@ -11,6 +11,7 @@ import com.jjrapps.constanza.reminding.AnswerWorker
 import com.jjrapps.constanza.reminding.NotificationPoster
 import com.jjrapps.constanza.scheduling.AlarmScheduler
 import com.jjrapps.constanza.scheduling.insertHabitWithSchedule
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -62,9 +63,14 @@ class EntryWriteParityTest {
             fixture.database, fixture.database.entryDao(), fixture.database.reminderOccurrenceDao(),
             mockk<AlarmScheduler>(relaxed = true), NotificationPoster(context), fixture.timeProvider,
         )
+        // Explicitly stubbed, not left to a relaxed default: a relaxed mock returns false for a
+        // Boolean, which would silently arm task 6b.9's banner branch in a test that is not about
+        // it (mockk(relaxed = true) gotcha, this codebase's own established lesson).
+        val alarmScheduler = mockk<AlarmScheduler>(relaxed = true)
+        every { alarmScheduler.canScheduleExactAlarms() } returns true
         viewModel = TodayViewModel(
             fixture.habitRepository, fixture.database.entryDao(), fixture.database.reminderOccurrenceDao(),
-            entryWriter, fixture.timeProvider,
+            entryWriter, alarmScheduler, fixture.timeProvider,
         )
     }
 

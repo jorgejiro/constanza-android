@@ -2,6 +2,9 @@
 
 package com.jjrapps.constanza.tracking
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,12 +20,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.domain.model.DayStatus
 import com.jjrapps.constanza.domain.model.EntryStatus
@@ -34,15 +42,30 @@ private const val MINUTES_PER_HOUR = 60
 private val TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm")
 
 /** Task 6b.1 — container, matching [com.jjrapps.constanza.habit.HabitListRoute]'s hoisted-route
- *  navigation shape (design.md §14, no navigation library). */
+ *  navigation shape (design.md §14, no navigation library). Task 6b.9: re-checks
+ *  [TodayViewModel.refreshExactAlarmPermission] on `ON_RESUME`, since the user can grant the
+ *  permission from system Settings and come back without any Room write to react to. */
 @Composable
-fun TodayRoute(onManageHabits: () -> Unit, viewModel: TodayViewModel = hiltViewModel()) {
+fun TodayRoute(
+    onManageHabits: () -> Unit,
+    onOpenSettings: () -> Unit = {},
+    viewModel: TodayViewModel = hiltViewModel(),
+) {
     val state by viewModel.uiState.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshExactAlarmPermission()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     TodayScreen(
         state = state,
         onToggleExpanded = viewModel::toggleExpanded,
         onAnswer = viewModel::answer,
         onManageHabits = onManageHabits,
+        onOpenSettings = onOpenSettings,
     )
 }
 
@@ -53,12 +76,16 @@ fun TodayScreen(
     onToggleExpanded: (Long) -> Unit,
     onAnswer: (Long, TodaySlot, InAppEntryStatus) -> Unit,
     onManageHabits: () -> Unit,
+    onOpenSettings: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.today_title)) },
                 actions = {
+                    TextButton(onClick = onOpenSettings) {
+                        Text(stringResource(R.string.today_settings))
+                    }
                     TextButton(onClick = onManageHabits) {
                         Text(stringResource(R.string.today_manage_habits))
                     }
@@ -79,11 +106,35 @@ private fun TodayContent(
     onAnswer: (Long, TodaySlot, InAppEntryStatus) -> Unit,
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
+        if (!state.canScheduleExactAlarms) {
+            item { ExactAlarmBanner() }
+        }
         if (state.rows.isEmpty()) {
             item { Text(stringResource(R.string.today_empty), modifier = Modifier.padding(16.dp)) }
         }
         items(state.rows, key = { it.habitId }) { row ->
             HabitRollupRow(row, row.habitId in state.expandedHabitIds, state.zone, onToggleExpanded, onAnswer)
+        }
+    }
+}
+
+/** Task 6b.9 (design §12/§13.1): non-blocking — reminders still fire, degraded to a 10-minute
+ *  inexact window (design §13.4's measurement), so this is informational, not a gate. One tap
+ *  deep-links to [Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM]; the default on a fresh install
+ *  targeting API 33+ is denied, so this is the common path, not an edge case. */
+@Composable
+private fun ExactAlarmBanner() {
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(stringResource(R.string.today_exact_alarm_banner), modifier = Modifier.padding(end = 8.dp))
+        TextButton(onClick = {
+            val uri = Uri.parse("package:${context.packageName}")
+            context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, uri))
+        }) {
+            Text(stringResource(R.string.today_exact_alarm_banner_action))
         }
     }
 }
