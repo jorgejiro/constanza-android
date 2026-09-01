@@ -379,9 +379,19 @@ The gate itself is discharged. These follow-ups come out of it and need decision
       **Still deferred to work unit 6b:** §13.1's non-blocking banner explaining that reminders may
       arrive late, with one tap to `ACTION_REQUEST_SCHEDULE_EXACT_ALARM`. That row of §13.1 is UI and
       this screen has none yet; it is named in `MainActivity`'s KDoc so it cannot be silently dropped.
-- [ ] G.6 Name the reboot-to-first-unlock blind window in §9.3 (§13.4 finding 4). Zero alarms are armed
+- [x] G.6 Name the reboot-to-first-unlock blind window in §9.3 (§13.4 finding 4). Zero alarms are armed
       in that window and it is the correct consequence of reading Room from credential-encrypted
       storage — but the design should say so rather than leave it implicit.
+      Written as **§9.4**, with the measured evidence, the reason the window cannot be avoided given
+      §9.3's storage choice, and the point that its length is bounded by nothing the app controls — an
+      unattended overnight OS update is the normal way it gets long. Records that reminders inside it
+      are late rather than lost, which is only true because of the recovery task G.5 added, and states
+      the `LOCKED_BOOT_COMPLETED` + device-encrypted-projection escape hatch as an option explicitly
+      **not** adopted, with its cost, so a future revisit starts from the tradeoff.
+      Also corrected a **false claim** found in §9.3's own trigger table while writing this: it said
+      `ExactAlarmPermissionReceiver` "downgrades on revoke". The platform sends that broadcast on grant
+      only, so nothing arrives to downgrade with — §13.4 finding 3 had already measured this, but §9.3
+      still asserted the wrong version. The revoke path is G.5's re-arm, not that receiver.
 - [ ] G.7 Run the four UI-dependent §13.3 rows once 6a and 6b ship: large screen (C1), orientation
       (C1), soft keyboard after a config change (C4), and the `wm size 800dpx1280dp` override. Plus the
       Z Fold 7 OEM-throttling assertion, which no Pixel can make.

@@ -90,11 +90,17 @@ class TimeChangeReceiver : BroadcastReceiver() {
 
 /**
  * Not one of the five mandatory triggers, but mandatory anyway (design.md §9.3, reminder-delivery:
- * Exact-Alarm Permission States): upgrades armed inexact alarms to exact on grant, downgrades on
- * revoke, without waiting for the next app launch. [AlarmScheduler.schedule] re-checks
- * `canScheduleExactAlarms()` on every call, so simply re-running [OccurrencePlanner.replanAll]
- * upgrades or downgrades every armed occurrence for free — no separate upgrade/downgrade branch is
- * needed here, and none is written.
+ * Exact-Alarm Permission States): upgrades armed inexact alarms to exact **on grant**, without
+ * waiting for the next app launch. [AlarmScheduler.schedule] re-checks `canScheduleExactAlarms()`
+ * on every call, so simply re-running [OccurrencePlanner.replanAll] upgrades every armed occurrence
+ * for free — no separate branch is needed here, and none is written.
+ *
+ * **This receiver never sees a revoke.** The platform sends
+ * `ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED` on grant only, and on revoke it instead
+ * cancels every one of the app's alarms and stops its process. Measured on the Pixel 10 at API 37
+ * and matched to the exact-alarm guide (design.md §13.4 finding 3); an earlier version of this KDoc
+ * claimed it downgraded on revoke, which was never possible. The revoke path is
+ * `OccurrenceResolver.reconcile()`'s re-arm plus the `onResume()` re-check instead (task G.5).
  */
 @AndroidEntryPoint
 class ExactAlarmPermissionReceiver : BroadcastReceiver() {
