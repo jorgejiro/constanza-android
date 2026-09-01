@@ -27,4 +27,30 @@
     <string name="habit_editor_notes_label">Notes (optional)</string>
     <string name="habit_editor_color_label">Colour</string>
     <string name="habit_editor_save">Save</string>
+
+    <!-- habit-scheduling: schedule-kind picker and per-kind parameter editors (task 6a.1, slice ii-a). -->
+    <string name="habit_editor_schedule_label">Frequency</string>
+    <string name="schedule_kind_daily">Daily</string>
+    <string name="schedule_kind_times_per_day">Multiple times a day</string>
+    <string name="schedule_kind_n_times_per_week">Times per week</string>
+    <string name="schedule_kind_weekly">Weekly</string>
+    <string name="schedule_kind_monthly">Monthly</string>
+    <string name="schedule_kind_every_n_days">Every N days</string>
+    <string name="habit_editor_times_per_week_label">Times per week</string>
+    <string name="habit_editor_day_of_week_label">Day of week</string>
+    <string name="habit_editor_day_of_month_label">Day of month</string>
+    <string name="habit_editor_every_n_days_label">Repeat every (days)</string>
+    <string name="habit_editor_anchor_date_label">Start date (YYYY-MM-DD)</string>
+    <string name="habit_editor_anchor_date_error">Enter a valid date as YYYY-MM-DD</string>
+    <string name="habit_editor_decrement">−</string>
+    <string name="habit_editor_increment">+</string>
+
+    <!-- habit-scheduling: TIMES_PER_DAY reminder-slot editor (task 6a.1, slice ii-a). -->
+    <string name="habit_editor_slots_label">Reminder times</string>
+    <string name="habit_editor_slots_error">Add at least one reminder time</string>
+    <string name="habit_editor_slot_add">Add time</string>
+    <string name="habit_editor_slot_remove">Remove</string>
+    <string name="habit_editor_slot_hour_label">Hour</string>
+    <string name="habit_editor_slot_minute_label">Minute</string>
+    <string name="habit_editor_slot_enabled_label">Enabled</string>
 </resources>

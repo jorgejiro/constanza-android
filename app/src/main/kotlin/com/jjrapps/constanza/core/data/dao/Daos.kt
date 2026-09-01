@@ -49,6 +49,11 @@ interface ReminderSlotDao {
     @Insert
     suspend fun insert(slot: ReminderSlotEntity): Long
 
+    /** Task 6a.1 (slice ii-a): edits an existing slot's `minuteOfDay`/`enabled` in place — the
+     *  editor's add/remove/enable slot flow (habit-scheduling: Reminder Slots for TIMES_PER_DAY). */
+    @Update
+    suspend fun update(slot: ReminderSlotEntity)
+
     @Query("SELECT * FROM reminder_slots WHERE habitId = :habitId")
     suspend fun findByHabitId(habitId: Long): List<ReminderSlotEntity>
 
