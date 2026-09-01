@@ -421,10 +421,19 @@ The gate itself is discharged. These follow-ups come out of it and need decision
       C4's content half PASSES on a real device rotation. Two findings: the exact-alarm banner's
       promised tap was rendering **off-screen** (fixed here, with before/after screenshots), and the
       IME is not re-requested after rotation despite the code trying to (task **6a.9** below).
-      **Z Fold 7 rows remain NOT RUN and are blocked on hardware, not on effort** — native large
-      screen, fold/unfold, and the One UI "put unused apps to sleep" multi-day assertion. §13.3 already
-      says no Pixel substitutes for them: the `wm size` override reproduces a width, never an OEM's own
-      throttling behaviour. They stay open against that device becoming available.
+      **Z Fold 7 rows: run 2026-09-01 on the real device — see design.md §13.6.** The Fold became
+      available immediately before archive, so these were run rather than archived as blocked. Native
+      large screen unfolded (`1968x2184`), the editor at that width, and landscape all PASS. **Fold /
+      unfold as a configuration change PASSES**, and it is the harshest case in the matrix: the app
+      moves between two physical displays (`1968x2184` inner → `1080x2520` cover → back), and task
+      6a.9's focus latch still restores the keyboard, the caret and the notes field's own focus.
+      The whole automated suite also passes there — 59 instrumented, 0 failures, on a different OEM at
+      a different API level — so nothing in it was Pixel-specific.
+      **§13.3's prediction is confirmed:** the Fold ships on **Android 16 / API 36**, so it cannot prove
+      API-37-gated behaviour at all. §13.4's Pixel run stays the only evidence for that half. Two
+      devices, two different jobs, exactly as §13.3 argued.
+      **Still NOT RUN:** the One UI "put unused apps to sleep" assertion. The device is here now, but
+      that row needs a multi-day idle window, so it remains genuinely open.
 - [x] 6a.9 **Added 2026-09-01 from G.7's run — the IME is not restored after rotation.** Task 6a.5
       requires "re-requesting IME visibility explicitly after rotation" and §5.7 C4 requires the editor
       not to assume the keyboard survives. G.7 measured `mInputShown` going `true` → `false` across a
