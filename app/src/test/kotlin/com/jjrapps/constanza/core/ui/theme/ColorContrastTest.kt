@@ -74,7 +74,12 @@ class ColorContrastTest {
 
     @Test
     fun `muted labels clear the AA body floor`() {
-        assertRatioAtLeast(ConstanzaColors.OnBackgroundMuted, ConstanzaColors.Background, CONTRAST_FLOOR, "OnBackgroundMuted")
+        assertRatioAtLeast(
+            ConstanzaColors.OnBackgroundMuted,
+            ConstanzaColors.Background,
+            CONTRAST_FLOOR,
+            "OnBackgroundMuted",
+        )
     }
 
     /**
@@ -112,7 +117,12 @@ class ColorContrastTest {
 
     @Test
     fun `primary text clears the AA floor on the surface container`() {
-        assertRatioAtLeast(ConstanzaColors.OnBackground, ConstanzaColors.Surface, PRIMARY_TEXT_FLOOR, "OnBackground on Surface")
+        assertRatioAtLeast(
+            ConstanzaColors.OnBackground,
+            ConstanzaColors.Surface,
+            PRIMARY_TEXT_FLOOR,
+            "OnBackground on Surface",
+        )
     }
 
     @Test
@@ -160,7 +170,11 @@ class ColorContrastTest {
     private fun relativeLuminance(color: Color): Double {
         fun channel(value: Float): Double {
             val v = value.toDouble()
-            return if (v <= GAMMA_THRESHOLD) v / GAMMA_LINEAR_DIVISOR else Math.pow((v + GAMMA_OFFSET) / GAMMA_DIVISOR, GAMMA_EXPONENT)
+            return if (v <= GAMMA_THRESHOLD) {
+                v / GAMMA_LINEAR_DIVISOR
+            } else {
+                Math.pow((v + GAMMA_OFFSET) / GAMMA_DIVISOR, GAMMA_EXPONENT)
+            }
         }
         return RED_WEIGHT * channel(color.red) + GREEN_WEIGHT * channel(color.green) + BLUE_WEIGHT * channel(color.blue)
     }

@@ -217,10 +217,14 @@ class TodayViewModelTest {
      *  which would silently arm the banner branch in every test that is not about it. */
     @Test
     fun `the banner state mirrors canScheduleExactAlarms, both when denied and when granted`() = runTest {
-        val deniedViewModel = buildViewModel(alarmScheduler = mockk { every { canScheduleExactAlarms() } returns false })
+        val deniedViewModel = buildViewModel(
+            alarmScheduler = mockk { every { canScheduleExactAlarms() } returns false },
+        )
         assertTrue(deniedViewModel.uiState.first().canScheduleExactAlarms.not())
 
-        val grantedViewModel = buildViewModel(alarmScheduler = mockk { every { canScheduleExactAlarms() } returns true })
+        val grantedViewModel = buildViewModel(
+            alarmScheduler = mockk { every { canScheduleExactAlarms() } returns true },
+        )
         assertTrue(grantedViewModel.uiState.first().canScheduleExactAlarms)
     }
 
