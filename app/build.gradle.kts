@@ -2,6 +2,10 @@ plugins {
     // AGP 9 has built-in Kotlin support; org.jetbrains.kotlin.android is no longer applied here.
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    // Work unit 7: the actual dependency declaration lives below, distinct from the
+    // resolutionStrategy.force block further down, which exists only to patch a room-testing
+    // packaging gap and was never itself a real kotlinx-serialization dependency.
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     alias(libs.plugins.detekt)
@@ -118,6 +122,10 @@ dependencies {
     // permission before" flag (design.md §14). Pinned in the version catalog since work unit 1
     // but wired as a dependency only here, on its first actual use.
     implementation(libs.androidx.datastore.preferences)
+    // Work unit 7 (task 7.1): the backup file format (design.md §8.4). First real use of
+    // kotlinx-serialization in :app — the resolutionStrategy.force block below is a room-testing
+    // packaging-gap workaround and was never itself a dependency declaration.
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit)
     // AGP does not auto-resolve kotlin("test") to the JUnit4 variant the way kotlin("jvm") does

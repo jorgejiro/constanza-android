@@ -100,5 +100,16 @@
     <!-- habit-management: per-habit progress entry point (task 6b.4). -->
     <string name="habit_list_progress">Progress</string>
 
+    <!-- data-portability: manual export/import (tasks 7.2, 7.3, 7.4). -->
+    <string name="portability_section_title">Data &amp; backup</string>
+    <string name="portability_export_action">Export data</string>
+    <string name="portability_import_action">Import data</string>
+    <string name="portability_import_confirm_title">Replace all data?</string>
+    <string name="portability_import_confirm_body">Importing this file replaces every habit, schedule, and entry currently on this device. This action cannot be undone.</string>
+    <string name="portability_import_confirm_action">Replace</string>
+    <string name="portability_import_success">Import complete.</string>
+
     <string name="action_back">Back</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_dismiss">Dismiss</string>
 </resources>

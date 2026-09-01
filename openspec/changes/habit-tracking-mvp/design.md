@@ -716,7 +716,7 @@ MVP scope (**OA-1**).
   "schemaVersion": 1,
   "exportedAt": "2026-08-31T10:15:00Z",
   "exportedAtZone": "Europe/Madrid",
-  "settings": { "defaultSnoozeMinutes": 20, "weekStart": "MONDAY" },
+  "settings": { "defaultSnoozeMinutes": 20 },
   "habits": [
     {
       "id": 1,
@@ -743,10 +743,10 @@ MVP scope (**OA-1**).
 |---|---|
 | Shape | Nested by habit, not flat tables. A human can read one habit's whole history in one place, and import becomes one transaction per habit. |
 | `reminder_occurrences` | **Deliberately excluded.** Transient scheduling state, fully rebuildable from `schedules`. Importing it would arm alarms derived from another device's clock. |
-| Settings | Included, because a backup that loses the user's snooze default is not a backup. |
+| Settings | Included, because a backup that loses the user's snooze default is not a backup. **Corrected 2026-09-01 while building work unit 7:** the example above used to also show `settings.weekStart`, and nothing was behind it. `weekStart` is a per-schedule column (`ScheduleEntity.weekStart`, and `Schedule.weekStart` in `:domain`); there is no global week-start setting, no DataStore entry for one, and the ratified decisions give the MVP none. Each habit's own `schedule.weekStart` is authoritative, and a DTO field for the global one would have had nothing to read or write. |
 | `value` | Present and `null` from day one — the point of §8.3. |
 | Forward compatibility | Unknown fields are ignored on import. A `formatVersion` higher than supported **refuses the whole import** with a clear message rather than importing partially. |
-| Import semantics (**OA-5**) | **Replace-all inside a single Room transaction**, behind an explicit confirmation. Merging would be conflict resolution, which ratified decision 6 forbids designing. IDs are reassigned on import and `slotId` references remapped through an in-memory old→new map. The spec flags merge-vs-replace as an open product question; this is the design's recommendation, not a ruling. |
+| Import semantics (**OA-5**) | **Replace-all inside a single Room transaction**, behind an explicit confirmation. Merging would be conflict resolution, which ratified decision 6 forbids designing. IDs are reassigned on import and `slotId` references remapped through an in-memory old→new map. **Ratified by the user 2026-09-01** — this row previously called itself "the design's recommendation, not a ruling" and said the spec flagged merge-vs-replace as an open product question. Neither is true any more: `data-portability` states replace-all, the confirmation, and atomicity as **MUST**s, and OA-5 is settled (§1). |
 | Post-import | Cancel all alarms, truncate `reminder_occurrences`, re-plan from scratch. |
 | Validation order | Parse and validate the **entire** file before touching the database. A malformed backup must never leave the user with neither their old data nor the new. |
 
