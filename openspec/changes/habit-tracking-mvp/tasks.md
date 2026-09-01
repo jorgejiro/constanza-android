@@ -526,14 +526,15 @@ pushed past, per the same instruction that converted unit 6a's overshoots into d
       (former inline `entryDao.upsert` call site) is now a thin adapter over
       `EntryWriter.answerOccurrence`; its existing idempotency and origin-date-crediting tests
       (`AnswerWorkerTest`) pass unchanged through the new seam.
-      **Test debt carried to a follow-up batch** (crossed the ~600-line stop before writing these):
-      an explicit comparative assertion that both routes produce the same `Entry` for equivalent
-      inputs (currently proven only implicitly — one shared code path, both callers' existing tests
-      green); a direct test that `InAppEntryStatus.SKIPPED` reaches storage (exercised in production
-      code and reachable from `TodayScreen`'s "Skip" button, but no dedicated test taps it); unit
-      tests for `TodayViewModel`'s rollup/expansion state and `TodayModel`'s pending/snoozed
-      rendering in isolation (covered today only via the one end-to-end `TodayComposeTest`, which
-      exercises `COMPLETED` and never drives a live `SNOOZED` occurrence).
+      **Test debt closed 2026-09-01, commit `639e200`** (crossed the ~600-line stop before writing
+      these, carried rather than dropped): an explicit comparative assertion that both routes
+      produce the same `Entry` for equivalent inputs — landed as `EntryWriteParityTest`, asserting
+      both routes credit the occurrence's origin date against real Room; a direct test that
+      `InAppEntryStatus.SKIPPED` reaches storage — landed in `TodayComposeTest`; unit tests for
+      `TodayViewModel`'s rollup/expansion state and `TodayModel`'s pending/snoozed rendering in
+      isolation — landed as `TodayViewModelTest` (192 lines, JVM level), including
+      `only a SNOOZED occurrence surfaces a snooze deadline, an armed one reads plain pending`,
+      which also closes 6b.3's carried debt below. All three pass.
 - [x] 6b.3 Render pending/snoozed state ("pending, snoozed until HH:mm") by reading `reminder_occurrences` (design §7 D3).
       **Done:** `TodayModel.toTodaySlot` reads `ReminderOccurrenceDao.observeUnresolved()` (a new
       reactive twin of the existing `findUnresolved()` — same SQL predicate, so the today screen's
@@ -543,18 +544,24 @@ pushed past, per the same instruction that converted unit 6a's overshoots into d
       `SnoozeWorker.kt`, `OccurrencePlanner.kt`, `OccurrenceResolver.kt`, `ReminderFireWorker.kt`) —
       one more literal `"SNOOZED"` comparison was added consistent with that existing convention
       rather than a new parallel list; a shared `ReminderOccurrenceState` type is a real refactor to
-      propose, not smuggle into this task. **No dedicated test exercises a live `SNOOZED` occurrence
-      yet** (see 6b.2's test-debt note) — carried to the follow-up batch.
+      propose, not smuggle into this task. **Test debt closed 2026-09-01, commit `639e200`**
+      (see 6b.2's note): `TodayViewModelTest`'s
+      `only a SNOOZED occurrence surfaces a snooze deadline, an armed one reads plain pending`
+      now exercises a live `SNOOZED` occurrence.
 - [x] 6b.4 Implement the progress view: current/best streak and compliance, calling `StreakCalculator`/`ComplianceCalculator` with `windowDays = 30`. **[Stale marker resolved — OA-4 ratified 2026-09-01, design.md §1]** (habit-progress: Streak Calculation, Compliance Calculation).
       **Done:** `progress/ProgressViewModel.kt`/`ProgressScreen.kt`, reached from `HabitListScreen`'s
       new per-habit "Progress" action (no navigation library, task 6a's own decision — a fourth leaf
       screen the same shape as `HabitEditor`). Neither calculator is reimplemented; the ViewModel only
       supplies the `Entry` history (new `EntryDao.observeByHabitId`, reactive) and the `Schedule` both
-      already read. **Test debt carried, not silently dropped** (crossed the ~600-line stop instruction
-      before writing it): a dedicated streak/compliance rendering test for `ProgressViewModel`/
-      `ProgressUiState` — the calculators themselves are already covered at `:domain` level
-      (`StreakCalculatorTest`/`ComplianceCalculatorTest`), so this gap is the UI-layer wiring only, not
-      the arithmetic.
+      already read. **Test debt closed 2026-09-01**, in the archive-exclusion fix
+      (`fix/archived-habit-progress-exclusion`, see the habit-management amendment below): a
+      dedicated streak/compliance rendering test for `ProgressViewModel`/`ProgressUiState` was
+      carried here — the calculators themselves were already covered at `:domain` level
+      (`StreakCalculatorTest`/`ComplianceCalculatorTest`), so the gap was UI-layer wiring only, not
+      the arithmetic. `ProgressViewModelTest.kt` now exercises that exact wiring end to end (mocked
+      `HabitRepository`/`EntryDao`/`TimeProvider` through `uiState`, asserting `complianceRatio` and
+      `currentStreak`), added while closing a CRITICAL full-change verification finding that the
+      same ViewModel was also missing the Habit Archiving exclusion rule.
 - [x] 6b.5 Implement the snooze-default setting screen bound to the DataStore entry from 5.6 (reminder-response: Snooze Configuration and Re-arm).
       **Done:** `reminding/SnoozeSettingsViewModel.kt`/`SnoozeSettingsScreen.kt`, reached from Today's
       new "Settings" action. Reads/writes `ReminderSettingsStore.snoozeDuration`/`setSnoozeDuration`

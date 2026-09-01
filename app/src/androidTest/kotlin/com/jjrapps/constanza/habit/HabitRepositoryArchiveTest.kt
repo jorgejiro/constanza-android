@@ -50,7 +50,8 @@ class HabitRepositoryArchiveTest {
         val archived = requireNotNull(repository.findById(id))
         assertTrue(archived.archived)
         assertEquals(
-            "archiving must stamp the archive date, since compliance windows read it",
+            "archiving must stamp the archive date, since ProgressViewModel's effectiveToday " +
+                "clamp and entry filter both key off it",
             today,
             archived.archivedAt,
         )
