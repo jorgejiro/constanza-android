@@ -452,6 +452,26 @@ verification).
 - [ ] 6a.5 **Slice ii-b.** Apply single responsive layout (no dedicated tablet layout) to the editor; verify at `sw >= 600dp` and both orientations, re-requesting IME visibility explicitly after rotation (ui-adaptive-layout: Minimal Adaptive Resilience, Soft Keyboard Visibility).
 - [ ] 6a.6 **Slice ii-b (moved from ii-a — budget stop).** [Compose UI test] Create each of the six schedule kinds; verify the persisted `Habit` + `Schedule`. Production code and ViewModel unit tests for all six kinds landed in ii-a (measured ~792 changed lines at the ~650 stop point, before this task's own Compose UI ceremony); the instrumented proof itself did not fit inside the same batch.
 - [ ] 6a.7 **Slice ii-b.** [Compose UI test] Rotate the editor mid-input; verify no content loss.
+- [ ] 6a.8 **Slice ii-b. Added 2026-09-01 — the single configurable reminder time for the five
+      non-`TIMES_PER_DAY` kinds.** `habit-scheduling` requires it — "Every other frequency kind MUST
+      have exactly one configurable reminder time, not per-slot times" — and no numbered task owned
+      it, so the ii-a editor cannot set one. `OccurrencePlanner` returns early when a habit has no
+      enabled `ReminderSlot` (`if (schedule == null || enabledSlots.isEmpty()) return`), so a habit
+      created as `DAILY`, `WEEKLY`, `MONTHLY`, `EVERY_N_DAYS` or `N_TIMES_PER_WEEK` through that
+      editor arms nothing and never reminds.
+      This is **not** a spec violation: the same capability states that with no reminder time set
+      "the system MUST NOT fire any reminder, while the habit MUST remain trackable in-app", and 6b's
+      today screen is that fallback. It is a hollow feature rather than a broken one — five of the six
+      kinds are selectable but silent — which is why it gets a number here instead of a note.
+      The task is to give those five kinds one time picker, persisted as their single enabled
+      `ReminderSlot`, and to decide deliberately what a habit saved without one should do: block the
+      save, or persist a reminder-less habit that the today screen still tracks. Read the capability
+      before choosing; do not infer the rule.
+      **Sixth instance of the unowned-promise pattern in this change** (task 5.9's fire-time wiring,
+      `ActionReceiver`'s manifest entry, §5.5's `onResume()` re-check, `HabitRepository`'s CRUD
+      surface, and this). The first four each shipped a dead or hollow path that was found late and by
+      accident; this one was caught before merge because the implementer flagged it instead of
+      absorbing it. See design.md §13.4.
 
 ## Phase 6b: Today Screen, Progress & Settings UI (Work Unit 6b) — depends on 3, 5
 
