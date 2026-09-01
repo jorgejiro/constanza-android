@@ -10,15 +10,73 @@ context: |
   Reference apps (Loop Habit Tracker/uhabits GPL-3.0, HabitNow, Habitify,
   Streaks) are reference-only; no code may be copied or derived from them.
 
-stack:
-  status: partially_ratified
+carried_forward_open_items:
   note: >
-    Reviewed and revised by sdd-design for change habit-tracking-mvp on
-    2026-08-31 (see openspec/changes/habit-tracking-mvp/design.md). The
-    items under `ratified` and `ratified_by_design` are decided; the items
-    under `still_unpinned` are NOT settled and must not be treated as
-    detected facts. No Gradle build exists in this repository yet, so no
-    version below has been built here.
+    Genuinely open, blocked work items surfaced by habit-tracking-mvp
+    (archived 2026-09-01 to openspec/changes/archive/2026-09-01-habit-tracking-mvp/).
+    Neither is a stale checkbox or an oversight; both are documented, reasoned
+    blocks with a named owner condition. This section is the durable home for
+    them because the change folder itself now lives under archive/, which a
+    future contributor opening a new change is unlikely to browse. Do not
+    close either item silently in a future change — resolve it explicitly and
+    remove it from this list when done, or replace it with a new decision.
+  items:
+    - id: "7.5"
+      title: "Automatic pre-migration export hook"
+      status: blocked
+      origin: "habit-tracking-mvp tasks.md, task 7.5 (left unchecked, not marked complete)"
+      reason: >
+        AppDatabase is at version = 1 with no Migration class anywhere in this
+        repository, so there is no "before" state for an export hook to run
+        against yet. No hook placed in :app's normal startup/DI path can work
+        either: Room applies migrations lazily and every typed DAO is bound to
+        the TARGET schema, so by the time a DAO is queryable the migration has
+        already run. The only correct placement is a version-agnostic raw-SQL
+        dump (enumerate sqlite_master, read each table via Cursor) as the
+        FIRST statement inside the future Migration(1, 2).migrate(db) body,
+        before any ALTER TABLE runs.
+      why_it_matters: >
+        Not housekeeping. Ratified decision 6 and OA-1 put manual export/import
+        in the MVP specifically as the failed-migration recovery path (see
+        openspec/specs/data-portability/spec.md); the automatic snapshot is
+        what makes that recovery reach a user who never exported by hand
+        before the migration that corrupted their data.
+      owner_condition: "Belongs to whoever writes the first Room migration (the first schema change past version 1)."
+    - id: "G.7-throttling-row"
+      title: "One UI \"put unused apps to sleep\" survival row (Galaxy Z Fold 7)"
+      status: blocked
+      origin: >
+        habit-tracking-mvp tasks.md task G.7 itself is marked complete ([x]);
+        this is one row inside that task's device matrix that is explicitly
+        recorded as NOT RUN, not a task-level gap. See
+        openspec/changes/archive/2026-09-01-habit-tracking-mvp/design.md
+        §13.6 (table row "One UI \"put unused apps to sleep\" survival").
+      reason: >
+        The Galaxy Z Fold 7 (SM-F966B, Android 16/API 36) became available and
+        discharged every other Fold row on 2026-09-01 (large screen, habit
+        editor, orientation, fold/unfold as a configuration change — all
+        PASS), but this specific row needs a multi-day idle window the
+        available device time did not cover.
+      why_it_matters: >
+        This is the assertion the WorkManager missed-reminder sweep exists to
+        satisfy: that a reminder still delivers even if the OEM's aggressive
+        background-kill policy throttles the app. Design.md §13.3 states no
+        Pixel can make this assertion — it requires this specific device
+        class and a multi-day observation window.
+      owner_condition: "Resolve when the Fold 7 (or an equivalent One-UI device) is available for an unattended multi-day idle window."
+
+stack:
+  status: ratified
+  note: >
+    Ratified by user decisions plus sdd-design revisions for change
+    habit-tracking-mvp (see openspec/changes/archive/2026-09-01-habit-tracking-mvp/design.md,
+    now archived). Confirmed built and verified in this repository: at `main`
+    9a4c8a4, `./gradlew :domain:test :app:testDebugUnitTest :domain:detektMain
+    :app:detektMain :app:connectedDebugAndroidTest --rerun-tasks` exits 0
+    (:domain:test 52, :app:testDebugUnitTest 97, :app:connectedDebugAndroidTest
+    59 — all 0 failures/errors/skipped; both detekt tasks clean). `still_unpinned`
+    was already empty before this archive; nothing here was reopened by
+    archiving.
 
   ratified:
     date: 2026-08-31
@@ -117,27 +175,30 @@ stack:
     planned_unratified precisely so sdd-design could revise it.
 
 testing:
-  status: planned_not_yet_verifiable
+  status: verified
   note: >
-    No build system exists yet, so none of the commands below have been
-    run or verified. They are the intended commands for when the Gradle
-    project is scaffolded (expected during sdd-design/sdd-apply for the
-    first change).
+    Verified in this repository at `main` 9a4c8a4 (archive of habit-tracking-mvp,
+    2026-09-01): `./gradlew :domain:test :app:testDebugUnitTest :domain:detektMain
+    :app:detektMain :app:connectedDebugAndroidTest --rerun-tasks` exits 0.
+    :domain:test 52/52, :app:testDebugUnitTest 97/97, :app:connectedDebugAndroidTest
+    59/59, all 0 failures/errors/skipped; both detekt tasks clean. This updates
+    the `planned_not_yet_verifiable` status recorded before the first change
+    shipped, per config.yaml's own `rules.archive` instruction.
   unit:
-    available: false
-    command: "./gradlew test"
-    framework: JUnit5 / Kotlin (planned, unratified)
+    available: true
+    command: "./gradlew :domain:test && ./gradlew :app:testDebugUnitTest"
+    framework: "JUnit4 + kotlin.test (revises the earlier unratified JUnit5 plan; see design_intent below)"
   instrumented:
-    available: false
-    command: "./gradlew connectedAndroidTest"
-    framework: AndroidX Test / Espresso (planned, unratified)
+    available: true
+    command: "./gradlew :app:connectedDebugAndroidTest"
+    framework: "AndroidX Test + androidx.work:work-testing + compose-ui-test-junit4"
   coverage:
     available: false
     command: ""
   quality:
     linter:
-      available: false
-      command: ""
+      available: true
+      command: "./gradlew :domain:detektMain :app:detektMain"
     formatter:
       available: false
       command: ""
