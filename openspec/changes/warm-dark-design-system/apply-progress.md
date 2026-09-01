@@ -389,3 +389,102 @@ this unit). Well inside the unit's own 460-line stop threshold and inside the 32
 - `TodayAdaptiveComposeTest.kt` itself — confirmed byte-identical to before this unit
   (`git diff --stat` shows no change to that file); only its passing result is new evidence, not its
   source.
+
+## Unit 5 — Editor Tonal Pass (PR D) — `feat/warm-dark-editor-tonal`
+
+Status: **done**, tasks 5.1–5.4 complete. Branch created off `feat/warm-dark-habit-color-identity`
+(tip `2c9c92c`, unit 4), landing as one commit — this is by far the smallest actual footprint of any
+unit so far, well under the unit's own 520-line stop threshold and under design.md's 360–520 forecast,
+the opposite of the "UI units roughly double their forecast" pattern the tracker flagged as
+historically likely here.
+
+### What landed
+
+- `habit/HabitEditorScreen.kt`: `Scaffold(topBar = { HabitEditorTopBar(titleRes) }, containerColor =
+  ConstanzaColors.Background)` — the `TopAppBar` itself was extracted into a new private
+  `HabitEditorTopBar(titleRes: Int)` composable carrying `TopAppBarDefaults.topAppBarColors
+  (containerColor = ConstanzaColors.Background)`, so the app bar reads as one seamless surface with
+  the screen behind it instead of M3's default `surfaceContainer` role (which `Theme.kt` never
+  repoints, so it would otherwise stay cool-toned). `SWATCH_SIZE`/`SWATCH_BORDER` (two private `val`s)
+  deleted; `ColorSwatchRow` now reads `Dimens.Swatch`/`Dimens.SwatchBorder` (already defined in unit
+  1's `Dimens.kt`, unused until now) — the one deliberate token-ownership move task 5.1 called for.
+- `habit/ScheduleEditors.kt`: **no change** — see the correction below.
+
+### Corrections to the task-stated scope — flagged loudly, per instruction
+
+1. **`ListItemDefaults.colors` does not apply to `HabitEditorScreen.kt`.** Task 5.1 lists it alongside
+   `TopAppBarDefaults`/`Scaffold`. `rg -n "ListItem"` against the file found zero matches — the editor
+   is built entirely from `Column`/`Row`/`OutlinedTextField`/`Text`/`Button`, never a `ListItem`. There
+   is nothing to apply the token to; not applied, rather than invented against a component that isn't
+   there.
+2. **The swatch selection border needed no change**, confirmed rather than assumed: it already reads
+   `MaterialTheme.colorScheme.primary` at `HabitEditorScreen.kt:247` (line renumbered from the task's
+   stated `:246` by the import additions below it — same file, same expression), which has been the
+   warm accent since unit 1's `Theme.kt` repointed `primary` to `ConstanzaColors.Accent`.
+3. **`habit/ScheduleEditors.kt` required zero production code changes.** Read in full (all 332 lines)
+   before concluding this. Every colour it reads — `MaterialTheme.colorScheme.onSurfaceVariant`,
+   `.error`, plus the implicit selection colours of `Switch` (`ReminderTimeEditor`), `FilterChip`
+   (`DayOfWeekPicker`), and `Checkbox` (`ReminderSlotRow`) — already resolves through the
+   `MaterialTheme.colorScheme` unit 1's `Theme.kt` built from `ConstanzaColors` (`primary`→Accent,
+   `secondaryContainer`→SurfaceSelected, `onSurfaceVariant`→OnBackgroundVariant). The file has no
+   `ListItem`, `TopAppBar`, `Scaffold`, or hardcoded `Color(...)` literal — none of design decision 7's
+   tonal-surface rules have anything to touch here, and decision 7's own table independently predicts
+   this ("selection states … none" structural change, already reading `colorScheme.primary`). `git
+   diff` for this file is empty; this is reported as a real finding, not silently skipped.
+4. **`ListItemDefaults`/`TopAppBarDefaults`/`Scaffold(containerColor = …)` genuinely only applied to
+   `HabitEditorScreen.kt`, and even there only two of the three** (`TopAppBarDefaults`, `Scaffold`) —
+   consistent with points 1–3 above.
+
+### Deviation, flagged loudly (detekt, not design)
+
+Inlining the `colors = TopAppBarDefaults.topAppBarColors(...)` argument directly into the existing
+`Scaffold(topBar = { TopAppBar(...) })` lambda pushed `HabitEditorScreen`'s body from 60 lines (the
+`LongMethod` threshold) to 66. `@Suppress` is ruled out by design. Resolved by extracting the whole
+`TopAppBar(...)` call into the new private `HabitEditorTopBar(titleRes: Int)` composable — the same
+extraction pattern the file already uses for `EditorNameField` — which returned the caller to a
+single-line `Scaffold(...)` call and detekt to clean.
+
+### Verification (real numbers, `--rerun-tasks` used throughout; `JAVA_HOME` pointed at Android
+Studio's bundled JBR as in units 1–4)
+
+| Command | Result |
+|---|---|
+| `./gradlew :app:testDebugUnitTest` (full suite) | BUILD SUCCESSFUL — 113 tests, 0 failures (exact match to baseline) |
+| `./gradlew :domain:test` | BUILD SUCCESSFUL — 52 tests, 0 failures (exact match to baseline; `:domain` confirmed untouched) |
+| `./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.jjrapps.constanza.habit.HabitEditorComposeTest,com.jjrapps.constanza.habit.HabitEditorRotationComposeTest` (device: Galaxy Z Fold 7, SM-F966B, API 36, serial `RFCY720PJKV`, `mWakefulness=Awake`, `isKeyguardShowing=false` confirmed before running) | BUILD SUCCESSFUL — 4 tests, 0 failures. Neither test's own source was modified — both ran exactly as they existed before this unit, per the non-negotiable on the focus-restoration machinery |
+| `./gradlew :app:connectedDebugAndroidTest` (full instrumented suite, same device) | BUILD SUCCESSFUL — 63 tests, 0 skipped, 0 failed (exact match to baseline — this unit added no new instrumented test) |
+| `./gradlew :app:detektMain` | First run FAILED — `LongMethod` on `HabitEditorScreen` (see deviation above). After the `HabitEditorTopBar` extraction: BUILD SUCCESSFUL, 0 issues |
+| `./gradlew :domain:detektMain` | BUILD SUCCESSFUL, 0 issues (untouched) |
+
+Instrumented `--tests` again rejected by this AGP/Gradle version (unit 2's recorded gotcha, confirmed
+still true); used `-Pandroid.testInstrumentationRunnerArguments.class=<FQCN>,<FQCN>` instead.
+
+### Focus-restoration machinery — confirmed untouched
+
+`focusRestoring(fieldId, focusedFieldId)`, the `FIELD_NAME`/`FIELD_QUESTION`/`FIELD_NOTES` constants,
+the single shared `rememberSaveable { mutableStateOf<String?>(null) }` in `HabitEditorScreen`, and
+`hasInitialized`/`rememberSaveable(habitId)` in `HabitEditorRoute` are all byte-identical to before this
+unit (`git diff` shows no touched lines in that region). Every text field's `.then(focusRestoring(...))`
+survives in its original position in the `Modifier` chain — none of this unit's edits touched a text
+field's `Modifier` chain at all, only the top bar and the swatch row.
+
+### Changed-line footprint
+
+`git diff --shortstat` against `feat/warm-dark-colour-identity` (this unit's only commit): **1 file
+changed, 19 insertions(+), 6 deletions(-)** — 25 total changed lines, all authored, all in
+`habit/HabitEditorScreen.kt`. `habit/ScheduleEditors.kt` has zero diff (see correction 3 above). This
+is far inside the unit's 520-line stop threshold and far below the 360–520 forecast — the smallest
+footprint of any unit in this change so far, because the tonal groundwork (tokenized `colorScheme`
+roles, `Dimens.Swatch`/`Dimens.SwatchBorder`) was already laid by units 1 and 2, leaving unit 5 with
+one real gap to close (the app bar's unrepointed `surfaceContainer` role) rather than a from-scratch
+retint.
+
+### Boundaries respected
+
+- `progress/ProgressScreen.kt`, `reminding/SnoozeSettingsScreen.kt`,
+  `portability/DataPortabilityScreen.kt` — untouched (unit 6's scope).
+- No migration, `AppDatabase`, `DatabaseModule`, `BackupImporter`/`BackupDto`, `TodayModel.kt`,
+  `TodayScreen.kt`, `HabitListScreen.kt`, or `HabitColorDot.kt` file touched.
+- `:domain` — confirmed untouched (`./gradlew :domain:test` exact-matches baseline 52).
+- `HabitEditorComposeTest.kt`/`HabitEditorRotationComposeTest.kt` — confirmed byte-identical to before
+  this unit; only their passing result is new evidence, not their source.
