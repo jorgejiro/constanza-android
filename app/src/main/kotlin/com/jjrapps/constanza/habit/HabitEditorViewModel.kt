@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jjrapps.constanza.core.time.TimeProvider
 import com.jjrapps.constanza.domain.model.Habit
+import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
@@ -14,15 +15,37 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
+import java.time.LocalDate
 import javax.inject.Inject
 
+private const val MIN_POSITIVE = 1
+private const val MIN_DAY_OF_MONTH = 1
+
+/** habit-scheduling design.md schema comment: `dayOfMonth INTEGER (1..31, clamped to month
+ *  length)` — the persisted column's own bound, not an invented business rule. */
+private const val MAX_DAY_OF_MONTH = 31
+private const val DEFAULT_TIMES_PER_WEEK = 3
+private const val DEFAULT_EVERY_N_DAYS = 2
+private const val DEFAULT_MINUTE_OF_DAY = 480 // 08:00
+private const val MINUTES_PER_DAY = 24 * 60
+
 /**
- * Task 6a.1 (non-schedule half)/6a.2/6a.3 (habit-management: Habit Creation, Habit Editing;
- * Creation requires a name). The schedule-kind picker and `TIMES_PER_DAY` slot editor are slice
- * ii's scope (tasks 6a.1's remainder); this slice fixes every new habit's [Schedule] to
- * [Schedule.Daily] and, when editing, preserves whatever [Schedule] is already persisted rather
- * than exposing it for change — [save] still round-trips it through [HabitRepository.update] so
- * 6a.3's replan wiring is real end to end, not stubbed pending slice ii.
+ * Task 6a.1/6a.2/6a.3 (habit-management: Habit Creation, Habit Editing; habit-scheduling: Six
+ * Frequency Kinds, Reminder Slots for TIMES_PER_DAY). Slice i fixed every new habit's [Schedule]
+ * to [Schedule.Daily]; slice ii-a adds the schedule-kind picker for all six kinds, each kind's
+ * parameter editor, and the `TIMES_PER_DAY` reminder-slot editor. [save] still round-trips the
+ * chosen [Schedule] (and, for `TIMES_PER_DAY`, its slots) through [HabitRepository], reusing
+ * 6a.3's existing replan wiring — no second implementation was written for slice ii-a.
+ *
+ * [onScheduleParamChange]/[onSlotAction] take a single sealed action rather than one method per
+ * field, keeping this class under detekt's `TooManyFunctions` threshold without losing per-field
+ * type safety (each [ScheduleParamAction]/[SlotAction] variant still carries its own typed payload).
+ *
+ * The single configurable reminder time habit-scheduling requires for the other five kinds ("Every
+ * other frequency kind MUST have exactly one configurable reminder time, not per-slot times") is
+ * NOT built by this slice: no numbered task owns that editor, only `TIMES_PER_DAY`'s slot editor
+ * (task 6a.1's explicit text). Flagged in the apply report rather than silently built or skipped.
  */
 @HiltViewModel
 class HabitEditorViewModel @Inject constructor(
@@ -41,12 +64,13 @@ class HabitEditorViewModel @Inject constructor(
         _uiState.value = HabitEditorUiState()
     }
 
-    /** habit-management: Habit Editing — loads the persisted habit and its (currently read-only
-     *  in this slice) schedule into the form. */
+    /** habit-management: Habit Editing — loads the persisted habit, its [Schedule], and (for
+     *  `TIMES_PER_DAY`) its persisted [ReminderSlot]s into the form. */
     fun startEdit(habitId: Long) {
         viewModelScope.launch {
             val habit = habitRepository.findById(habitId) ?: return@launch
             val schedule = habitRepository.findScheduleFor(habitId) ?: Schedule.Daily()
+            val slots = if (schedule is Schedule.TimesPerDay) habitRepository.findSlotsFor(habitId) else emptyList()
             _uiState.value = HabitEditorUiState(
                 habitId = habit.id,
                 name = habit.name,
@@ -54,6 +78,8 @@ class HabitEditorViewModel @Inject constructor(
                 colorArgb = habit.colorArgb,
                 notes = habit.notes.orEmpty(),
                 schedule = schedule,
+                slots = slots,
+                anchorDateText = if (schedule is Schedule.EveryNDays) schedule.anchor.toString() else "",
             )
         }
     }
@@ -66,40 +92,216 @@ class HabitEditorViewModel @Inject constructor(
 
     fun onNotesChange(value: String) = _uiState.update { it.copy(notes = value) }
 
+    /** habit-scheduling: Six Frequency Kinds/N_TIMES_PER_WEEK/WEEKLY/MONTHLY/EVERY_N_DAYS —
+     *  dispatches on [ScheduleParamAction]'s variant. An action whose variant does not match the
+     *  current [Schedule] subtype (a stale UI event after a kind switch mid-flight) is a no-op. */
+    fun onScheduleParamChange(action: ScheduleParamAction) {
+        _uiState.update { state ->
+            when (action) {
+                is ScheduleParamAction.Kind -> applyKindChange(state, action.kind, timeProvider.today())
+                is ScheduleParamAction.TimesPerWeek -> applyTimesPerWeek(state, action.times)
+                is ScheduleParamAction.DayOfWeek -> applyDayOfWeek(state, action.dayOfWeek)
+                is ScheduleParamAction.DayOfMonth -> applyDayOfMonth(state, action.dayOfMonth)
+                is ScheduleParamAction.EveryNDays -> applyEveryNDays(state, action.n)
+                is ScheduleParamAction.AnchorDate -> applyAnchorDate(state, action.text)
+            }
+        }
+    }
+
+    /** habit-scheduling: Reminder Slots for TIMES_PER_DAY — add/remove/enable/reschedule one slot,
+     *  addressed by [HabitEditorUiState.slots] index. */
+    fun onSlotAction(action: SlotAction) {
+        _uiState.update { state ->
+            when (action) {
+                SlotAction.Add -> addSlot(state)
+                is SlotAction.Remove -> state.copy(slots = state.slots.filterIndexed { i, _ -> i != action.index })
+                is SlotAction.SetEnabled -> {
+                    val slots = withSlot(state.slots, action.index) { it.copy(enabled = action.enabled) }
+                    state.copy(slots = slots)
+                }
+
+                is SlotAction.SetTime -> {
+                    val bounded = action.minuteOfDay.coerceIn(0, MINUTES_PER_DAY - 1)
+                    state.copy(slots = withSlot(state.slots, action.index) { it.copy(minuteOfDay = bounded) })
+                }
+            }
+        }
+    }
+
     /** habit-management: Creation requires a name — rejects the save and never reaches the
      *  repository when the name is blank (including whitespace-only, since a name made only of
-     *  spaces identifies nothing any more than an empty one does). */
+     *  spaces identifies nothing any more than an empty one does). Also enforces habit-scheduling's
+     *  "`TIMES_PER_DAY` MUST define one or more explicit clock-time ReminderSlots" and a parseable
+     *  `EVERY_N_DAYS` anchor, both blocking save the same way a missing name does. */
     fun save() {
         val state = _uiState.value
-        if (state.name.isBlank()) {
-            _uiState.update { it.copy(nameError = true) }
+        val error = validationError(state)
+        if (error != null) {
+            _uiState.update { error.apply(it) }
             return
         }
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
-            persist(state)
+            val habit = Habit(
+                id = state.habitId ?: 0L,
+                name = state.name.trim(),
+                question = state.question.trim().ifBlank { null },
+                colorArgb = state.colorArgb,
+                notes = state.notes.trim().ifBlank { null },
+                archived = false,
+                archivedAt = null,
+                createdAt = timeProvider.now(),
+                sortOrder = 0,
+            )
+            if (state.habitId == null) {
+                habitRepository.create(habit, state.schedule, state.slots)
+            } else {
+                habitRepository.update(habit, state.schedule, state.slots)
+            }
             _uiState.update { it.copy(isSaving = false) }
             _events.send(HabitEditorEvent.Saved)
         }
     }
 
-    private suspend fun persist(state: HabitEditorUiState) {
-        val habit = Habit(
-            id = state.habitId ?: 0L,
-            name = state.name.trim(),
-            question = state.question.trim().ifBlank { null },
-            colorArgb = state.colorArgb,
-            notes = state.notes.trim().ifBlank { null },
-            archived = false,
-            archivedAt = null,
-            createdAt = timeProvider.now(),
-            sortOrder = 0,
-        )
-        if (state.habitId == null) {
-            habitRepository.create(habit, state.schedule)
-        } else {
-            habitRepository.update(habit, state.schedule)
-        }
+    private fun validationError(state: HabitEditorUiState): SaveValidationError? = when {
+        state.name.isBlank() -> SaveValidationError.NameBlank
+        state.schedule is Schedule.TimesPerDay && state.slots.isEmpty() -> SaveValidationError.SlotsEmpty
+        state.schedule is Schedule.EveryNDays && state.anchorDateText.toLocalDateOrNull() == null ->
+            SaveValidationError.InvalidAnchor
+
+        else -> null
+    }
+}
+
+/** habit-scheduling: Reminder Slots for TIMES_PER_DAY — a new, unsaved slot (`id = 0` sentinel,
+ *  same convention as [Habit.id]) at a default morning time; a no-op outside `TIMES_PER_DAY`. */
+private fun addSlot(state: HabitEditorUiState): HabitEditorUiState {
+    if (state.schedule !is Schedule.TimesPerDay) return state
+    val newSlot = ReminderSlot(
+        id = 0L,
+        habitId = state.habitId ?: 0L,
+        minuteOfDay = DEFAULT_MINUTE_OF_DAY,
+        enabled = true,
+    )
+    return state.copy(slots = state.slots + newSlot, slotsError = false)
+}
+
+private fun withSlot(slots: List<ReminderSlot>, index: Int, transform: (ReminderSlot) -> ReminderSlot) =
+    slots.mapIndexed { i, slot -> if (i == index) transform(slot) else slot }
+
+/** habit-scheduling: Six Frequency Kinds — a sensible starting value for each kind's own
+ *  parameter(s) when the user switches into it. */
+private fun defaultScheduleFor(kind: ScheduleKind, weekStart: DayOfWeek, today: LocalDate): Schedule = when (kind) {
+    ScheduleKind.DAILY -> Schedule.Daily(weekStart)
+    ScheduleKind.TIMES_PER_DAY -> Schedule.TimesPerDay(weekStart)
+    ScheduleKind.N_TIMES_PER_WEEK -> Schedule.NTimesPerWeek(DEFAULT_TIMES_PER_WEEK, weekStart)
+    ScheduleKind.WEEKLY -> Schedule.Weekly(DayOfWeek.MONDAY, weekStart)
+    ScheduleKind.MONTHLY -> Schedule.Monthly(MIN_DAY_OF_MONTH, weekStart)
+    ScheduleKind.EVERY_N_DAYS -> Schedule.EveryNDays(DEFAULT_EVERY_N_DAYS, today, weekStart)
+}
+
+/** Extracted so [HabitEditorViewModel.onScheduleParamChange]'s `when` stays a plain dispatch —
+ *  each of these six carries its own branch's cyclomatic cost instead of piling it all into one
+ *  function (top-level, not a class member, so it does not count toward `TooManyFunctions` either). */
+private fun applyKindChange(state: HabitEditorUiState, kind: ScheduleKind, today: LocalDate): HabitEditorUiState {
+    val newSchedule = defaultScheduleFor(kind, state.schedule.weekStart, today)
+    return state.copy(
+        schedule = newSchedule,
+        slots = if (kind == ScheduleKind.TIMES_PER_DAY) state.slots else emptyList(),
+        anchorDateText = if (kind == ScheduleKind.EVERY_N_DAYS) today.toString() else "",
+        slotsError = false,
+        anchorDateError = false,
+    )
+}
+
+private fun applyTimesPerWeek(state: HabitEditorUiState, times: Int): HabitEditorUiState {
+    val schedule = state.schedule as? Schedule.NTimesPerWeek ?: return state
+    return state.copy(schedule = schedule.copy(times = times.coerceAtLeast(MIN_POSITIVE)))
+}
+
+private fun applyDayOfWeek(state: HabitEditorUiState, dayOfWeek: DayOfWeek): HabitEditorUiState {
+    val schedule = state.schedule as? Schedule.Weekly ?: return state
+    return state.copy(schedule = schedule.copy(dayOfWeek = dayOfWeek))
+}
+
+private fun applyDayOfMonth(state: HabitEditorUiState, dayOfMonth: Int): HabitEditorUiState {
+    val schedule = state.schedule as? Schedule.Monthly ?: return state
+    val bounded = dayOfMonth.coerceIn(MIN_DAY_OF_MONTH, MAX_DAY_OF_MONTH)
+    return state.copy(schedule = schedule.copy(dayOfMonth = bounded))
+}
+
+private fun applyEveryNDays(state: HabitEditorUiState, n: Int): HabitEditorUiState {
+    val schedule = state.schedule as? Schedule.EveryNDays ?: return state
+    return state.copy(schedule = schedule.copy(n = n.coerceAtLeast(MIN_POSITIVE)))
+}
+
+private fun applyAnchorDate(state: HabitEditorUiState, text: String): HabitEditorUiState {
+    val schedule = state.schedule as? Schedule.EveryNDays ?: return state
+    val parsed = text.toLocalDateOrNull()
+    return state.copy(
+        anchorDateText = text,
+        schedule = if (parsed != null) schedule.copy(anchor = parsed) else schedule,
+        anchorDateError = false,
+    )
+}
+
+private fun String.toLocalDateOrNull(): LocalDate? = runCatching { LocalDate.parse(this) }.getOrNull()
+
+/** The six frequency kinds a habit's [Schedule] can take (habit-scheduling: Six Frequency Kinds) —
+ *  a UI-facing, stable identifier for the schedule-kind picker; [Schedule] itself has no such
+ *  discriminator beyond its own sealed subtype. */
+enum class ScheduleKind {
+    DAILY,
+    TIMES_PER_DAY,
+    N_TIMES_PER_WEEK,
+    WEEKLY,
+    MONTHLY,
+    EVERY_N_DAYS,
+}
+
+val Schedule.kind: ScheduleKind
+    get() = when (this) {
+        is Schedule.Daily -> ScheduleKind.DAILY
+        is Schedule.TimesPerDay -> ScheduleKind.TIMES_PER_DAY
+        is Schedule.NTimesPerWeek -> ScheduleKind.N_TIMES_PER_WEEK
+        is Schedule.Weekly -> ScheduleKind.WEEKLY
+        is Schedule.Monthly -> ScheduleKind.MONTHLY
+        is Schedule.EveryNDays -> ScheduleKind.EVERY_N_DAYS
+    }
+
+/** One action per editable schedule parameter across the six kinds — [HabitEditorScreen] sends
+ *  these through a single callback instead of one lambda per field. */
+sealed interface ScheduleParamAction {
+    data class Kind(val kind: ScheduleKind) : ScheduleParamAction
+    data class TimesPerWeek(val times: Int) : ScheduleParamAction
+    data class DayOfWeek(val dayOfWeek: java.time.DayOfWeek) : ScheduleParamAction
+    data class DayOfMonth(val dayOfMonth: Int) : ScheduleParamAction
+    data class EveryNDays(val n: Int) : ScheduleParamAction
+    data class AnchorDate(val text: String) : ScheduleParamAction
+}
+
+/** One action per `TIMES_PER_DAY` reminder-slot edit, addressed by [HabitEditorUiState.slots]
+ *  index — same single-callback reasoning as [ScheduleParamAction]. */
+sealed interface SlotAction {
+    data object Add : SlotAction
+    data class Remove(val index: Int) : SlotAction
+    data class SetEnabled(val index: Int, val enabled: Boolean) : SlotAction
+    data class SetTime(val index: Int, val minuteOfDay: Int) : SlotAction
+}
+
+private sealed interface SaveValidationError {
+    fun apply(state: HabitEditorUiState): HabitEditorUiState
+
+    data object NameBlank : SaveValidationError {
+        override fun apply(state: HabitEditorUiState) = state.copy(nameError = true)
+    }
+
+    data object SlotsEmpty : SaveValidationError {
+        override fun apply(state: HabitEditorUiState) = state.copy(slotsError = true)
+    }
+
+    data object InvalidAnchor : SaveValidationError {
+        override fun apply(state: HabitEditorUiState) = state.copy(anchorDateError = true)
     }
 }
 
@@ -110,7 +312,11 @@ data class HabitEditorUiState(
     val colorArgb: Int = HabitColorPalette.DEFAULT,
     val notes: String = "",
     val schedule: Schedule = Schedule.Daily(),
+    val slots: List<ReminderSlot> = emptyList(),
+    val anchorDateText: String = "",
     val nameError: Boolean = false,
+    val slotsError: Boolean = false,
+    val anchorDateError: Boolean = false,
     val isSaving: Boolean = false,
 )
 

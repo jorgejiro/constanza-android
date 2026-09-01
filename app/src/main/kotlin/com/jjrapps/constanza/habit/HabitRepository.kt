@@ -11,6 +11,7 @@ import com.jjrapps.constanza.core.data.mapper.toDomain
 import com.jjrapps.constanza.core.data.mapper.toEntity
 import com.jjrapps.constanza.core.time.TimeProvider
 import com.jjrapps.constanza.domain.model.Habit
+import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
 import com.jjrapps.constanza.scheduling.OccurrencePlanner
 import com.jjrapps.constanza.scheduling.ScheduleEditor
@@ -43,6 +44,13 @@ data class HabitDaos @Inject constructor(
  * [deleteSlot] pays D11's cost of dropping `entries.slotId`'s foreign key by hand, inside one
  * transaction; entries under the deleted slot are removed rather than reassigned to the `0`
  * sentinel, which would risk colliding with `UNIQUE(habitId, date, slotId)`.
+ *
+ * [create]/[update]'s `slots` parameter is task 6a.1's (slice ii-a) `TIMES_PER_DAY` slot editor
+ * surface, reconciled by [syncSlots] inside the same transaction as the schedule write — a habit
+ * switching away from `TIMES_PER_DAY` naturally arrives here with an empty list, which correctly
+ * tears down its now-orphaned slots (habit-scheduling: Reminder Slots for TIMES_PER_DAY, "Every
+ * other frequency kind MUST have exactly one configurable reminder time" — that single-slot editor
+ * for the other five kinds is NOT built by this slice; see the apply report).
  */
 class HabitRepository @Inject constructor(
     private val daos: HabitDaos,
@@ -58,18 +66,26 @@ class HabitRepository @Inject constructor(
 
     suspend fun findScheduleFor(habitId: Long): Schedule? = daos.scheduleDao.findByHabitId(habitId)?.toDomain()
 
+    /** Task 6a.1 (slice ii-a): the persisted [ReminderSlot]s the editor loads back when editing a
+     *  `TIMES_PER_DAY` habit. */
+    suspend fun findSlotsFor(habitId: Long): List<ReminderSlot> =
+        daos.reminderSlotDao.findByHabitId(habitId).map { it.toDomain() }
+
     /** habit-management: Habit Creation. [habit] carries a sentinel `id = 0`; returns the real id. */
-    suspend fun create(habit: Habit, schedule: Schedule): Long = database.withTransaction {
-        val id = daos.habitDao.insert(habit.toEntity())
-        scheduleEditor.updateSchedule(id, schedule)
-        id
-    }
+    suspend fun create(habit: Habit, schedule: Schedule, slots: List<ReminderSlot> = emptyList()): Long =
+        database.withTransaction {
+            val id = daos.habitDao.insert(habit.toEntity())
+            scheduleEditor.updateSchedule(id, schedule)
+            syncSlots(id, slots)
+            id
+        }
 
     /** habit-management: Habit Editing / Editing the schedule reschedules reminders. */
-    suspend fun update(habit: Habit, schedule: Schedule) {
+    suspend fun update(habit: Habit, schedule: Schedule, slots: List<ReminderSlot> = emptyList()) {
         database.withTransaction {
             daos.habitDao.update(habit.toEntity())
             scheduleEditor.updateSchedule(habit.id, schedule)
+            syncSlots(habit.id, slots)
         }
     }
 
@@ -91,6 +107,24 @@ class HabitRepository @Inject constructor(
         database.withTransaction {
             daos.entryDao.deleteBySlot(habitId, slotId)
             daos.reminderSlotDao.deleteById(slotId)
+        }
+    }
+
+    /** Reconciles [habitId]'s persisted slots against the editor's [slots]: a slot missing from
+     *  [slots] is removed through [deleteSlot] (so its entries drop with it, D11), a slot carrying
+     *  the `id = 0` sentinel (same convention as [Habit.id]) is a new, unsaved slot and is
+     *  inserted, and every other slot is updated in place. */
+    private suspend fun syncSlots(habitId: Long, slots: List<ReminderSlot>) {
+        val existingIds = daos.reminderSlotDao.findByHabitId(habitId).map { it.id }.toSet()
+        val keptIds = slots.mapNotNull { it.id.takeIf { id -> id != 0L } }.toSet()
+        (existingIds - keptIds).forEach { deleteSlot(habitId, it) }
+        slots.forEach { slot ->
+            val withHabit = slot.copy(habitId = habitId)
+            if (slot.id == 0L) {
+                daos.reminderSlotDao.insert(withHabit.toEntity())
+            } else {
+                daos.reminderSlotDao.update(withHabit.toEntity())
+            }
         }
     }
 }
