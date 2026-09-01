@@ -90,8 +90,15 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    // The FAB's "add" icon on the habit list (task 6a.4) — the small core icon set only, no
+    // material-icons-extended dependency.
+    implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
+    // Work unit 6a: container/presentational ViewModels (HabitListViewModel, HabitEditorViewModel)
+    // and hiltViewModel() in a single-Activity, no-navigation-library setup (design.md §14).
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.hilt.navigation.compose)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
@@ -118,6 +125,12 @@ dependencies {
     // Work unit 4a: AlarmScheduler/OccurrencePlanner tests mock Room DAOs (plain interfaces) and
     // android.app.AlarmManager/PendingIntent (final Android framework classes) without Robolectric.
     testImplementation(libs.mockk)
+    // Work unit 6a: HabitListViewModelTest is the first Flow-under-test unit; turbine was pinned
+    // in the version catalog since work unit 1 for exactly this and wired here on first use.
+    testImplementation(libs.turbine)
+    // Work unit 6a: the first `viewModelScope.launch` code in this project — Dispatchers.setMain
+    // needs a JVM Main dispatcher, which only kotlinx-coroutines-test provides.
+    testImplementation(libs.kotlinx.coroutines.test)
 
     androidTestImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.runner)
@@ -129,8 +142,14 @@ dependencies {
     // JVM mockk idiom already used by AlarmSchedulerTest.
     androidTestImplementation(libs.androidx.work.testing)
     androidTestImplementation(libs.mockk.android)
+    // Work unit 6a: the first Compose UI tests in this project (tasks 6a.6/6a.7's dependencies,
+    // added here since this slice needs them for its own create/validate/archive-filter tests).
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
+    // Registers the test-only ComponentActivity ui-test-junit4's createComposeRule launches into.
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
 // androidx.room:room-testing 2.8.4's own published module metadata declares a strict
@@ -139,6 +158,23 @@ dependencies {
 // (which added `typeParametersSerializers()`). Left unresolved, MigrationTestHelper crashes with
 // `AbstractMethodError` at runtime. Forcing the newer, backward-compatible core/json artifacts
 // resolves the mismatch; this is a Room 2.8.4 packaging gap, not an app-level version choice.
+//
+// Work unit 6a: ui-test-junit4 1.12.0 only *requires* (a soft minimum) espresso-core 3.5.0, whose
+// UiController reflects on `android.hardware.input.InputManager.getInstance()` — removed on the
+// connected Pixel 10 (API 37/"Android 17") — throwing `NoSuchMethodException` on every Compose
+// `performClick`/`performTextInput`, before it can inject anything. Forcing the latest cached
+// espresso-core/espresso-idling-resource/androidx.test:monitor resolves this; an androidx.test/API
+// 37 compatibility gap, not an app-level choice, matching the kotlinx-serialization force above.
+//
+// A note about running Compose UI tests on the physical Pixel 10: they need the **keyguard down**.
+// With it showing, the freshly-launched test Activity never resumes and every test fails with
+// `IllegalStateException: No compose hierarchies found in the app`, which reads like a Compose or
+// dependency problem and is not one. The device is PIN-protected, so `adb shell wm dismiss-keyguard`
+// cannot clear it — someone has to unlock it, and `adb shell svc power stayon usb` then keeps it
+// from re-locking while plugged in. Check `adb shell dumpsys window | rg isKeyguardShowing` before
+// diagnosing anything else. An earlier version of this comment recorded the failure as an
+// unexplained device/OS defect that had "ruled out doze/keyguard" and claimed it blocked every
+// Compose UI test in this change; that was wrong on both counts, and the tests pass unlocked.
 configurations.all {
     resolutionStrategy {
         force(
@@ -146,6 +182,9 @@ configurations.all {
             "org.jetbrains.kotlinx:kotlinx-serialization-core:1.8.1",
             "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.8.1",
             "org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1",
+            "androidx.test.espresso:espresso-core:3.7.0",
+            "androidx.test.espresso:espresso-idling-resource:3.7.0",
+            "androidx.test:monitor:1.8.0",
         )
     }
 }

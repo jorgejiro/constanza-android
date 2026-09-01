@@ -1,7 +1,6 @@
 package com.jjrapps.constanza.habit
 
 import android.content.Context
-import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jjrapps.constanza.core.data.AppDatabase
@@ -22,18 +21,17 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class HabitRepositoryDeleteSlotTest {
 
-    private lateinit var database: AppDatabase
-    private lateinit var repository: HabitRepository
+    private lateinit var fixture: HabitRepositoryTestFixture
+    private val database: AppDatabase get() = fixture.database
+    private val repository: HabitRepository get() = fixture.habitRepository
 
     @Before
     fun setUp() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
-        repository = HabitRepository(database, database.reminderSlotDao(), database.entryDao())
+        fixture = HabitRepositoryTestFixture(ApplicationProvider.getApplicationContext<Context>())
     }
 
     @After
-    fun tearDown() = database.close()
+    fun tearDown() = fixture.close()
 
     @Test
     fun deletingASlotRemovesItsEntriesInTheSameTransaction() = runBlocking {
