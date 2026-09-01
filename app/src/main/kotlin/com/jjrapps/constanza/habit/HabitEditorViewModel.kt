@@ -42,10 +42,14 @@ private const val MINUTES_PER_DAY = 24 * 60
  * field, keeping this class under detekt's `TooManyFunctions` threshold without losing per-field
  * type safety (each [ScheduleParamAction]/[SlotAction] variant still carries its own typed payload).
  *
- * The single configurable reminder time habit-scheduling requires for the other five kinds ("Every
- * other frequency kind MUST have exactly one configurable reminder time, not per-slot times") is
- * NOT built by this slice: no numbered task owns that editor, only `TIMES_PER_DAY`'s slot editor
- * (task 6a.1's explicit text). Flagged in the apply report rather than silently built or skipped.
+ * Task 6a.8 (habit-scheduling: "Every other frequency kind MUST have exactly one configurable
+ * reminder time, not per-slot times", now ratified as OPTIONAL): [HabitEditorUiState.slots] doubles
+ * as that single reminder time's storage for the five non-`TIMES_PER_DAY` kinds — 0 slots means no
+ * reminder, 1 means the configured time — reusing [onSlotAction]'s existing `Add`/`Remove`/`SetTime`
+ * rather than adding a parallel code path. [addSlot] caps those five kinds at one slot; `TIMES_PER_DAY`
+ * keeps its own multi-slot behaviour unchanged. No validation requires a slot to be present for any
+ * of the five kinds — the ratified decision is that a reminder-less habit MUST still save and stay
+ * trackable, never blocked.
  */
 @HiltViewModel
 class HabitEditorViewModel @Inject constructor(
@@ -64,13 +68,14 @@ class HabitEditorViewModel @Inject constructor(
         _uiState.value = HabitEditorUiState()
     }
 
-    /** habit-management: Habit Editing — loads the persisted habit, its [Schedule], and (for
-     *  `TIMES_PER_DAY`) its persisted [ReminderSlot]s into the form. */
+    /** habit-management: Habit Editing — loads the persisted habit, its [Schedule], and its
+     *  persisted [ReminderSlot]s into the form. Loaded unconditionally regardless of [schedule]'s
+     *  kind (task 6a.8): `TIMES_PER_DAY` may hold several, the other five kinds hold at most one. */
     fun startEdit(habitId: Long) {
         viewModelScope.launch {
             val habit = habitRepository.findById(habitId) ?: return@launch
             val schedule = habitRepository.findScheduleFor(habitId) ?: Schedule.Daily()
-            val slots = if (schedule is Schedule.TimesPerDay) habitRepository.findSlotsFor(habitId) else emptyList()
+            val slots = habitRepository.findSlotsFor(habitId)
             _uiState.value = HabitEditorUiState(
                 habitId = habit.id,
                 name = habit.name,
@@ -173,10 +178,13 @@ class HabitEditorViewModel @Inject constructor(
     }
 }
 
-/** habit-scheduling: Reminder Slots for TIMES_PER_DAY — a new, unsaved slot (`id = 0` sentinel,
- *  same convention as [Habit.id]) at a default morning time; a no-op outside `TIMES_PER_DAY`. */
+/** A new, unsaved slot (`id = 0` sentinel, same convention as [Habit.id]) at a default morning
+ *  time. `TIMES_PER_DAY` (habit-scheduling: Reminder Slots for TIMES_PER_DAY) allows any number;
+ *  every other kind allows at most one, since it is a single configurable reminder time, not a
+ *  slot list (task 6a.8) — a second `Add` while one already exists is a no-op, which is how the UI
+ *  (a switch, not a repeatable "Add time" button) already presents that limit. */
 private fun addSlot(state: HabitEditorUiState): HabitEditorUiState {
-    if (state.schedule !is Schedule.TimesPerDay) return state
+    if (state.schedule !is Schedule.TimesPerDay && state.slots.isNotEmpty()) return state
     val newSlot = ReminderSlot(
         id = 0L,
         habitId = state.habitId ?: 0L,
@@ -202,12 +210,16 @@ private fun defaultScheduleFor(kind: ScheduleKind, weekStart: DayOfWeek, today: 
 
 /** Extracted so [HabitEditorViewModel.onScheduleParamChange]'s `when` stays a plain dispatch —
  *  each of these six carries its own branch's cyclomatic cost instead of piling it all into one
- *  function (top-level, not a class member, so it does not count toward `TooManyFunctions` either). */
+ *  function (top-level, not a class member, so it does not count toward `TooManyFunctions` either).
+ *  Task 6a.8: the single reminder time carries over across a switch between two non-`TIMES_PER_DAY`
+ *  kinds (e.g. DAILY to WEEKLY) — it is the same concept in both. It is cleared entering or leaving
+ *  `TIMES_PER_DAY`, whose multi-slot editor has different semantics the single time cannot represent. */
 private fun applyKindChange(state: HabitEditorUiState, kind: ScheduleKind, today: LocalDate): HabitEditorUiState {
     val newSchedule = defaultScheduleFor(kind, state.schedule.weekStart, today)
+    val keepsSingleReminderTime = kind != ScheduleKind.TIMES_PER_DAY && state.schedule !is Schedule.TimesPerDay
     return state.copy(
         schedule = newSchedule,
-        slots = if (kind == ScheduleKind.TIMES_PER_DAY) state.slots else emptyList(),
+        slots = if (keepsSingleReminderTime) state.slots else emptyList(),
         anchorDateText = if (kind == ScheduleKind.EVERY_N_DAYS) today.toString() else "",
         slotsError = false,
         anchorDateError = false,

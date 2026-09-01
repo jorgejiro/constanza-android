@@ -45,12 +45,17 @@ data class HabitDaos @Inject constructor(
  * transaction; entries under the deleted slot are removed rather than reassigned to the `0`
  * sentinel, which would risk colliding with `UNIQUE(habitId, date, slotId)`.
  *
- * [create]/[update]'s `slots` parameter is task 6a.1's (slice ii-a) `TIMES_PER_DAY` slot editor
- * surface, reconciled by [syncSlots] inside the same transaction as the schedule write — a habit
- * switching away from `TIMES_PER_DAY` naturally arrives here with an empty list, which correctly
- * tears down its now-orphaned slots (habit-scheduling: Reminder Slots for TIMES_PER_DAY, "Every
- * other frequency kind MUST have exactly one configurable reminder time" — that single-slot editor
- * for the other five kinds is NOT built by this slice; see the apply report).
+ * [create]/[update]'s `slots` parameter is task 6a.1's `TIMES_PER_DAY` slot editor surface, and
+ * (task 6a.8) the single reminder time the other five kinds also round-trip through the same list,
+ * capped at one entry. [syncSlots] runs BEFORE [ScheduleEditor.updateSchedule] rather than after —
+ * that ordering matters, not just style: `updateSchedule` calls [OccurrencePlanner.replanAll]
+ * synchronously inside its own (composed) transaction, and `replanAll` reads `reminder_slots`
+ * directly off the database. Syncing the slots first means that read sees the just-written rows in
+ * the same write; syncing them after (this method's original order) left a brand-new habit's first
+ * replan seeing zero slots regardless of what [slots] contained, arming nothing until some later,
+ * unrelated write happened to trigger a second replan. A habit switching away from `TIMES_PER_DAY`
+ * naturally arrives here with an empty list, which correctly tears down its now-orphaned slots
+ * either way, since teardown order does not depend on replan visibility.
  */
 class HabitRepository @Inject constructor(
     private val daos: HabitDaos,
@@ -75,8 +80,8 @@ class HabitRepository @Inject constructor(
     suspend fun create(habit: Habit, schedule: Schedule, slots: List<ReminderSlot> = emptyList()): Long =
         database.withTransaction {
             val id = daos.habitDao.insert(habit.toEntity())
-            scheduleEditor.updateSchedule(id, schedule)
             syncSlots(id, slots)
+            scheduleEditor.updateSchedule(id, schedule)
             id
         }
 
@@ -84,8 +89,8 @@ class HabitRepository @Inject constructor(
     suspend fun update(habit: Habit, schedule: Schedule, slots: List<ReminderSlot> = emptyList()) {
         database.withTransaction {
             daos.habitDao.update(habit.toEntity())
-            scheduleEditor.updateSchedule(habit.id, schedule)
             syncSlots(habit.id, slots)
+            scheduleEditor.updateSchedule(habit.id, schedule)
         }
     }
 

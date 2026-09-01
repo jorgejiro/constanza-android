@@ -53,4 +53,9 @@
     <string name="habit_editor_slot_hour_label">Hour</string>
     <string name="habit_editor_slot_minute_label">Minute</string>
     <string name="habit_editor_slot_enabled_label">Enabled</string>
+
+    <!-- habit-scheduling: single optional reminder time for the five non-TIMES_PER_DAY kinds
+         (task 6a.8, ratified 2026-09-01). -->
+    <string name="habit_editor_reminder_time_switch">Remind me</string>
+    <string name="habit_editor_reminder_time_none">No reminder set. You can still track this habit in the app.</string>
 </resources>

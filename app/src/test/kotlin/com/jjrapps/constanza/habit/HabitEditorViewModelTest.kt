@@ -123,6 +123,7 @@ class HabitEditorViewModelTest {
         )
         coEvery { habitRepository.findById(EXISTING_HABIT_ID) } returns existing
         coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns Schedule.Weekly(DayOfWeek.TUESDAY)
+        coEvery { habitRepository.findSlotsFor(EXISTING_HABIT_ID) } returns emptyList()
         val viewModel = newViewModel()
 
         viewModel.startEdit(EXISTING_HABIT_ID)
@@ -148,6 +149,7 @@ class HabitEditorViewModelTest {
         )
         coEvery { habitRepository.findById(EXISTING_HABIT_ID) } returns existing
         coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns Schedule.Weekly(DayOfWeek.TUESDAY)
+        coEvery { habitRepository.findSlotsFor(EXISTING_HABIT_ID) } returns emptyList()
         coEvery { habitRepository.update(any(), any(), any()) } returns Unit
         val viewModel = newViewModel()
         viewModel.startEdit(EXISTING_HABIT_ID)
@@ -312,6 +314,83 @@ class HabitEditorViewModelTest {
         val viewModel = newViewModel()
         viewModel.onNameChange("Stretch")
         viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.TIMES_PER_DAY))
+        viewModel.onSlotAction(SlotAction.Add)
+
+        viewModel.save()
+
+        coVerify(exactly = 1) {
+            habitRepository.create(any(), any(), match { it.size == 1 && it.single().enabled })
+        }
+    }
+
+    // --- Task 6a.8: single optional reminder time for the five non-TIMES_PER_DAY kinds ---
+
+    @Test
+    fun `adding a reminder time to a DAILY habit adds exactly one slot`() = runTest {
+        val viewModel = newViewModel() // starts as DAILY, no reminder time
+
+        viewModel.onSlotAction(SlotAction.Add)
+
+        assertEquals(1, viewModel.uiState.value.slots.size)
+    }
+
+    @Test
+    fun `a second Add on a non-TIMES_PER_DAY kind is a no-op — only one reminder time is allowed`() = runTest {
+        val viewModel = newViewModel()
+        viewModel.onSlotAction(SlotAction.Add)
+
+        viewModel.onSlotAction(SlotAction.Add)
+
+        assertEquals(1, viewModel.uiState.value.slots.size)
+    }
+
+    @Test
+    fun `removing the reminder time returns the habit to no reminder`() = runTest {
+        val viewModel = newViewModel()
+        viewModel.onSlotAction(SlotAction.Add)
+
+        viewModel.onSlotAction(SlotAction.Remove(0))
+
+        assertTrue(viewModel.uiState.value.slots.isEmpty())
+    }
+
+    @Test
+    fun `the reminder time survives switching between two non-TIMES_PER_DAY kinds`() = runTest {
+        val viewModel = newViewModel()
+        viewModel.onSlotAction(SlotAction.Add)
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.WEEKLY))
+
+        assertEquals(1, viewModel.uiState.value.slots.size)
+    }
+
+    @Test
+    fun `the reminder time is cleared when switching into or out of TIMES_PER_DAY`() = runTest {
+        val viewModel = newViewModel()
+        viewModel.onSlotAction(SlotAction.Add)
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.TIMES_PER_DAY))
+
+        assertTrue(viewModel.uiState.value.slots.isEmpty())
+    }
+
+    @Test
+    fun `save is never blocked by a missing reminder time — the habit is accepted with none armed`() = runTest {
+        coEvery { habitRepository.create(any(), any(), any()) } returns 1L
+        val viewModel = newViewModel()
+        viewModel.onNameChange("Meditate") // DAILY, no reminder time set
+
+        viewModel.save()
+
+        assertFalse(viewModel.uiState.value.nameError)
+        coVerify(exactly = 1) { habitRepository.create(any(), any(), emptyList()) }
+    }
+
+    @Test
+    fun `a habit saved with a reminder time passes that single slot through to the repository`() = runTest {
+        coEvery { habitRepository.create(any(), any(), any()) } returns 1L
+        val viewModel = newViewModel()
+        viewModel.onNameChange("Meditate")
         viewModel.onSlotAction(SlotAction.Add)
 
         viewModel.save()
