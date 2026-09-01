@@ -556,6 +556,22 @@ pushed past, per the same instruction that converted unit 6a's overshoots into d
       (design.md §8.1), "one row, right slot" IS the slot-independence assertion. Passed on the
       connected Pixel 10 (API 37), keyguard confirmed down first.
 - [ ] 6b.8 [Compose UI test] Render the today screen at `sw = 600dp` with a multi-slot habit due; verify no clipping/overlap.
+- [ ] 6b.9 **Slice ii. Added 2026-09-01 — the exact-alarm banner, finally given a number.** §13.1's
+      failure table and §12 both promise a non-blocking banner explaining that reminders may arrive late,
+      with one tap to `ACTION_REQUEST_SCHEDULE_EXACT_ALARM`. Task G.5 deferred it to work unit 6b, and no
+      task in 6b.1–6b.8 ever owned it. It surfaces when `canScheduleExactAlarms()` is false — the default
+      on a fresh install targeting API 33+, so this is the common path, not an edge case. Non-blocking:
+      reminders still work, degraded to a ten-minute inexact window (design §13.4's measurement).
+      **Eighth instance of the unowned-promise pattern** — and the second caught before shipping rather
+      than after, because the implementer flagged it instead of absorbing it.
+- [ ] 6b.10 **Slice ii. Added 2026-09-01 — decide `rollupDay`'s classification precedence.** Today a
+      missed slot outranks partial completion, which outranks a fully-pending day. No spec mandates that
+      order; it is `DayRollup.kt`'s own assumption, and it was harmless while invisible. **OA-2's ratified
+      collapsed row makes it the single word a user reads for a whole day**, so a three-slot day with two
+      completions and one miss reads `ANY_MISSED` rather than `PARTIAL`. That is a product choice about
+      whether the row leads with the failure or the progress. Decide it deliberately, amend
+      `habit-entry-tracking` with the answer, and update `DayRollup.kt`'s KDoc — which currently records
+      the open question rather than pretending OA-2 settled it.
 
 **Flagged — eighth unowned-promise instance (see design.md §13.4, learning obs #35):**
 design.md §12/§1298 name a non-blocking "reminders may arrive late" banner with one tap to
