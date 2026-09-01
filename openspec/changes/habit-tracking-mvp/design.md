@@ -1320,6 +1320,40 @@ only via a developer-only forced run, so not demonstrably user-reachable; and on
 `Worker result FAILURE` was seen after reboot but the logcat buffer rotated before it could be
 attributed, so it is recorded as unattributed rather than assigned to this app.
 
+#### Addendum 2026-09-01 — unowned-promise pattern, ninth instance, and the first found by a
+full-change verification rather than by an implementer
+
+`habit-management`'s Habit Archiving requirement promises an archived habit "MUST be excluded from
+streak and compliance calculations for any date on or after the archive date." `:domain`'s
+`StreakCalculator`/`ComplianceCalculator` correctly take no archive parameter (they stay pure
+functions of schedule and entries, exactly as designed) — but no task ever assigned the archive
+boundary to the one layer that could enforce it, `ProgressViewModel`. `HabitRepository.setArchived`
+wires the reminder half correctly (`replanAll()` cancels every armed occurrence); the calculation
+half had no expression anywhere. The behaviour read correct by accident: `dailyRatio` only counts
+`COMPLETED`/`MISSED`, so a post-archive day with no entry drops out of the denominator on its own,
+and archiving stops the midnight sweep from ever writing one. The boundary genuinely leaked,
+though — an entry dated on or after `archivedAt` arriving from another source (an import, or an
+answer given the same day just before archiving) counted anyway, and an `N_TIMES_PER_WEEK`
+schedule's current streak would have silently zeroed rather than frozen, since an entry-less week
+after archiving reads as a missed quota, not a neutral gap.
+
+Same class as all eight prior instances: a normative promise with no numbered task owner, invisible
+because every existing test happened to exercise only the paths where the accidental correctness
+held. **Different in one respect worth recording**: the first eight were each found either as a
+production defect or by an implementer flagging a gap mid-task; this one was caught by a
+full-change `sdd-verify` pass reading the requirement against the code, with nothing yet broken in
+production. That is evidence the verification step earns its cost, not just process overhead.
+
+**Fixed** in `fix/archived-habit-progress-exclusion`: `ProgressViewModel.buildState` now filters
+entries dated on or after `archivedAt` before either calculator sees them, and clamps `today` to
+`archivedAt.minusDays(1)` so the compliance window and the streak walk's upper bound cannot extend
+past the archive date either — freezing current streak at its value the moment the habit was
+archived, leaving best streak numerically unaffected (no entry exists after that date to extend
+it), and keeping the compliance window anchored to the pre-archive history rather than sliding past
+it. `:domain` is untouched. Covered by `ProgressViewModelTest.kt`, including the spec's own
+scenario pinned near-verbatim and the on/after-boundary case the spec's "on or after" wording makes
+explicit.
+
 #### Deferred, with reasons
 
 - **Large screen (C1), orientation (C1), soft keyboard (C4)** — all three need the today screen and

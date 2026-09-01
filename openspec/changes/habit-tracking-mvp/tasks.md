@@ -550,11 +550,15 @@ pushed past, per the same instruction that converted unit 6a's overshoots into d
       new per-habit "Progress" action (no navigation library, task 6a's own decision — a fourth leaf
       screen the same shape as `HabitEditor`). Neither calculator is reimplemented; the ViewModel only
       supplies the `Entry` history (new `EntryDao.observeByHabitId`, reactive) and the `Schedule` both
-      already read. **Test debt carried, not silently dropped** (crossed the ~600-line stop instruction
-      before writing it): a dedicated streak/compliance rendering test for `ProgressViewModel`/
-      `ProgressUiState` — the calculators themselves are already covered at `:domain` level
-      (`StreakCalculatorTest`/`ComplianceCalculatorTest`), so this gap is the UI-layer wiring only, not
-      the arithmetic.
+      already read. **Test debt closed 2026-09-01**, in the archive-exclusion fix
+      (`fix/archived-habit-progress-exclusion`, see the habit-management amendment below): a
+      dedicated streak/compliance rendering test for `ProgressViewModel`/`ProgressUiState` was
+      carried here — the calculators themselves were already covered at `:domain` level
+      (`StreakCalculatorTest`/`ComplianceCalculatorTest`), so the gap was UI-layer wiring only, not
+      the arithmetic. `ProgressViewModelTest.kt` now exercises that exact wiring end to end (mocked
+      `HabitRepository`/`EntryDao`/`TimeProvider` through `uiState`, asserting `complianceRatio` and
+      `currentStreak`), added while closing a CRITICAL full-change verification finding that the
+      same ViewModel was also missing the Habit Archiving exclusion rule.
 - [x] 6b.5 Implement the snooze-default setting screen bound to the DataStore entry from 5.6 (reminder-response: Snooze Configuration and Re-arm).
       **Done:** `reminding/SnoozeSettingsViewModel.kt`/`SnoozeSettingsScreen.kt`, reached from Today's
       new "Settings" action. Reads/writes `ReminderSettingsStore.snoozeDuration`/`setSnoozeDuration`
