@@ -746,7 +746,7 @@ MVP scope (**OA-1**).
 | Settings | Included, because a backup that loses the user's snooze default is not a backup. |
 | `value` | Present and `null` from day one — the point of §8.3. |
 | Forward compatibility | Unknown fields are ignored on import. A `formatVersion` higher than supported **refuses the whole import** with a clear message rather than importing partially. |
-| Import semantics (**OA-5**) | **Replace-all inside a single Room transaction**, behind an explicit confirmation. Merging would be conflict resolution, which ratified decision 6 forbids designing. IDs are reassigned on import and `slotId` references remapped through an in-memory old→new map. The spec flags merge-vs-replace as an open product question; this is the design's recommendation, not a ruling. |
+| Import semantics (**OA-5**) | **Replace-all inside a single Room transaction**, behind an explicit confirmation. Merging would be conflict resolution, which ratified decision 6 forbids designing. IDs are reassigned on import and `slotId` references remapped through an in-memory old→new map. **Ratified by the user 2026-09-01** — this row previously called itself "the design's recommendation, not a ruling" and said the spec flagged merge-vs-replace as an open product question. Neither is true any more: `data-portability` states replace-all, the confirmation, and atomicity as **MUST**s, and OA-5 is settled (§1). |
 | Post-import | Cancel all alarms, truncate `reminder_occurrences`, re-plan from scratch. |
 | Validation order | Parse and validate the **entire** file before touching the database. A malformed backup must never leave the user with neither their old data nor the new. |
 
