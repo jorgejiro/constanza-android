@@ -166,11 +166,15 @@ dependencies {
 // espresso-core/espresso-idling-resource/androidx.test:monitor resolves this; an androidx.test/API
 // 37 compatibility gap, not an app-level choice, matching the kotlinx-serialization force above.
 //
-// UNRESOLVED, left for the next session: even with this fix, every Compose UI test on this exact
-// device/OS build fails with "No compose hierarchies found" — the freshly-launched test Activity
-// transits RESUMED -> PAUSED -> STOPPED within ~20ms of every launch. Ruled out: doze/keyguard,
-// zeroed animation scale, stale recent tasks, and both the v1/v2 `createComposeRule` APIs. Blocks
-// every Compose UI test task in this change (6a.6/6a.7, 6b's), not only this slice's two.
+// A note about running Compose UI tests on the physical Pixel 10: they need the **keyguard down**.
+// With it showing, the freshly-launched test Activity never resumes and every test fails with
+// `IllegalStateException: No compose hierarchies found in the app`, which reads like a Compose or
+// dependency problem and is not one. The device is PIN-protected, so `adb shell wm dismiss-keyguard`
+// cannot clear it — someone has to unlock it, and `adb shell svc power stayon usb` then keeps it
+// from re-locking while plugged in. Check `adb shell dumpsys window | rg isKeyguardShowing` before
+// diagnosing anything else. An earlier version of this comment recorded the failure as an
+// unexplained device/OS defect that had "ruled out doze/keyguard" and claimed it blocked every
+// Compose UI test in this change; that was wrong on both counts, and the tests pass unlocked.
 configurations.all {
     resolutionStrategy {
         force(
