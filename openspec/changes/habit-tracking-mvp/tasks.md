@@ -449,10 +449,10 @@ verification).
 - [x] 6a.2 Enforce name-required validation blocking save (habit-management: Creation requires a name). Blank AND whitespace-only names are both rejected.
 - [x] 6a.3 Wire schedule-edit save to the `HabitRepository` transaction that triggers `replanAll()` (habit-management: Editing reschedules reminders — depends on 4a.5). **Corrected:** that transaction is `ScheduleEditor`'s (task 4a.5), not a second one in `HabitRepository` — `HabitRepository.create`/`update` delegate to `ScheduleEditor.updateSchedule`, composing Room transactions rather than duplicating the replan wiring.
 - [x] 6a.4 Implement archive/un-archive and a habit list with an archived filter (habit-management: Habit Archiving, Un-archiving does not back-fill).
-- [ ] 6a.5 **Slice ii-b.** Apply single responsive layout (no dedicated tablet layout) to the editor; verify at `sw >= 600dp` and both orientations, re-requesting IME visibility explicitly after rotation (ui-adaptive-layout: Minimal Adaptive Resilience, Soft Keyboard Visibility).
-- [ ] 6a.6 **Slice ii-b (moved from ii-a — budget stop).** [Compose UI test] Create each of the six schedule kinds; verify the persisted `Habit` + `Schedule`. Production code and ViewModel unit tests for all six kinds landed in ii-a (measured ~792 changed lines at the ~650 stop point, before this task's own Compose UI ceremony); the instrumented proof itself did not fit inside the same batch.
-- [ ] 6a.7 **Slice ii-b.** [Compose UI test] Rotate the editor mid-input; verify no content loss.
-- [ ] 6a.8 **Slice ii-b. Added 2026-09-01 — the single configurable reminder time for the five
+- [x] 6a.5 **Slice ii-b.** Apply single responsive layout (no dedicated tablet layout) to the editor; verify at `sw >= 600dp` and both orientations, re-requesting IME visibility explicitly after rotation (ui-adaptive-layout: Minimal Adaptive Resilience, Soft Keyboard Visibility). **Done:** the editor already used no fixed widths/orientation; verified on-device via `wm size 800dpx1280dp` at both orientations — no clipping/overlap (screenshots). Added `EditorNameField`'s explicit IME re-request (`rememberSaveable` focus flag + `FocusRequester.requestFocus()` + `LocalSoftwareKeyboardController.show()` on the fresh composition), since C4 confirmed Android 17 does not restore it. **Found and fixed two real content-loss bugs while verifying, both pinned by 6a.7's test and confirmed on-device**: (1) `MainActivity`'s `ConstanzaRoute` navigation state used plain `remember`, not `rememberSaveable` — a rotation bounced the app back to the habit list, losing the in-progress edit entirely; made `ConstanzaRoute : java.io.Serializable` and switched to `rememberSaveable`. (2) `HabitEditorRoute`'s `LaunchedEffect(habitId)` re-ran `startCreate()`/`startEdit()` on every fresh composition (including a config-change rebuild), wiping the ViewModel's in-progress state even though the ViewModel instance itself survives rotation; added a `hasInitialized` `rememberSaveable(habitId)` guard so it only (re)initializes on a genuine navigation, not a same-habit config change.
+- [x] 6a.6 **Slice ii-b (moved from ii-a — budget stop).** [Compose UI test] Create each of the six schedule kinds; verify the persisted `Habit` + `Schedule`. Production code and ViewModel unit tests for all six kinds landed in ii-a (measured ~792 changed lines at the ~650 stop point, before this task's own Compose UI ceremony); the instrumented proof itself did not fit inside the same batch. **Done:** `HabitScheduleKindComposeTest` — one method per kind (six of something structurally similar is this change's own recurring multiplier signal), all six create through the real editor UI and assert the persisted `Habit` name + `Schedule.kind`.
+- [x] 6a.7 **Slice ii-b.** [Compose UI test] Rotate the editor mid-input; verify no content loss. **Done:** `HabitEditorRotationComposeTest` uses `StateRestorationTester.emulateSavedInstanceStateRestore()` rather than a real `requestedOrientation` flip — a real device rotation destroyed and recreated the bare test-host `ComponentActivity` with nothing re-attaching the previously-set composable content (confirmed on-device: "No compose hierarchies found in the app"), an artifact of this manually-constructed non-Hilt test `ViewModel`, not of the production screen. `StateRestorationTester` is the documented, idiomatic tool for exactly this: it disposes/reconstructs the composition the same way a real configuration change does, without needing an Activity relaunch. Additionally verified with a REAL device rotation of the running app (typed text, rotated portrait→landscape→portrait): the app stayed on the editor screen with the typed name intact, confirming both content-loss fixes recorded under 6a.5 together in production, not just in the simulated test.
+- [x] 6a.8 **Slice ii-b. Added 2026-09-01 — the single configurable reminder time for the five
       non-`TIMES_PER_DAY` kinds.** `habit-scheduling` requires it — "Every other frequency kind MUST
       have exactly one configurable reminder time, not per-slot times" — and no numbered task owned
       it, so the ii-a editor cannot set one. `OccurrencePlanner` returns early when a habit has no
@@ -472,6 +472,18 @@ verification).
       surface, and this). The first four each shipped a dead or hollow path that was found late and by
       accident; this one was caught before merge because the implementer flagged it instead of
       absorbing it. See design.md §13.4.
+      **Done:** ratified by the user 2026-09-01 (see habit-scheduling spec amendment) — the single
+      time is OPTIONAL, never blocks save, persisted as the habit's one enabled `ReminderSlot` (no
+      time = no slot, reusing the existing `SlotAction.Add`/`Remove`, capped at one entry outside
+      `TIMES_PER_DAY`). Legibility: a `Switch` labelled "Remind me" IS the has-a-time/has-no-time
+      affordance — off shows "No reminder set. You can still track this habit in the app." instead of
+      a disabled/blank time field a user could mistake for "not set yet". Found and fixed a real
+      ordering bug while adding the repository-level "arms an occurrence" test: `HabitRepository.
+      create`/`update` called `ScheduleEditor.updateSchedule` (which replans synchronously) BEFORE
+      `syncSlots` wrote the passed slots, so a brand-new habit's first replan always saw zero slots
+      regardless of what was passed — latent since ii-a's `TIMES_PER_DAY` slot editor, never
+      previously exercised end-to-end. Reordered `syncSlots` before the schedule write (Room composes
+      the nested transaction, so the replan reads its own just-written rows).
 
 ## Phase 6b: Today Screen, Progress & Settings UI (Work Unit 6b) — depends on 3, 5
 
