@@ -8,4 +8,23 @@
     <string name="notification_action_no">No</string>
     <string name="notification_action_snooze">Snooze</string>
     <string name="notification_default_question">Did you do it?</string>
+
+    <!-- habit-management: Habit list (task 6a.4). -->
+    <string name="habit_list_title">Habits</string>
+    <string name="habit_list_add_habit">Add habit</string>
+    <string name="habit_list_show_archived">Show archived</string>
+    <string name="habit_list_empty_active">No habits yet. Tap + to add one.</string>
+    <string name="habit_list_empty_archived">No archived habits.</string>
+    <string name="habit_list_archive">Archive</string>
+    <string name="habit_list_unarchive">Un-archive</string>
+
+    <!-- habit-management: Habit editor (tasks 6a.1, 6a.2, 6a.3). -->
+    <string name="habit_editor_title_create">New habit</string>
+    <string name="habit_editor_title_edit">Edit habit</string>
+    <string name="habit_editor_name_label">Name</string>
+    <string name="habit_editor_name_error">A name is required</string>
+    <string name="habit_editor_question_label">Guiding question (optional)</string>
+    <string name="habit_editor_notes_label">Notes (optional)</string>
+    <string name="habit_editor_color_label">Colour</string>
+    <string name="habit_editor_save">Save</string>
 </resources>
