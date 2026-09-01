@@ -347,9 +347,38 @@ The gate itself is discharged. These follow-ups come out of it and need decision
       Covered by `WorkSchedulerTest` (4 instrumented tests, including the two-cold-start regression
       read back through `WorkInfo.nextScheduleTimeMillis`) and `MidnightAnchorTest` (5 unit tests over
       the anchor arithmetic, DST both ways).
-- [ ] G.5 Decide whether an exact-alarm revoke should re-plan instead of waiting out the hourly net
+- [x] G.5 Decide whether an exact-alarm revoke should re-plan instead of waiting out the hourly net
       (§13.4 finding 3). Delivery is "late, not lost" as designed, but nothing re-arms on app open, so
       every reminder after a revoke rests entirely on the reconcile period.
+      **Decided: re-plan.** Not a new design choice — the design had already said so in three places
+      and none of it had been implemented: §5.5's "`canScheduleExactAlarms()` before **every**
+      scheduling call, plus the state-changed receiver, plus an `onResume()` re-check"; §5.5's
+      "recovery after any platform-initiated cancellation is a query, not a guess"; and §13.1's
+      failure table, which names the same `onResume()` re-check. Waiting out the net would have left
+      every reminder after a revoke up to a full reconcile period late, **every day**, until a reboot,
+      timezone change, app update or schedule edit happened to re-plan.
+      Two changes, both routed through machinery that already existed. `OccurrenceResolver.reconcile()`
+      now re-arms a **future** `ARMED` occurrence at its own instant — it re-armed past-due ones only,
+      so persisted state was not actually the recomputable source of truth §5.5 claims. And
+      `MainActivity` registers `ReplanOnResumeObserver`, a `DefaultLifecycleObserver` that sends
+      `ON_RESUME` through the same idempotent `OccurrencePlanner.replanAll()` all five broadcast
+      triggers use (§9.3); no permission branch is written, because `AlarmScheduler.schedule()`
+      re-checks `canScheduleExactAlarms()` on every call and so upgrades or degrades each occurrence as
+      a side effect of re-planning it. The re-arm also persists the mode it got, so a row cannot keep
+      claiming `exact = 1` for an alarm that is now an inexact window.
+      **The re-arm is strictly `state == ARMED && scheduledAt > now`, and the tests pin that.**
+      `findUnresolved()` returns `ARMED`, `FIRED` and `SNOOZED`, and §8.2's `PendingIntent` request
+      code is `occurrence.id`, shared by an occurrence's own alarm and its snooze alarm — so re-arming
+      a `SNOOZED` row at its original `scheduledAt` would overwrite the pending snooze and fire at the
+      wrong time, and a `FIRED` row already reached the user and is awaiting an answer. Covered by
+      `aFutureArmedOccurrenceIsReArmedAtItsOriginalInstant` (which fails against the previous
+      `reconcile()`: `schedule(eq(1), eq(1788321600000)) was not called`),
+      `aLiveSnoozeIsNeverReArmedAndItsSnoozeAlarmIsLeftIntact`,
+      `aFiredOccurrenceAwaitingAnAnswerIsNotReArmed`, and `ReplanOnResumeObserverTest`'s two tests,
+      which drive a real `LifecycleRegistry` rather than calling `onResume()` directly.
+      **Still deferred to work unit 6b:** §13.1's non-blocking banner explaining that reminders may
+      arrive late, with one tap to `ACTION_REQUEST_SCHEDULE_EXACT_ALARM`. That row of §13.1 is UI and
+      this screen has none yet; it is named in `MainActivity`'s KDoc so it cannot be silently dropped.
 - [ ] G.6 Name the reboot-to-first-unlock blind window in §9.3 (§13.4 finding 4). Zero alarms are armed
       in that window and it is the correct consequence of reading Room from credential-encrypted
       storage — but the design should say so rather than leave it implicit.

@@ -43,7 +43,26 @@ class OccurrenceResolver @Inject constructor(
      * design.md §5.5/§11 (reminder-delivery: Missed-Reminder Sweep) and D3's abandonment layers 2-3
      * (habit-entry-tracking: Abandoned Snooze Resolution): the hard `resolveDeadline` wins first and
      * force-resolves regardless of state; otherwise a `SNOOZED` chain past grace force-resolves;
-     * otherwise an `ARMED` occurrence whose alarm should already have fired is re-armed for now.
+     * otherwise an `ARMED` occurrence whose alarm should already have fired is re-armed for now;
+     * otherwise an `ARMED` occurrence still in the future is re-armed at its own instant.
+     *
+     * That last branch is what makes §5.5's "occurrence state is persisted, so 'which alarms should
+     * exist' is always recomputable from the database — recovery after any platform-initiated
+     * cancellation is a query, not a guess" true rather than aspirational (§13.4 finding 3, task
+     * G.5). Revoking `SCHEDULE_EXACT_ALARM` makes the platform cancel every alarm this app owns and
+     * stop its process, and `ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED` is documented as
+     * firing on **grant only**, so nothing tells the app it happened. Without this branch every
+     * future occurrence stayed `ARMED` with no alarm behind it and was delivered only once the
+     * branch above noticed it was overdue — late, not lost, but late every day until some other
+     * trigger happened to re-plan.
+     *
+     * **The condition is deliberately `ARMED` AND future, and must stay exactly that.** design.md
+     * §8.2: `occurrence.id` IS the `PendingIntent` request code, shared by the occurrence's own
+     * alarm and its snooze alarm, so re-arming a `SNOOZED` row at its original
+     * `scheduledAtEpochMs` would overwrite the pending snooze and fire the reminder at the wrong
+     * time. A `FIRED` row already reached the user and is waiting for an answer, so re-arming it
+     * would post the same reminder twice. `findUnresolved()` returns all three states; exactly one
+     * of them may be re-armed.
      */
     suspend fun reconcile(now: Instant) {
         for (occ in daos.reminderOccurrenceDao.findUnresolved()) {
@@ -52,8 +71,8 @@ class OccurrenceResolver @Inject constructor(
             when {
                 !hardDeadline.isAfter(now) -> forceResolve(occ, now)
                 isGraceExpired(occ, now) -> forceResolve(occ, now)
-                occ.state == STATE_ARMED && scheduledAt.isBefore(now) ->
-                    alarmScheduler.schedule(occ.id, now.toEpochMilli())
+                occ.state == STATE_ARMED && scheduledAt.isBefore(now) -> reArm(occ, now.toEpochMilli())
+                occ.state == STATE_ARMED -> reArm(occ, occ.scheduledAtEpochMs)
                 else -> Unit
             }
         }
@@ -90,6 +109,14 @@ class OccurrenceResolver @Inject constructor(
         if (occ.state != STATE_SNOOZED || occ.snoozeUntilEpochMs == null) return false
         val grace = now.minusSeconds(reconcilePeriodHours * SECONDS_PER_HOUR)
         return Instant.ofEpochMilli(occ.snoozeUntilEpochMs).isBefore(grace)
+    }
+
+    /** Arms [occ]'s alarm for [atEpochMilli] and persists the mode it actually got. Recording the
+     *  degrade is the point: after an exact-alarm revoke the row would otherwise keep claiming
+     *  `exact = 1` for an alarm that is now an inexact window (design.md §11, §13.4 finding 3). */
+    private suspend fun reArm(occ: ReminderOccurrenceEntity, atEpochMilli: Long) {
+        val exact = alarmScheduler.schedule(occ.id, atEpochMilli)
+        daos.reminderOccurrenceDao.updateExact(occ.id, exact)
     }
 
     private suspend fun forceResolve(occ: ReminderOccurrenceEntity, now: Instant) {

@@ -1180,6 +1180,52 @@ alarms are `Pending alarms per uid: [… <uid>:N]`, and live notifications are
    `reconcile()` re-arms only `STATE_ARMED && scheduledAt < now`. Opening the app does not re-arm:
    verified twice with zero pending alarms and both periodic jobs healthy. Delivery is "late, not
    lost" as §5.5 promises, with the whole burden on the hourly net.
+
+   **Resolved 2026-09-01 while discharging task G.5: re-plan, do not wait out the net.** This was
+   never an open design question — §5.5 already promised "`canScheduleExactAlarms()` before **every**
+   scheduling call, plus the state-changed receiver, plus an `onResume()` re-check", already promised
+   that "recovery after any platform-initiated cancellation is a query, not a guess", and §13.1's
+   failure table already named the same `onResume()` re-check. What was missing was the code.
+
+   Two changes, both reusing machinery that already existed rather than adding a path:
+
+   - `OccurrenceResolver.reconcile()` gained the future case: an `ARMED` occurrence whose
+     `scheduledAt` has **not** passed is re-armed at its own instant. Until this, "which alarms
+     should exist is always recomputable from the database" was true of the schema and false of the
+     code — only past-due occurrences were recovered. `AlarmScheduler.schedule()` re-checks
+     `canScheduleExactAlarms()` on every call, so the same branch recovers correctly whether or not
+     the permission has come back, and the re-arm now persists the mode it actually got instead of
+     leaving the row claiming `exact = 1` for an inexact window (finding 1's class of stale claim).
+   - `MainActivity` registers `ReplanOnResumeObserver`, which sends `ON_RESUME` through
+     `OccurrencePlanner.replanAll()` — the same idempotent entry point all five §9.3 triggers use.
+     `ON_RESUME` rather than `ON_START`/`ON_CREATE` because returning from the system's exact-alarm
+     settings screen resumes the Activity without recreating it. No permission branch is written
+     here, exactly as `ExactAlarmPermissionReceiver` writes none.
+
+   **The re-arm condition is deliberately narrow: `state == ARMED` AND future.** `findUnresolved()`
+   also returns `FIRED` and `SNOOZED`, and §8.2's `PendingIntent` request code is `occurrence.id`,
+   shared by an occurrence's own alarm and its snooze alarm. Re-arming a `SNOOZED` row at its
+   original `scheduledAt` would therefore overwrite the pending snooze alarm and fire the reminder at
+   the wrong time; a `FIRED` row already reached the user and is waiting for an answer. Both
+   exclusions are pinned by tests, not by comments
+   (`aLiveSnoozeIsNeverReArmedAndItsSnoozeAlarmIsLeftIntact`,
+   `aFiredOccurrenceAwaitingAnAnswerIsNotReArmed`), and the defect itself is pinned by
+   `aFutureArmedOccurrenceIsReArmedAtItsOriginalInstant`, which fails against the previous
+   `reconcile()` (`schedule(eq(1), eq(1788321600000)) was not called`) and passes after it.
+
+   **§13.1's banner stays deferred to work unit 6b** — the non-blocking "reminders may arrive late"
+   message with one tap to `ACTION_REQUEST_SCHEDULE_EXACT_ALARM` is UI, and `MainActivity` still
+   renders nothing. It is named in that class's KDoc so the deferral is visible in the code, not only
+   here.
+
+   **Worth naming as a pattern, because this is now three for three.** §5.5's `onResume()` re-check
+   was promised in two sections and owned by no numbered task, so nothing ever built it. That is the
+   same class of gap as §9.1's fire-time wiring, which the design assigned to work unit 5 while no
+   task owned it (added later as task 5.9, after slice i shipped a notification poster nothing
+   called), and as `ActionReceiver` being implemented but never declared in the manifest (commit
+   `b78075b`, PR #14). All three were silent: the build was green, every task was ticked, and a
+   promise in prose had no owner. Any future task list for this change should be checked against
+   §5.5, §9.1 and §13.1 promise by promise, not against its own numbering.
 4. **Between a reboot and the first unlock there are zero armed alarms.** `AlarmManager` alarms do not
    survive a reboot and `BootReceiver` waits for `BOOT_COMPLETED`, which the platform withholds until
    the user unlocks (`Started users state: [0=RUNNING_LOCKED]`, and the app's data directory is not

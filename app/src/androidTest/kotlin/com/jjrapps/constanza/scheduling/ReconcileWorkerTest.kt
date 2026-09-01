@@ -14,6 +14,7 @@ import com.jjrapps.constanza.core.data.AppDatabase
 import com.jjrapps.constanza.core.data.entity.HabitEntity
 import com.jjrapps.constanza.core.data.entity.ReminderOccurrenceEntity
 import com.jjrapps.constanza.core.data.entity.ScheduleEntity
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.runBlocking
@@ -101,6 +102,83 @@ class ReconcileWorkerTest {
         verify { alarmScheduler.schedule(occId, now.toEpochMilli()) }
         assertTrue(database.entryDao().findByHabitId(habitId).isEmpty())
         assertEquals("ARMED", database.reminderOccurrenceDao().findById(occId)?.state)
+    }
+
+    /**
+     * design.md §5.5 ("Occurrence state is persisted, so 'which alarms should exist' is always
+     * recomputable from the database | Recovery after any platform-initiated cancellation is a
+     * query, not a guess") and §13.4 finding 3, task G.5.
+     *
+     * A `SCHEDULE_EXACT_ALARM` revoke makes the platform cancel every alarm this app owns, and no
+     * broadcast announces it — `ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED` is
+     * grant-only. The row is still `ARMED` and still in the future, so the reconcile pass must
+     * re-arm it at its ORIGINAL instant instead of waiting for that instant to pass and then
+     * delivering late. Before task G.5 this test failed: `reconcile()` re-armed past-due
+     * occurrences only.
+     */
+    @Test
+    fun aFutureArmedOccurrenceIsReArmedAtItsOriginalInstant() = runBlocking {
+        val habitId = insertHabit()
+        val scheduledAt = now.plusSeconds(3 * HOUR_SECONDS)
+        every { alarmScheduler.schedule(any(), any()) } returns false
+        val occId = database.reminderOccurrenceDao().upsert(
+            occurrence(habitId, "2026-09-02", scheduledAt.toEpochMilli(), "ARMED"),
+        )
+
+        buildWorker().doWork()
+
+        verify { alarmScheduler.schedule(occId, scheduledAt.toEpochMilli()) }
+        verify(exactly = 0) { alarmScheduler.cancel(any()) }
+        val stored = database.reminderOccurrenceDao().findById(occId)
+        assertEquals("ARMED", stored?.state)
+        // The re-arm records the mode it actually got, so a row cannot keep claiming `exact` after
+        // the permission it depended on was revoked (the §13.4 finding 1 class of stale claim).
+        assertEquals(false, stored?.exact)
+        assertTrue(database.entryDao().findByHabitId(habitId).isEmpty())
+    }
+
+    /**
+     * **The trap the re-arm above must never fall into.** design.md §8.2: the alarm
+     * `PendingIntent` request code IS `occurrence.id`, with no second id scheme — so the
+     * occurrence's own alarm and its snooze alarm share one request code. Re-arming a `SNOOZED` row
+     * at its original `scheduledAt` would OVERWRITE the pending snooze alarm and fire the reminder
+     * at the wrong time, silently undoing the user's snooze. The re-arm condition is
+     * `state == ARMED && scheduledAt > now` and must stay exactly that; widening it to an `else`
+     * branch fails here.
+     */
+    @Test
+    fun aLiveSnoozeIsNeverReArmedAndItsSnoozeAlarmIsLeftIntact() = runBlocking {
+        val habitId = insertHabit()
+        val occ = occurrence(habitId, "2026-09-02", now.minusSeconds(HOUR_SECONDS).toEpochMilli(), "SNOOZED")
+            .copy(snoozeUntilEpochMs = now.plusSeconds(20 * MINUTE_SECONDS).toEpochMilli(), snoozeCount = 1)
+        val occId = database.reminderOccurrenceDao().upsert(occ)
+
+        buildWorker().doWork()
+
+        verify(exactly = 0) { alarmScheduler.schedule(any(), any()) }
+        verify(exactly = 0) { alarmScheduler.cancel(any()) }
+        val stored = database.reminderOccurrenceDao().findById(occId)
+        assertEquals("SNOOZED", stored?.state)
+        assertEquals(now.plusSeconds(20 * MINUTE_SECONDS).toEpochMilli(), stored?.snoozeUntilEpochMs)
+        assertTrue(database.entryDao().findByHabitId(habitId).isEmpty())
+    }
+
+    /** A `FIRED` occurrence already reached the user and is waiting for an answer (design.md
+     *  §9.1): re-arming it would post the same reminder twice, so it is left alone until it is
+     *  answered, snoozed, or hits its resolve deadline. */
+    @Test
+    fun aFiredOccurrenceAwaitingAnAnswerIsNotReArmed() = runBlocking {
+        val habitId = insertHabit()
+        val occ = occurrence(habitId, "2026-09-02", now.minusSeconds(30 * MINUTE_SECONDS).toEpochMilli(), "FIRED")
+            .copy(notifiedAtEpochMs = now.minusSeconds(30 * MINUTE_SECONDS).toEpochMilli())
+        val occId = database.reminderOccurrenceDao().upsert(occ)
+
+        buildWorker().doWork()
+
+        verify(exactly = 0) { alarmScheduler.schedule(any(), any()) }
+        verify(exactly = 0) { alarmScheduler.cancel(any()) }
+        assertEquals("FIRED", database.reminderOccurrenceDao().findById(occId)?.state)
+        assertTrue(database.entryDao().findByHabitId(habitId).isEmpty())
     }
 
     @Test
