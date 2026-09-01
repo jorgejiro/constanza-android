@@ -20,6 +20,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -40,6 +41,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
+import com.jjrapps.constanza.core.ui.theme.Dimens
 import com.jjrapps.constanza.core.ui.theme.HabitPalette
 
 /**
@@ -119,7 +122,7 @@ fun HabitEditorScreen(
     } else {
         R.string.habit_editor_title_edit
     }
-    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(titleRes)) }) }) { padding ->
+    Scaffold(topBar = { HabitEditorTopBar(titleRes) }, containerColor = ConstanzaColors.Background) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
@@ -173,6 +176,19 @@ fun HabitEditorScreen(
             }
         }
     }
+}
+
+/** Work unit 5 (design.md decision 7): pins the app bar to [ConstanzaColors.Background] so it reads
+ *  as one seamless surface with the [Scaffold] behind it rather than M3's default `surfaceContainer`
+ *  tone, which is not one of the roles [ConstanzaColors] repoints in `Theme.kt` and would otherwise
+ *  stay cool-toned against the rest of this warm-dark screen. Extracted out of [HabitEditorScreen]
+ *  itself to keep that composable under detekt's `LongMethod` threshold. */
+@Composable
+private fun HabitEditorTopBar(titleRes: Int) {
+    TopAppBar(
+        title = { Text(stringResource(titleRes)) },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = ConstanzaColors.Background),
+    )
 }
 
 /**
@@ -237,9 +253,6 @@ private fun EditorNameField(
     )
 }
 
-private val SWATCH_SIZE = 40.dp
-private val SWATCH_BORDER = 3.dp
-
 @Composable
 private fun ColorSwatchRow(selected: Int, onColorChange: (Int) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -247,10 +260,10 @@ private fun ColorSwatchRow(selected: Int, onColorChange: (Int) -> Unit) {
             val borderColor = if (swatch == selected) MaterialTheme.colorScheme.primary else Color.Transparent
             Row(
                 modifier = Modifier
-                    .size(SWATCH_SIZE)
+                    .size(Dimens.Swatch)
                     .clip(CircleShape)
                     .background(Color(swatch))
-                    .border(SWATCH_BORDER, borderColor, CircleShape)
+                    .border(Dimens.SwatchBorder, borderColor, CircleShape)
                     .clickable { onColorChange(swatch) },
             ) {}
         }
