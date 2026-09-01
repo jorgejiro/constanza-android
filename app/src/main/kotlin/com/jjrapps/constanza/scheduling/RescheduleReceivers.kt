@@ -59,7 +59,8 @@ class PackageReplacedReceiver : BroadcastReceiver() {
 /** Wall-clock `RTC_WAKEUP` targets must be recomputed after a timezone, date, or time change —
  *  including the DST transition itself (design.md §9.3, task 4a.7). `ACTION_DATE_CHANGED` is also
  *  one of design.md §9.2's three redundant midnight-sweep triggers for work unit 4b: it enqueues an
- *  immediate one-shot [MidnightSweepWorker] run rather than waiting for the next periodic tick. */
+ *  immediate one-shot [MidnightSweepWorker] run under a work name of its own rather than waiting
+ *  for the sweep's own midnight-anchored run. */
 @AndroidEntryPoint
 class TimeChangeReceiver : BroadcastReceiver() {
     @Inject lateinit var occurrencePlanner: OccurrencePlanner

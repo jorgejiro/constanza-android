@@ -61,9 +61,13 @@ class MidnightSweepWorkerTest {
         val resolver = OccurrenceResolver(
             daos, database.entryDao(), mockk(relaxed = true), RECONCILE_PERIOD_HOURS, RESOLVE_DEADLINE_HOURS,
         )
+        // The real WorkScheduler, not a mock: the worker re-enqueues its own successor (task G.4),
+        // and that enqueue lands harmlessly in this test's WorkManager. What the successor's anchor
+        // must be is asserted in WorkSchedulerTest, through WorkManager's own query APIs.
+        val workScheduler = WorkScheduler(context, FakeTimeProvider(now), RECONCILE_PERIOD_HOURS)
         val factory = object : WorkerFactory() {
             override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters) =
-                MidnightSweepWorker(appContext, workerParameters, resolver, FakeTimeProvider(now))
+                MidnightSweepWorker(appContext, workerParameters, resolver, FakeTimeProvider(now), workScheduler)
         }
         return TestListenableWorkerBuilder<MidnightSweepWorker>(context).setWorkerFactory(factory).build()
     }

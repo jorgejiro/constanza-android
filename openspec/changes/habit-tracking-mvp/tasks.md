@@ -321,12 +321,32 @@ The gate itself is discharged. These follow-ups come out of it and need decision
       though nothing reached the user (§13.4 finding 1), so any future reader treating it as "the user
       was told" would be wrong. Either stop writing it on the suppressed branch or rename it to say
       what it actually records.
-- [ ] G.4 Stop `WorkScheduler.scheduleAll()` re-anchoring the periodic workers on every cold start
+- [x] G.4 Stop `WorkScheduler.scheduleAll()` re-anchoring the midnight sweep on every cold start
       (§13.4 finding 2). Measured: a process start at 00:04:55 pushed the midnight sweep to
-      `Delay=+23h29m59s`, skipping the boundary. A user opening the app often enough can postpone the
-      hourly reconcile and the sweep indefinitely — starving the net §5.5 calls the correctness
-      guarantee. `UPDATE` was chosen so tuning `ReconcilePeriodHours` reaches existing installs, so the
-      fix must keep that without resetting the anchor each launch.
+      `Delay=+23h29m59s`, skipping the boundary.
+      **The claim above that this affected both periodic workers, and that a user could postpone the
+      hourly reconcile indefinitely, is wrong; it is corrected rather than deleted here and in
+      §13.4.** Neither the `ExistingPeriodicWorkPolicy` reference nor the "update work" guide states
+      what `UPDATE` does to an existing schedule's timing, so it was probed on the device against this
+      project's WorkManager 2.11.2 (`app/src/androidTest/.../seed/PeriodicAnchorProbe.kt`, reading
+      `WorkInfo.nextScheduleTimeMillis`): `UPDATE` with the SAME initial delay left the next run time
+      unchanged, `UPDATE` with a DIFFERENT delay shifted it by exactly the delta (30m→50m gave
+      `+1200000ms`, `08:52:17.615` → `09:12:17.615`), and `KEEP` left it unchanged — i.e. **`UPDATE`
+      applies the new initial delay to the ORIGINAL enqueue instant, not to now.** `ReconcileWorker`
+      is enqueued with no initial delay and an unchanging request shape, so repeated `UPDATE` calls
+      never moved it; only the sweep, whose `setInitialDelay(millisUntilNextMidnight())` is recomputed
+      every launch, drifted.
+      Fixed by making the sweep unique **one-time** work delayed to the next local midnight under
+      `ExistingWorkPolicy.KEEP`, with `MidnightSweepWorker` enqueuing its own successor for the
+      following midnight at the end of a successful run — the anchor is recomputed daily instead of
+      derived from a stale first-enqueue instant, and DST and timezone changes come out right for
+      free. `ReconcileWorker`'s scheduling is untouched, so tuning `ReconcilePeriodHours` still
+      reaches existing installs. The chain is not a single point of failure: §9.2's other two triggers
+      (the hourly reconcile, and `ACTION_DATE_CHANGED`) still sweep, and a cold start re-enqueues the
+      chain because `KEEP` defers only to a sweep that is still pending.
+      Covered by `WorkSchedulerTest` (4 instrumented tests, including the two-cold-start regression
+      read back through `WorkInfo.nextScheduleTimeMillis`) and `MidnightAnchorTest` (5 unit tests over
+      the anchor arithmetic, DST both ways).
 - [ ] G.5 Decide whether an exact-alarm revoke should re-plan instead of waiting out the hourly net
       (§13.4 finding 3). Delivery is "late, not lost" as designed, but nothing re-arms on app open, so
       every reminder after a revoke rests entirely on the reconcile period.

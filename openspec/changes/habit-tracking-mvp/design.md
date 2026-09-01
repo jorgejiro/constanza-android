@@ -1132,14 +1132,47 @@ alarms are `Pending alarms per uid: [… <uid>:N]`, and live notifications are
    `POST_NOTIFICATIONS` denied the post is correctly suppressed and no false `MISSED` is written, but
    the occurrence still stores `notifiedAt`. Any later reader that treats that field as "the user was
    told" would be wrong. PR #14 logged this as cosmetic; on-device it is a data-integrity claim.
-2. **`WorkScheduler.scheduleAll()` re-anchors both periodic workers on every `Application.onCreate`.**
+2. **`WorkScheduler.scheduleAll()` re-anchors the midnight sweep on every `Application.onCreate`.**
    `ExistingPeriodicWorkPolicy.UPDATE` with `setInitialDelay(millisUntilNextMidnight())` recomputes
-   the next run each cold start. Measured directly: after a process start at 00:04:55 the midnight
-   sweep's next run read `Delay=+23h29m59s` — it had skipped the 00:00 boundary entirely. In
-   production, a user who opens the app often enough can keep postponing the hourly reconcile and the
-   midnight sweep indefinitely, starving the very net §5.5 calls the correctness guarantee. This also
+   the delay each cold start. Measured directly: after a process start at 00:04:55 the midnight
+   sweep's next run read `Delay=+23h29m59s` — it had skipped the 00:00 boundary entirely. This also
    made the gate hard to measure: reading state started the process, which reprogrammed what was
    being measured.
+
+   **Corrected 2026-09-01 while discharging task G.4.** As first written, this finding said *both*
+   periodic workers were re-anchored, and that a user opening the app often enough could postpone the
+   hourly reconcile indefinitely. That is wrong, and the wording is corrected rather than removed so
+   the record shows what was actually measured. Neither the `ExistingPeriodicWorkPolicy` reference
+   page nor the "update work" guide states what `UPDATE` does to an existing schedule's timing, so it
+   was probed on the device against this project's WorkManager 2.11.2
+   (`app/src/androidTest/kotlin/com/jjrapps/constanza/seed/PeriodicAnchorProbe.kt`, reading
+   `WorkInfo.nextScheduleTimeMillis` before and after each re-enqueue):
+
+   | Re-enqueue under a name that already exists | Next run time |
+   |---|---|
+   | `UPDATE`, same initial delay | unchanged |
+   | `UPDATE`, initial delay 30m → 50m | shifted by exactly the delta: `+1200000ms`, `08:52:17.615` → `09:12:17.615` (identical milliseconds on both sides) |
+   | `KEEP` | unchanged |
+
+   So **`UPDATE` applies the new initial delay to the ORIGINAL enqueue instant, not to now** — a
+   semantic worth recording here because it is in neither doc page. `ReconcileWorker` is therefore
+   *not* affected: it is enqueued with no initial delay and an unchanging request shape, so every
+   repeated `UPDATE` from a cold start leaves its anchor exactly where it was, and `UPDATE` remains
+   what lets a tuned `ReconcilePeriodHours` reach an existing install. The sweep was the whole defect:
+   its delay is recomputed on every launch, and `UPDATE` then applied that fresh delay to the
+   first-ever enqueue instant, producing an anchor of `firstEnqueueTime + millisUntilNextMidnight(now)`
+   — not midnight, and drifting arbitrarily.
+
+   **Fix (task G.4).** The sweep is no longer periodic. It is unique **one-time** work delayed to the
+   next local midnight under `ExistingWorkPolicy.KEEP`, so a cold start cannot move one that is
+   already pending, and `MidnightSweepWorker` enqueues its own successor for the following midnight at
+   the end of a successful run. Recomputing the anchor per run is what makes it self-correcting, and
+   it absorbs the 23h and 25h local days a fixed 24h period cannot express. `ReconcileWorker`'s
+   scheduling is unchanged. The chain is not a single point of failure, which is the only reason a
+   self-rescheduling worker is acceptable here: §9.2's other two triggers stand behind it —
+   `ReconcileWorker` sweeps on every hourly pass and `TimeChangeReceiver` sweeps on
+   `ACTION_DATE_CHANGED` — and a cold start re-enqueues the chain, because `KEEP` defers only to a
+   sweep that is still pending.
 3. **After an exact-alarm revoke nothing re-arms until each occurrence's own time passes.** The
    platform cancels every alarm and stops the app (`Killing …: schedule_exact_alarm revoked`), and the
    guide confirms the state-changed broadcast fires on **grant only** — so `ExactAlarmPermissionReceiver`
@@ -1167,7 +1200,8 @@ attributed, so it is recorded as unattributed rather than assigned to this app.
 - **OEM throttling survival** — Z Fold 7 only, over a multi-day idle window. No Pixel can make this
   assertion, exactly as §13.3 says.
 - **Natural-timing observation of the hourly net** — the periodic workers never ran on their own
-  inside the observation window, and finding 2 explains why every attempt to observe them moved them.
+  inside the observation window. Finding 2 explains why every attempt to observe the sweep moved it;
+  the reconcile worker's own anchor, as that finding's correction records, was never moved at all.
 
 ## 14. Module and file layout
 
