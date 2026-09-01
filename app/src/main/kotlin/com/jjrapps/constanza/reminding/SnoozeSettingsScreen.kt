@@ -24,6 +24,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.portability.DataPortabilitySection
 
 private const val MINUTES_PER_HOUR = 60
 
@@ -50,6 +51,9 @@ fun SnoozeSettingsScreen(current: SnoozeDuration, onSelect: (SnoozeDuration) -> 
             items(SnoozeDuration.entries, key = { it.name }) { duration ->
                 SnoozeDurationRow(duration, duration == current, onSelect)
             }
+            // Tasks 7.2/7.3/7.4: export/import lives on this same Settings screen, not a new
+            // route — see DataPortabilitySection's own KDoc for why.
+            item { DataPortabilitySection() }
         }
     }
 }

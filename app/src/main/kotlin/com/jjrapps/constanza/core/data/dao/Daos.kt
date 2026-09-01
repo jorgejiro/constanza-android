@@ -33,6 +33,12 @@ interface HabitDao {
 
     @Query("DELETE FROM habits WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    /** Task 7.3: the replace-all import's wipe step. Cascades `ON DELETE CASCADE` through
+     *  `schedules`, `reminder_slots`, `entries`, and `reminder_occurrences` (design.md §8.1) — one
+     *  statement clears the whole dataset. */
+    @Query("DELETE FROM habits")
+    suspend fun deleteAll()
 }
 
 @Dao
