@@ -629,7 +629,8 @@ reminder_occurrences(                     -- transient scheduling state; never e
   exact              INTEGER NOT NULL DEFAULT 1,  -- 0 when armed as an inexact window
   snoozeUntilEpochMs INTEGER,
   snoozeCount        INTEGER NOT NULL DEFAULT 0,
-  notifiedAtEpochMs  INTEGER,
+  notifiedAtEpochMs  INTEGER,             -- set ONLY when a notification really posted; NULL
+                                          -- when canPost() gated it (§11, §13.4 finding 1)
   resolveDeadlineMs  INTEGER NOT NULL,    -- scheduledAt + 24h, clamped to next same-slot occurrence
   UNIQUE(habitId, slotId, scheduledDate)
 )
@@ -756,8 +757,10 @@ Planner        AlarmScheduler      AlarmManager   ReminderReceiver   Notifier   
    │                                   │   Candidate && quota met
    │                                   │     → state = SUPPRESSED; write nothing; stop
    │                                   │ areNotificationsEnabled() && channel.importance > NONE
-   │                                   │     → false: leave state = FIRED, no post;
+   │                                   │     → false: state = FIRED, notifiedAt = NULL, no post;
    │                                   │       Today screen remains the fallback; stop
+   │                                   │       (notifiedAt records delivery, so a gated post
+   │                                   │        leaves it null — §13.4 finding 1, task G.3)
    │                                   │──────────────────►│
    │                                   │                   │ post(id = occ.id,
    │                                   │                   │   actions Yes | No | Snooze,
@@ -986,9 +989,9 @@ clock — `today` and `answeredAt` are always parameters (§4).
 | Exact alarm not permitted at schedule time | `canScheduleExactAlarms()` before **every** scheduling call, and again in `onResume()` | `setWindow(RTC_WAKEUP, target, 10 min)`; `occ.exact = 0`; a non-blocking banner explains reminders may arrive late, with one tap to `ACTION_REQUEST_SCHEDULE_EXACT_ALARM`. Nothing crashes, nothing is lost. |
 | Exact-alarm permission revoked while running | `OccurrenceResolver.reconcile()`'s re-arm, and the `onResume()` re-check (task G.5) | The platform cancels every alarm and stops the process, and sends the state-changed broadcast **on grant only** — so no receiver fires here. Recovery re-arms every future `ARMED` occurrence in inexact mode from persisted state. This row previously credited that receiver, which never sees a revoke (§13.4 finding 3). |
 | Exact-alarm permission granted later | same receiver | `replanAll()` upgrades armed inexact alarms to exact. |
-| `POST_NOTIFICATIONS` denied (API 33+) | `areNotificationsEnabled()` | No post. Occurrence stays unresolved — **never** written `missed`, because a suppressed notification is the app's failure, not the user's. Today screen is a complete fallback. Requested contextually after the first habit with a reminder; after two denials the system blocks the dialog, so the only path offered is a deep link to system settings. |
+| `POST_NOTIFICATIONS` denied (API 33+) | `areNotificationsEnabled()` | No post, and `notifiedAtEpochMs` stays **null** — the occurrence records `FIRED` without claiming a delivery (§13.4 finding 1, task G.3). Occurrence stays unresolved — **never** written `missed`, because a suppressed notification is the app's failure, not the user's. Today screen is a complete fallback. Requested contextually after the first habit with a reminder; after two denials the system blocks the dialog, so the only path offered is a deep link to system settings. |
 | API 31–32 | `SDK_INT < 33` | The runtime request is **skipped entirely** — the permission does not exist and notifications are implicitly granted. Both branches converge on the enabled/importance check, which is what still matters on 31–32 because the user can mute the channel. (Mandatory consequence 3.) |
-| Channel muted / `IMPORTANCE_NONE` | `getNotificationChannel(id).importance` | Treated exactly as denied, with a deep link to the channel settings. |
+| Channel muted / `IMPORTANCE_NONE` | `getNotificationChannel(id).importance` | Treated exactly as denied — same single `canPost()` gate, so `notifiedAtEpochMs` stays null here too — with a deep link to the channel settings. |
 | Doze, App Standby, OEM throttling (Samsung One UI sleep, Xiaomi MIUI) | `ReconcileWorker` finds `state = ARMED AND scheduledAt < now - tolerance` | Fire late rather than lose it; increment a late-delivery counter. Only after repeated detected misses does Settings surface per-OEM guidance. No unsolicited `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` on first launch — poor UX and Play-policy discouraged. |
 | Expedited work quota exhausted | `OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST` | The answer write still lands, just not instantly. The notification is cancelled by the worker, so the drawer keeps showing the reminder until the write is durable. |
 | Answer arrives twice (redelivery, double tap) | `enqueueUniqueWork(..., KEEP)` + `UNIQUE(habitId, date, slotId)` upsert | Idempotent; the second attempt is a no-op. |
@@ -1173,8 +1176,22 @@ alarms are `Pending alarms per uid: [… <uid>:N]`, and live notifications are
 
 1. **`notifiedAtEpochMs` is recorded for a notification that never reached the user.** With
    `POST_NOTIFICATIONS` denied the post is correctly suppressed and no false `MISSED` is written, but
-   the occurrence still stores `notifiedAt`. Any later reader that treats that field as "the user was
-   told" would be wrong. PR #14 logged this as cosmetic; on-device it is a data-integrity claim.
+   the occurrence still stores `notifiedAt` (measured: `notifiedAt=2026-08-31T23:36:01.461`). Any
+   later reader that treats that field as "the user was told" would be wrong. PR #14 logged this as
+   cosmetic; on-device it is a data-integrity claim.
+
+   **Resolved 2026-09-01 (task G.3) by not writing the field on the suppressed branch.** The
+   alternative — renaming the column to describe what it actually recorded — was rejected: the name
+   was already correct and only the fire path disagreed with it, and a rename would have forced a
+   schema version bump, a migration and a re-exported schema JSON to enshrine wrong behaviour.
+   `NotificationPoster.postReminder` now reports whether it posted, and `ReminderFireHandler.fire`
+   sets `notifiedAtEpochMs` only when it did. `canPost`'s own contract already promised "no post,
+   never a silent lie about delivery"; the gate had held up its end and the caller then recorded
+   exactly that lie. **No new state and no migration:** the occurrence still lands on `FIRED`, never
+   `SUPPRESSED` (D8's terminal quota exit, excluded by `findUnresolved()`), so it stays unresolved
+   for the reconcile net and the Today screen and never becomes a false `MISSED` (§5.5). A null
+   `notifiedAtEpochMs` on an already-nullable column is the whole distinction between "fired but not
+   notified" and "fired and notified".
 2. **`WorkScheduler.scheduleAll()` re-anchors the midnight sweep on every `Application.onCreate`.**
    `ExistingPeriodicWorkPolicy.UPDATE` with `setInitialDelay(millisUntilNextMidnight())` recomputes
    the delay each cold start. Measured directly: after a process start at 00:04:55 the midnight

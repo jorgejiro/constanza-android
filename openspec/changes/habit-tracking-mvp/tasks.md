@@ -287,8 +287,12 @@ enqueuing nothing would not be independently verifiable. The seam used instead i
       so no reminder could reach the user at all. The gap surfaced when slice i shipped a poster that
       nothing calls. The receiver must load the occurrence by the id its `PendingIntent` carries,
       re-evaluate before posting, post via `NotificationPoster`, and record `state = FIRED` with
-      `notifiedAtEpochMs`. The re-evaluation is not decoration: work unit 4a arms an alarm every day
-      for `N_TIMES_PER_WEEK` precisely because D8 defers quota suppression to fire time, so **this is
+      `notifiedAtEpochMs`. **Corrected 2026-09-01 while discharging G.3:** `notifiedAtEpochMs` is
+      recorded only when the post actually reached the system. As first written this line read as an
+      unconditional write, and the implementation followed it literally; the wording is corrected
+      rather than deleted so the record shows where the defect came from. The re-evaluation is not
+      decoration: work unit 4a arms an alarm every day for `N_TIMES_PER_WEEK` precisely because D8
+      defers quota suppression to fire time, so **this is
       the one place a weekly habit whose quota is already met is silently suppressed**. Without it a
       "3 times per week" habit nags on all seven days. Keep the receiver validate-only — no Room
       access on the ~10s `onReceive` budget; enqueue expedited work, as 5.3 does for actions.
@@ -317,10 +321,26 @@ documentation half was already discharged 2026-08-31 (design §5.7) and MUST NOT
 
 The gate itself is discharged. These follow-ups come out of it and need decisions, not just edits:
 
-- [ ] G.3 Decide what `notifiedAtEpochMs` means when the post was suppressed. Today it is recorded even
+- [x] G.3 Decide what `notifiedAtEpochMs` means when the post was suppressed. Today it is recorded even
       though nothing reached the user (§13.4 finding 1), so any future reader treating it as "the user
       was told" would be wrong. Either stop writing it on the suppressed branch or rename it to say
       what it actually records.
+      **Resolved 2026-09-01 by stopping the write on the suppressed branch, not by renaming.** The
+      field name already says the right thing — it was the fire path that did not respect it, so the
+      code was corrected to match the name rather than the name lowered to match the code.
+      `NotificationPoster.postReminder` now returns whether it actually posted, and
+      `ReminderFireHandler.fire` writes `notifiedAtEpochMs` only on `true`. The rename option was
+      rejected on cost with no semantic gain: `notifiedAtEpochMs` is a Room column, so renaming it
+      would have forced a schema version bump, a migration and a re-exported
+      `app/schemas/com.jjrapps.constanza.core.data.AppDatabase/1.json` — all to describe behaviour
+      that was simply wrong. Deliberately **no** new state: the occurrence stays `FIRED`, never
+      `SUPPRESSED` (which is D8's terminal quota exit that `findUnresolved()` excludes), so a
+      permission- or mute-suppressed reminder stays unresolved for the reconcile net and the Today
+      screen and never becomes a false `MISSED` (§5.5, §11). `notifiedAtEpochMs = null` is what
+      distinguishes "fired but not notified" from "fired and notified", which is exactly why the
+      column — already `Long?` — needed no change at all. Proven by
+      `ReminderFireWorkerTest.aGatedPostRecordsNoNotifiedAtAndStillLandsOnFired`, which fails against
+      the previous fire path with `expected null, but was:<1788249600000>`.
 - [x] G.4 Stop `WorkScheduler.scheduleAll()` re-anchoring the midnight sweep on every cold start
       (§13.4 finding 2). Measured: a process start at 00:04:55 pushed the midnight sweep to
       `Delay=+23h29m59s`, skipping the boundary.

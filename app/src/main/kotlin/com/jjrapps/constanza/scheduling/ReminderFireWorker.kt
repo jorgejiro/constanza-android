@@ -49,8 +49,15 @@ class ReminderFireHandler @Inject constructor(
             return
         }
 
-        notificationPoster.postReminder(occ.id, habit.name, habit.question, habit.colorArgb)
-        val notifiedAt = timeProvider.now().toEpochMilli()
+        val posted = notificationPoster.postReminder(occ.id, habit.name, habit.question, habit.colorArgb)
+        // design.md §13.4 finding 1 (task G.3): `notifiedAtEpochMs` records that the user was
+        // actually told, so a gated post leaves it null rather than claiming a delivery that never
+        // happened. The state still becomes FIRED and NOT STATE_SUPPRESSED — that one is D8's quota
+        // exit above and is terminal, excluded by `findUnresolved()`, whereas a permission- or
+        // mute-suppressed occurrence must stay unresolved so the reconcile net and the Today screen
+        // still handle it and it never becomes a false `MISSED` (design.md §5.5, §11). The null is
+        // what separates "fired but not notified" from "fired and notified"; no new state is needed.
+        val notifiedAt = if (posted) timeProvider.now().toEpochMilli() else null
         daos.reminderOccurrenceDao.upsert(occ.copy(state = STATE_FIRED, notifiedAtEpochMs = notifiedAt))
     }
 

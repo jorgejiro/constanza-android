@@ -85,11 +85,15 @@ class NotificationPosterTest {
         verify(exactly = 2) { manager.areNotificationsEnabled() }
     }
 
+    /** design.md §13.4 finding 1 (task G.3): the gate's "never a silent lie about delivery" half is
+     *  only keepable if the caller can tell a gated call from a posted one, so the skip is reported
+     *  rather than swallowed. The `true` return is proven on-device instead, where a real
+     *  `Notification` can be built (`NotificationPosterInstrumentedTest`). */
     @Test
-    fun `postReminder skips notify entirely when posting is blocked`() {
+    fun `postReminder skips notify entirely and reports no post when posting is blocked`() {
         every { manager.areNotificationsEnabled() } returns false
 
-        poster.postReminder(OCCURRENCE_ID, "Meditate", "Did you meditate today?", 0)
+        assertFalse(poster.postReminder(OCCURRENCE_ID, "Meditate", "Did you meditate today?", 0))
 
         verify(exactly = 0) { manager.notify(any<Int>(), any()) }
     }
