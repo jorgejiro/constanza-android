@@ -60,8 +60,14 @@ private fun entryEntity(slotId: Long, status: EntryStatus) = EntryEntity(
     value = null, answeredAt = FIXED_INSTANT.toString(), source = "IN_APP",
 )
 
-private fun occurrence(id: Long, slotId: Long, state: String, snoozeUntilEpochMs: Long?) = ReminderOccurrenceEntity(
-    id = id, habitId = HABIT_ID, slotId = slotId, scheduledDate = TODAY.toString(), scheduledAtEpochMs = 0,
+private fun occurrence(
+    id: Long,
+    slotId: Long,
+    state: String,
+    snoozeUntilEpochMs: Long?,
+    scheduledDate: LocalDate = TODAY,
+) = ReminderOccurrenceEntity(
+    id = id, habitId = HABIT_ID, slotId = slotId, scheduledDate = scheduledDate.toString(), scheduledAtEpochMs = 0,
     state = state, snoozeUntilEpochMs = snoozeUntilEpochMs, snoozeCount = 0, notifiedAtEpochMs = null,
     resolveDeadlineMs = 0,
 )
@@ -105,6 +111,39 @@ class TodayViewModelTest {
         assertEquals(DayStatus.PARTIAL, row.dayStatus)
         assertEquals(listOf(EntryStatus.COMPLETED, EntryStatus.UNKNOWN), row.slots.map { it.status })
         assertEquals(listOf(null, OCCURRENCE_ID), row.slots.map { it.occurrenceId })
+    }
+
+    /**
+     * Regression guard. `observeUnresolved()` spans every unresolved date on purpose, so it agrees
+     * with what re-arming considers live, and `OccurrencePlanner` arms today, today+1 and today+2.
+     * Before the date bound in [buildTodayHabitRow], a slot took whichever row the query returned
+     * first — and that query has no `ORDER BY`, so not even that was stable. Once today's occurrence
+     * went `RESOLVED` and dropped out, the slot surfaced **tomorrow's** `ARMED` one, leaving answer
+     * buttons on an already-answered slot; a correcting tap then wrote the `Entry` against
+     * tomorrow's date and cancelled tomorrow's alarm.
+     *
+     * Tomorrow's occurrence is given the LOWER id here so a `firstOrNull` with no date filter picks
+     * it — the test has to be able to fail for the original reason, not merely pass by luck of
+     * insertion order.
+     */
+    @Test
+    fun `a slot never adopts another day's occurrence, even when today's has resolved away`() {
+        val snapshot = TodaySnapshot(
+            entriesToday = emptyList(),
+            unresolvedOccurrences = listOf(
+                occurrence(OCCURRENCE_ID, MORNING_SLOT_ID, STATE_ARMED, null, scheduledDate = TODAY.plusDays(1)),
+                occurrence(OCCURRENCE_ID + 1, EVENING_SLOT_ID, STATE_ARMED, null, scheduledDate = TODAY.plusDays(2)),
+            ),
+            today = TODAY,
+        )
+
+        val row = requireNotNull(buildTodayHabitRow(habit(), Schedule.Daily(), twoSlots(), snapshot))
+
+        assertEquals(
+            listOf(null, null),
+            row.slots.map { it.occurrenceId },
+            "no slot may carry an occurrence handle from another day",
+        )
     }
 
     /** Task 6b.3 / design.md D3: the snooze deadline is gated on the occurrence's `state`, not on the

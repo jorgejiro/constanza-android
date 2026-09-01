@@ -76,21 +76,25 @@ class EntryWriteParityTest {
         val (notifyHabit, notifySlot, notifyOcc) = armHabit("Notified")
         val (inAppHabit, inAppSlot, inAppOcc) = armHabit("Answered in app")
 
-        // The state the Today screen would actually hand the view model. Awaited on both slots
-        // carrying their occurrence handle, not merely on both rows existing: `combine` also emits
-        // while the habits flow is ahead of the occurrences flow, and that emission is not the one
-        // this test means to drive.
-        val rows = withTimeout(AWAIT_TIMEOUT_MS) {
-            viewModel.uiState.first { state ->
-                state.rows.size == BOTH_ROUTES && state.rows.flatMap { it.slots }.all { it.occurrenceId != null }
-            }
-        }.rows
-        val slotState = rows.single { it.habitId == inAppHabit }.slots.single()
-        assertEquals(inAppOcc, slotState.occurrenceId)
-
         // Notification route, through the same adapter ActionReceiver's worker uses.
         AnswerResponder(entryWriter).answer(notifyOcc, AnswerWorker.STATUS_COMPLETED)
-        viewModel.answer(inAppHabit, slotState, InAppEntryStatus.COMPLETED)
+
+        // In-app route, driven at EntryWriter's own entry point rather than through
+        // TodayViewModel.uiState. Both routes are what this test compares, and going through the
+        // screen made it depend on the screen surfacing an occurrence dated other than today — which
+        // it deliberately no longer does, since a slot adopting another day's occurrence was the bug
+        // `TodayViewModelTest` now guards.
+        //
+        // The `date` passed here is deliberately TODAY while the occurrence's own scheduledDate is
+        // ORIGIN_DATE, so the assertion below proves the occurrence's origin date wins over whatever
+        // the caller supplied. That is a stronger claim than the previous wiring could make.
+        entryWriter.answerInApp(
+            habitId = inAppHabit,
+            date = fixture.timeProvider.today(),
+            slotId = inAppSlot,
+            status = InAppEntryStatus.COMPLETED,
+            occurrenceId = inAppOcc,
+        )
 
         val entries = withTimeout(AWAIT_TIMEOUT_MS) {
             fixture.database.entryDao().observeByDate(ORIGIN_DATE).first { it.size == BOTH_ROUTES }

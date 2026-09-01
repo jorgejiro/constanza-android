@@ -63,7 +63,19 @@ fun buildTodayHabitRow(
     val dayStatus = rollupDay(schedule, snapshot.today, slots, domainEntries)
     if (dayStatus == DayStatus.NOT_DUE) return null
 
-    val habitOccurrences = snapshot.unresolvedOccurrences.filter { it.habitId == habit.id }
+    // Today's occurrences only. `observeUnresolved()` deliberately spans every unresolved date so it
+    // agrees with what re-arming considers live, and `OccurrencePlanner` arms today, today+1 and
+    // today+2 — so without this bound a slot picked whichever row the query happened to return
+    // first, with no ORDER BY to make even that stable. Worse, once today's occurrence went
+    // RESOLVED the slot surfaced TOMORROW's ARMED one: the answer buttons stayed on an
+    // already-answered slot, and a correcting tap wrote the Entry against tomorrow's date and
+    // cancelled tomorrow's alarm — an origin-date violation reachable by ordinary use. The date
+    // bound belongs here, in the screen that shows one day, not in the DAO whose breadth is load
+    // bearing for re-arming.
+    val todayText = snapshot.today.toString()
+    val habitOccurrences = snapshot.unresolvedOccurrences.filter {
+        it.habitId == habit.id && it.scheduledDate == todayText
+    }
     val slotRows = if (enabledSlots.isEmpty()) {
         listOf(toTodaySlot(slotId = null, minuteOfDay = null, entries = domainEntries, occurrences = habitOccurrences))
     } else {
