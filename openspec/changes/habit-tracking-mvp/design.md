@@ -1377,8 +1377,8 @@ cannot be from this device.** Every override was reset afterwards and the reset 
 | Large screen — C1, habit editor | **PASS** at the same override. Name, question, notes, the six colour swatches, the frequency dropdown, the "Remind me" toggle with its hour/minute fields, and Save all render intact. |
 | Orientation — C1 | **PASS** at both widths, portrait and landscape, with no clipping or overlap. |
 | Soft keyboard after a config change — C4 | **Content PASSES, IME re-request FAILS.** See finding 2. |
-| Z Fold 7: native large screen, fold/unfold | **NOT RUN** — the device is not available here. No Pixel substitutes: §13.3 says so, and the `wm size` override reproduces the width, never One UI's own behaviour. |
-| Z Fold 7: OEM throttling survival | **NOT RUN** — needs that device *and* a multi-day idle window. |
+| Z Fold 7: native large screen, fold/unfold | **PASS — run 2026-09-01 on the real device.** See §13.6. |
+| Z Fold 7: OEM throttling survival | **NOT RUN** — the device is now available, but this row also needs a multi-day idle window. |
 
 #### Finding 1 — the exact-alarm banner's action was off-screen, and the banner looked fine
 
@@ -1421,6 +1421,53 @@ caret back even if the keyboard had not appeared.
 Not fixed here. A latch-on-focus-gain would restore the keyboard but would also re-open one the user
 had deliberately dismissed, so the correct behaviour is a product decision rather than a mechanical
 change. Recorded as **task 6a.9** with this measurement.
+
+### 13.6 Discharge record — the Galaxy Z Fold 7 rows (task G.7, second device)
+
+The device became available on 2026-09-01, immediately before archive, so the rows §13.5 recorded as
+hardware-blocked were run rather than archived as blocked. Device: `RFCY720PJKV`, `SM-F966B`,
+**Android 16 / API 36**, One UI. Every override was reset afterwards and the reset verified.
+
+**§13.3's own prediction is confirmed, and it matters.** That table says the Fold "cannot prove API 37
+gated behaviour, **if** it ships on Android 16" — it does. So this device discharges the *layout and
+configuration-change* rows and cannot speak to the API-37 gating at all; §13.4's Pixel run remains the
+only evidence for that half. Two devices, two different jobs, exactly as §13.3 argued.
+
+| Row | Result |
+|---|---|
+| Native large screen, unfolded | **PASS** at the real inner display, `1968x2184` — title, both top-bar actions, banner **with its "Fix" action visible**, and the habit row, no clipping or overlap. The banner fix from §13.5 holds at a width far greater than the `wm size` override it was found under. |
+| Habit editor, unfolded | **PASS** — name, colour, frequency, the "Remind me" toggle and Save all present and intact. |
+| Orientation, unfolded | **PASS** in landscape, all editor fields present, entered text preserved. |
+| **Fold / unfold as a configuration change** | **PASS**, and this is the harshest case in the matrix. |
+| One UI "put unused apps to sleep" survival | **NOT RUN** — the device is here, but this row needs a multi-day idle window. It stays open. |
+
+#### The fold/unfold measurement
+
+Typed into the editor's notes field with the keyboard up, then folded and unfolded:
+
+| Observation | Before | Folded | After unfolding |
+|---|---|---|---|
+| Display | `1968x2184` (inner) | **`1080x2520` (cover)** | `1968x2184` |
+| `dumpsys input_method` `mInputShown` | `true` | — | **`true`** |
+| Focused field | notes | — | **notes** |
+| Typed content | `FOLDTEST` | — | `FOLDTEST` |
+
+Task 6a.9's focus latch survives a configuration change that **moves the app between two physical
+displays** — considerably harsher than the rotation it was built for — and still restores the caret to
+the notes field rather than stealing it back to the name field.
+
+#### One more thing this device proved for free
+
+The entire automated suite passes here too: **59 instrumented, 0 failures**, plus 52 `:domain` and 97
+`:app` unit tests, on a different OEM at a different API level. Nothing in the suite was Pixel-specific.
+
+Worth recording how the run started, because it is the third instance of the same trap: the first
+attempt failed with **every** Compose UI test reporting
+`IllegalStateException: No compose hierarchies found in the app`, and the cause was that the device was
+`mWakefulness=Dozing` with `mCurrentFocus=null`. Not a keyguard this time, not a dependency, not an OEM
+quirk — an asleep screen. **That error message means "no Activity resumed", and the first thing to
+check is always whether the device is awake and interactive.** `adb shell screencap` on a foldable also
+needs an explicit `-d <displayId>`, or it writes a warning where the PNG should be.
 
 ## 14. Module and file layout
 
