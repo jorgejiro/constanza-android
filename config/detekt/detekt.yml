@@ -47,6 +47,18 @@ style:
     active: true
     ignoreAnnotated: ['Module']
 
+coroutines:
+  # Surfaced by :app gaining real type resolution (app/build.gradle.kts), not by new code: this rule
+  # is semantic and was silently inert here before. The one call site is `replanAsync`, the shared
+  # `goAsync()` helper behind five BroadcastReceivers. It is a top-level private function with no
+  # constructor to inject into, and threading a dispatcher through five receivers via Hilt to reach
+  # it would add a seam that no test wants — these receivers are covered on-device, where the real
+  # dispatcher is the point. Excluded by file rather than switched off, so the rule still applies to
+  # every class that does have somewhere to inject.
+  InjectDispatcher:
+    active: true
+    excludes: ['**/scheduling/RescheduleReceivers.kt']
+
 naming:
   # @Composable functions are PascalCase by Compose convention, which this rule does not know
   # about. detekt 1.23.8's FunctionNaming supports only `excludes`, `functionPattern` and
