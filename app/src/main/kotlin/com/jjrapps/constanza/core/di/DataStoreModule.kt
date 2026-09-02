@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.Module
 import dagger.Provides
+import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
@@ -26,4 +27,27 @@ object DataStoreModule {
     @Singleton
     fun provideReminderSettingsDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
         context.reminderSettingsDataStore
+}
+
+/**
+ * first-run-onboarding design.md §8.1's seeding mechanism, corrected during `sdd-apply` (Unit B):
+ * the design's own snippet declared this `@EntryPoint` inside `androidTest/CoreFlowTestFixture.kt`,
+ * but Hilt's aggregating KSP step processes `main` and `androidTest` as separate compilations for a
+ * plain (non-`HiltAndroidTest`) instrumented app — an entry point declared only in `androidTest`
+ * never reaches the `main`-generated `SingletonComponent` implementation, and
+ * `EntryPointAccessors.fromApplication` then throws `ClassCastException` at runtime because the
+ * real component class does not implement it. Measured directly, not assumed: the exact matrix run
+ * this fixture exists for failed every `CoreFlowE2ETest` method with
+ * `ClassCastException: Cannot cast ...SingletonCImpl to ...ReminderSettingsDataStoreEntryPoint`
+ * until this declaration moved here, into `main`.
+ *
+ * `internal`, not `private`, for the same reason [ReminderSettingsStore]'s companion object is
+ * `internal`: `androidTest` already has compile-time visibility into `main`'s `internal`
+ * declarations in this module's Gradle source-set setup, and a rename here should break the
+ * fixture at compile time rather than silently seeding through a stale accessor.
+ */
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+internal interface ReminderSettingsDataStoreEntryPoint {
+    fun reminderSettingsDataStore(): DataStore<Preferences>
 }
