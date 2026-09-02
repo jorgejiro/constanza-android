@@ -69,6 +69,10 @@
     <string name="today_title">Today</string>
     <string name="today_manage_habits">Manage habits</string>
     <string name="today_empty">Nothing due today.</string>
+    <!-- today-add-habit: one label for both presentations of the same action — centred when the
+         list is empty, trailing the last row once it is not. Deliberately shared: it is one
+         action, and two wordings would read as two different things. -->
+    <string name="today_add_habit">Add habit</string>
     <string name="today_status_all_completed">All done</string>
     <string name="today_status_partial">In progress</string>
     <string name="today_status_any_missed">Missed something</string>

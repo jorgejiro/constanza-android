@@ -33,6 +33,30 @@ import com.jjrapps.constanza.reminding.NotificationPermissionDecision
  * [TodayScreen] stay presentational: state in, callbacks out, no Android entry point of its own.
  */
 
+/**
+ * Both banners for one [TodayUiState], emitted in the order the screen wants them and nothing at
+ * all when neither applies.
+ *
+ * Kept as one composable rather than two `LazyColumn` items so that [TodayScreen]'s two layouts —
+ * the scrolling list and the empty state's plain [androidx.compose.foundation.layout.Column] —
+ * can each place the pair with a single call, and cannot drift apart on which banner comes first
+ * or on whether one of them was forgotten.
+ */
+@Composable
+internal fun TodayPermissionBanners(state: TodayUiState, onNotificationPermissionRequested: () -> Unit) {
+    // Above the exact-alarm banner deliberately: a late reminder is a degraded reminder, a missing
+    // permission is no reminder at all.
+    if (state.notificationPermission.needsBanner()) {
+        NotificationPermissionBanner(
+            decision = state.notificationPermission,
+            onPermissionRequested = onNotificationPermissionRequested,
+        )
+    }
+    if (!state.canScheduleExactAlarms) {
+        ExactAlarmBanner()
+    }
+}
+
 /** Only the two actionable states put a banner on screen: `GRANTED` needs nothing and
  *  `NOT_APPLICABLE` (API 31-32) has no runtime permission to talk about at all. */
 internal fun NotificationPermissionDecision.needsBanner(): Boolean =

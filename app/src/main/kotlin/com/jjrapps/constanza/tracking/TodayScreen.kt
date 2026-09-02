@@ -48,6 +48,7 @@ private val TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm")
 @Composable
 fun TodayRoute(
     onManageHabits: () -> Unit,
+    onAddHabit: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     viewModel: TodayViewModel = hiltViewModel(),
 ) {
@@ -68,6 +69,7 @@ fun TodayRoute(
         onToggleExpanded = viewModel::toggleExpanded,
         onAnswer = viewModel::answer,
         onManageHabits = onManageHabits,
+        onAddHabit = onAddHabit,
         onOpenSettings = onOpenSettings,
         onNotificationPermissionRequested = viewModel::recordNotificationPermissionRequested,
     )
@@ -88,6 +90,7 @@ fun TodayScreen(
     onToggleExpanded: (Long) -> Unit,
     onAnswer: (Long, TodaySlot, InAppEntryStatus) -> Unit,
     onManageHabits: () -> Unit,
+    onAddHabit: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onNotificationPermissionRequested: () -> Unit = {},
 ) {
@@ -107,7 +110,7 @@ fun TodayScreen(
         },
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
-            TodayContent(state, onToggleExpanded, onAnswer, onNotificationPermissionRequested)
+            TodayContent(state, onToggleExpanded, onAnswer, onAddHabit, onNotificationPermissionRequested)
         }
     }
 }
@@ -117,28 +120,28 @@ private fun TodayContent(
     state: TodayUiState,
     onToggleExpanded: (Long) -> Unit,
     onAnswer: (Long, TodaySlot, InAppEntryStatus) -> Unit,
+    onAddHabit: () -> Unit,
     onNotificationPermissionRequested: () -> Unit,
 ) {
+    // Two layouts, chosen by whether there is a list at all, rather than one LazyColumn with an
+    // empty branch inside it. A `fillParentMaxSize` item is sized against the whole viewport and
+    // knows nothing about the banners above it, so with both banners showing the "centred" action
+    // was pushed into the bottom third of a real screen — seen on the emulator, not reasoned about.
+    // A Column whose empty state takes `weight(1f)` centres in the space that is actually left.
+    // Nothing scrolls in that case anyway: at most two banners and one call to action.
+    if (state.rows.isEmpty()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            TodayPermissionBanners(state, onNotificationPermissionRequested)
+            TodayEmptyState(onAddHabit, modifier = Modifier.weight(1f))
+        }
+        return
+    }
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        // Above the exact-alarm banner deliberately: a late reminder is a degraded reminder, a
-        // missing permission is no reminder at all.
-        if (state.notificationPermission.needsBanner()) {
-            item {
-                NotificationPermissionBanner(
-                    decision = state.notificationPermission,
-                    onPermissionRequested = onNotificationPermissionRequested,
-                )
-            }
-        }
-        if (!state.canScheduleExactAlarms) {
-            item { ExactAlarmBanner() }
-        }
-        if (state.rows.isEmpty()) {
-            item { Text(stringResource(R.string.today_empty), modifier = Modifier.padding(16.dp)) }
-        }
+        item { TodayPermissionBanners(state, onNotificationPermissionRequested) }
         items(state.rows, key = { it.habitId }) { row ->
             HabitRollupRow(row, row.habitId in state.expandedHabitIds, state.zone, onToggleExpanded, onAnswer)
         }
+        item { TrailingAddHabitAction(onAddHabit) }
     }
 }
 
