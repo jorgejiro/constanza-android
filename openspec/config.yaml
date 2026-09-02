@@ -157,63 +157,59 @@ carried_forward_open_items:
         habit editor.
     - id: "no-launcher-icon"
       title: "The app ships with the stock Android launcher icon"
-      status: open
+      status: resolved
       origin: >
-        Seen on the S25 on 2026-09-02: the app appears with the generic Android
-        robot in the launcher and in system settings.
+        Seen on the S25 on 2026-09-02: the app appeared with the generic
+        Android robot in the launcher and in system settings.
       reason: >
-        AndroidManifest.xml declares
+        AndroidManifest.xml declared
         `android:icon="@android:drawable/sym_def_app_icon"` and no mipmap
-        resources exist anywhere in app/src/main/res.
+        resources existed anywhere in app/src/main/res.
       why_it_matters: >
-        Not cosmetic once there is a design system. The warm-dark identity now
-        has a defined accent and palette, and the launcher icon is the one place
-        a habit app is seen every day without being opened.
-      owner_condition: "Its own small PR. Needs an adaptive icon (foreground/background layers) plus a monochrome layer for themed icons."
-      progress: >
-        Branch feat/launcher-icon (2026-09-02, NOT merged and no PR opened)
-        builds the whole resource path and leaves only the artwork outstanding.
-        Shipped on that branch: res/drawable/ic_launcher_foreground.xml and
-        res/drawable/ic_launcher_monochrome.xml (108x108 viewport, stroked
-        Direction A "Espiral" path, round caps, accent #E8A860 matching
-        ConstanzaColors.ACCENT_ARGB); res/values/ic_launcher_background.xml as a
-        flat colour (#110B06, matching BACKGROUND_ARGB) rather than a drawable;
-        res/mipmap-anydpi-v26/ic_launcher.xml and ic_launcher_round.xml as
-        <adaptive-icon> with background/foreground/monochrome; and
-        AndroidManifest.xml pointing android:icon at @mipmap/ic_launcher with
-        android:roundIcon added. NO legacy raster mipmap was produced and none is
-        needed: minSdk = 31 is above the API 26 adaptive-icon floor, so every
-        device that can install the app renders the vector layers and the
-        density PNG buckets would be dead weight. Verified on emulator-5554
-        (API 37, 1080x2400, 420dpi): aapt2 confirms the manifest resolves to the
-        adaptive icon and that the compiled <monochrome> layer is present; the
-        icon renders on the launcher home screen unclipped by the circular mask;
-        and the Android 13+ themed path was exercised for real by switching
-        Wallpaper & style > Icons > Style to "Minimal", where the monochrome
-        layer rendered correctly and was system-tinted. Gates green on that
-        branch: assembleDebug, testDebugUnitTest, detekt, detektMain, lintDebug,
-        and emulatorMatrixGroupDebugAndroidTest (79 tests, 1 skipped, 0 failed).
-      blocked_on: >
-        The artwork itself, which does not survive at launcher size. The supplied
-        path steps its radius by 3 per half-turn (27, 24, 21, 18, 15), so the
-        coil's pitch — the radial distance between two adjacent turns — is 6,
-        while the stroke is 9 wide and therefore spans 4.5 either side of its
-        centreline. Adjacent turns overlap by 3 instead of leaving a gap, so the
-        turns fuse into a solid disc. On screen the icon reads as a coffee bean
-        or an eye: a filled amber circle with a dark notch where the innermost
-        unstroked area (radius 10.5) survives, with the round cap of the final
-        free end cutting the comma. This is arithmetic, not an anti-aliasing
-        artifact, so it fails at every size, not only at 48dp. The safe-zone half
-        of the design DID hold: the outermost stroked edge lands at radius 31.5
-        against the 33 safe radius, and nothing is clipped by any mask.
-      owner_condition_addendum: >
-        Needs a drawing decision from the maintainer before this can merge, and
-        the decision is only about numbers, not direction. Either thin the stroke
-        below the pitch of 6 (a stroke of 3 leaves an equal 3-wide gap, but at
-        48dp that is about 1.3dp of ink and probably too faint), or keep a
-        heavier stroke and widen the pitch by using fewer turns, which is what
-        makes a spiral legible at icon size. Everything else on the branch is
-        finished and can be reused as-is once the path data is settled.
+        Not cosmetic once there is a design system. The warm-dark identity has
+        a defined accent and palette, and the launcher icon is the one place a
+        habit app is seen every day without being opened.
+      resolution: >
+        Adaptive icon shipped: drawable/ic_launcher_foreground.xml,
+        drawable/ic_launcher_monochrome.xml, values/ic_launcher_background.xml
+        and mipmap-anydpi/{ic_launcher,ic_launcher_round}.xml, with the manifest
+        pointing at both icon and roundIcon. The mark is "Espiral" — one
+        unbroken stroke coiling inward — chosen by the maintainer from five
+        directions, in ACCENT_ARGB over BACKGROUND_ARGB.
+
+        No raster anywhere and no density buckets: minSdk is 31, well above the
+        26 that adaptive icons need, so legacy PNG fallbacks would be dead
+        weight. The folder is `mipmap-anydpi`, not `-v26`; the version
+        qualifier is redundant at this minSdk and lint's ObsoleteSdkInt was
+        right to say so.
+      resolution_lesson: >
+        The first attempt shipped a broken drawing and it is worth recording
+        why, because the failure was invisible in the source. The coil's radii
+        stepped by 3 per half-turn, putting adjacent turns 6 apart, under a
+        stroke of 9 that reaches 4.5 either side of its centreline — so
+        consecutive turns overlapped by 3 and welded into a solid disc with a
+        notch. It read as a coffee bean at every size, not just small ones.
+        The rule the drawables now carry in comments: stroke must stay below
+        the pitch. The corrected coil steps by 6.5 (pitch 13) under a stroke of
+        8, leaving a clean 5-wide gap, and drops from two and a half turns to
+        two, because a stroke that heavy cannot fit more inside the 66dp safe
+        circle.
+
+        The wider lesson is about verification, not geometry: the artwork was
+        authored in SVG at large size and signed off there. Nothing catches
+        this but rasterising it and looking.
+      verified: >
+        Built and installed on the API 37 emulator, app drawer screenshotted
+        and read: the coil is legible as a spiral, centred, unclipped by the
+        launcher mask. lint reports no icon findings — IconMissingDensityFolder,
+        IconLauncherShape and MonochromeLauncherIcon are all silent and
+        legitimately so, with no lint.xml or baseline suppressing anything.
+        Unit tests green.
+      not_verified: >
+        The themed/monochrome layer was exercised on the emulator by the first
+        attempt (Wallpaper & style, Icons, Minimal) and rendered system-tinted,
+        but that check has not been repeated against the corrected geometry.
+        The icon has not been seen on the physical Galaxy S25.
     - id: "release-build-never-produced"
       title: "No release build has ever been assembled, and the R8 path is unexercised"
       status: open
