@@ -30,7 +30,7 @@ fun OnboardingRoute(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshPermission()
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -50,6 +50,7 @@ fun OnboardingRoute(
             OnboardingPage.Intro -> OnboardingIntroPage()
             OnboardingPage.Permissions -> OnboardingPermissionsPage(
                 permission = state.permission,
+                canScheduleExactAlarms = state.canScheduleExactAlarms,
                 onPermissionRequested = viewModel::recordRequestedNotificationPermission,
             )
         }

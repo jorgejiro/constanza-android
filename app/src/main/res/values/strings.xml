@@ -101,7 +101,7 @@
     <!-- design §12/§13.1: non-blocking exact-alarm banner (task 6b.9). -->
     <string name="today_settings">Settings</string>
     <string name="today_exact_alarm_banner">Reminders may arrive a few minutes late on this device.</string>
-    <string name="today_exact_alarm_banner_action">Fix</string>
+    <string name="today_exact_alarm_banner_action">Open settings</string>
 
     <!-- reminder-response: Notification Permission Scope — the Today banner that asks for
          POST_NOTIFICATIONS, or points at system settings once the system stops prompting. -->
@@ -149,4 +149,7 @@
     <string name="onboarding_permission_blocked_action">Open settings</string>
     <string name="onboarding_action_continue">Continue</string>
     <string name="onboarding_action_finish">Finish</string>
+    <string name="onboarding_exact_alarm_granted_body">Exact reminders are on. Habits will ring right on time.</string>
+    <string name="onboarding_exact_alarm_denied_body">Reminders will still arrive, but on this device they may arrive a few minutes late unless you turn on exact alarms.</string>
+    <string name="onboarding_exact_alarm_denied_action">Open settings</string>
 </resources>

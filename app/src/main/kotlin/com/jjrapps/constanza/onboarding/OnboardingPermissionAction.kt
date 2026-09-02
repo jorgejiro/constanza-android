@@ -2,6 +2,7 @@ package com.jjrapps.constanza.onboarding
 
 import android.Manifest
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -83,6 +84,51 @@ internal fun OnboardingPermissionAction(
                 modifier = Modifier.padding(top = Spacing.md),
             ) {
                 Text(stringResource(R.string.onboarding_permission_blocked_action))
+            }
+        }
+    }
+}
+
+/**
+ * Screen 2's exact-alarm row (design.md decisions 2, 3, 5, 6). A plain [Boolean], not a decision
+ * enum — `SCHEDULE_EXACT_ALARM` has no four-state table the way `POST_NOTIFICATIONS` does, since
+ * `minSdk = 31` means the permission concept always exists and the offer is repeatable, so there is
+ * no `NOT_APPLICABLE` and no "we have asked" latch.
+ *
+ * [canSchedule] `true` renders one confirmation line and no button — a button whose only honest
+ * action is "nothing" is exactly the dead-button defect this design avoids. `false` renders the
+ * degradation copy plus a FILLED [Button] (design decision 5: sibling parity with
+ * [OnboardingPermissionAction]'s own controls, not a lighter, "less important" outlined one) that
+ * deep-links to `ACTION_REQUEST_SCHEDULE_EXACT_ALARM`. No launcher and no callback (decision 6): the
+ * only outbound edge is `startActivity`, and the caller re-reads the real state on `ON_RESUME`
+ * regardless of what the user did in settings.
+ */
+@Composable
+internal fun OnboardingExactAlarmAction(canSchedule: Boolean) {
+    val context = LocalContext.current
+    if (canSchedule) {
+        Text(
+            stringResource(R.string.onboarding_exact_alarm_granted_body),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    } else {
+        Column {
+            Text(
+                stringResource(R.string.onboarding_exact_alarm_denied_body),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(
+                onClick = {
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                            Uri.parse("package:${context.packageName}"),
+                        ),
+                    )
+                },
+                modifier = Modifier.padding(top = Spacing.md),
+            ) {
+                Text(stringResource(R.string.onboarding_exact_alarm_denied_action))
             }
         }
     }

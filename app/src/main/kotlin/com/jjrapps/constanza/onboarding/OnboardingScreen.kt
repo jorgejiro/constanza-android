@@ -110,12 +110,18 @@ internal fun OnboardingIntroPage() {
 }
 
 /** Screen 2 — applicability-derived (design.md §7): present only when [OnboardingViewModel]
- *  includes [OnboardingPage.Permissions] in its page list. [permission] is the LIVE decision,
- *  re-read on `ON_RESUME` by the caller — this composable stays presentational, state in, callback
- *  out. */
+ *  includes [OnboardingPage.Permissions] in its page list. Hosts BOTH permission rows, the
+ *  notification row first (spec ordering: delivery severity, not a ranking of the two asks — a
+ *  denied notification silences the app, a denied exact alarm only widens the delivery window).
+ *  Each row decides its own visibility: [OnboardingPermissionAction] renders nothing for
+ *  [NotificationPermissionDecision.NOT_APPLICABLE], so on the API 31-32 leg where only the
+ *  exact-alarm ask applies, this page shows exactly one row despite always composing both calls.
+ *  [permission] and [canScheduleExactAlarms] are both LIVE, re-read on `ON_RESUME` by the caller —
+ *  this composable stays presentational, state in, callback out. */
 @Composable
 internal fun OnboardingPermissionsPage(
     permission: NotificationPermissionDecision,
+    canScheduleExactAlarms: Boolean,
     onPermissionRequested: () -> Unit,
 ) {
     Column {
@@ -126,5 +132,7 @@ internal fun OnboardingPermissionsPage(
         )
         Spacer(modifier = Modifier.height(Spacing.md))
         OnboardingPermissionAction(decision = permission, onRequested = onPermissionRequested)
+        Spacer(modifier = Modifier.height(Spacing.md))
+        OnboardingExactAlarmAction(canSchedule = canScheduleExactAlarms)
     }
 }
