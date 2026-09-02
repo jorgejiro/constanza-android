@@ -216,7 +216,7 @@ carried_forward_open_items:
         in the matrix and not tested for.
     - id: "compose-test-db-teardown-race"
       title: "TodayComposeTest's async DB teardown can crash the whole instrumentation process"
-      status: open
+      status: resolved
       severity: "does not fail the build honestly — it misattributes failures to unrelated tests"
       origin: >
         Fired on 2026-09-02 during first-run-onboarding Unit B's second matrix
@@ -242,6 +242,116 @@ carried_forward_open_items:
         timeout: make teardown deterministic so the collector cannot outlive
         the database. Worth auditing every instrumented test that constructs a
         ViewModel by bare constructor, not just these two.
+      resolution: >
+        Fixed on branch fix/compose-teardown-race by moving the ordering out of
+        the tests and into the object that owns the database.
+
+        HabitRepositoryTestFixture now owns ViewModel lifetime. Every ViewModel
+        reaches it through a factory — fixture.todayViewModel(),
+        habitListViewModel(), habitEditorViewModel(), or register() for one with
+        no factory yet — and close() drains every registered scope in reverse
+        creation order before database.close(). No test writes a teardown
+        ordering any more; the six that had hand-copied one now just call
+        fixture.close().
+
+        cancelAndJoin, not cancel. The KDoc the old tests copied described
+        cancel(), which returns as soon as the job is marked cancelled and
+        before its children have stopped — so a query already handed to Room's
+        query executor could still land on a closing database. That was a
+        smaller race, not the absence of one. Joining waits for it. The join is
+        bounded by SCOPE_DRAIN_TIMEOUT_MS = 5s so a coroutine that refuses to
+        finish degrades to the old behaviour rather than hanging the matrix
+        behind one @After, and the timeout is deliberately not asserted on:
+        throwing in @After would misattribute a result, which is the failure
+        mode this whole change removes.
+
+        The audit found more than the two classes this item named. Twelve
+        androidTest classes built a ViewModel by bare constructor over a real
+        Room database, at 15 call sites. Six already cancelled (TodayComposeTest,
+        TodayAdaptiveComposeTest, TodayAddHabitComposeTest,
+        TodaySlotRowComposeTest, EntryWriteParityTest, and HabitColorDotComposeTest
+        partially). Seven were leaking: HabitEditorComposeTest,
+        HabitEditorCancelComposeTest, HabitEditorRotationComposeTest,
+        HabitEditorTimePickerComposeTest, HabitScheduleKindComposeTest,
+        HabitListArchiveComposeTest, and HabitColorDotComposeTest's second
+        ViewModel — its HabitListViewModel, which has an eager stateIn over
+        habitRepository.observeAll() and was never cancelled at all, while the
+        same class carefully cancelled its TodayViewModel. The e2e classes were
+        checked and need no change: they construct no ViewModels themselves, and
+        CoreFlowTestFixture opens its own Room.databaseBuilder handle rather than
+        Hilt's singleton, so its close() never shuts the database the Activity's
+        ViewModels read.
+
+        The six identical TodayViewModel(...) constructions collapsed into one
+        factory. Net across the change: 148 insertions against 207 deletions.
+
+        Enforced rather than documented, because a correct fix written once in a
+        KDoc and applied to three of ten files is what created this item.
+        ViewModelTeardownCallSiteTest (app/src/test) scans src/androidTest/kotlin
+        as text and fails the build on a bare constructor of any of the app's
+        eight ViewModels — not only the three built today, since six of the eight
+        carry an eager collector. It exempts a construction passed directly to
+        register(), blanks comments and strings first, and pins both judgements
+        against inline sources. It also asserts its own reach, so a scan that
+        reads nothing cannot pass.
+
+        detekt was considered and does not reach this. app/build.gradle.kts
+        registers exactly one type-resolved detekt task, detektMain, with
+        setSource(files("src/main/kotlin")); the plugin's plain detekt task is
+        PSI-only under AGP 9. A ForbiddenMethodCall ban on these constructors
+        would therefore not resolve in androidTest at all. Covering it would mean
+        a third type-resolved task wired to debugAndroidTestCompileClasspath.
+        That is the alternative; the call-site test is the lighter guard and
+        reuses the precedent ControlStrokeCallSiteTest already set.
+      resolution_verification: >
+        Baseline first: the matrix was run on the unmodified tree at ef9d372
+        before anything changed, and it was GREEN — 182 testcases across both
+        legs, 179 passed, 3 skipped, 0 failed, 0 errored. So main was not red
+        when this was fixed. That is the expected shape of a race, not evidence
+        against one: the same defect had already been observed failing twice,
+        once as a ComposeTimeoutException on api37 and once as an
+        SQLException from ReminderSlotDao.findByHabitId that poisoned the
+        following test through UncaughtExceptionsBeforeTest.
+
+        After the fix: :app:testDebugUnitTest 160/160 green, and
+        :app:detekt :app:detektMain :app:lintDebug clean. The matrix was then run
+        twice with --rerun-tasks, both times on exactly the committed code, and
+        both were green — 182 testcases, 179 passed, 3 skipped, 0 failed, 0
+        errored, each time.
+        `TodayComposeTest.skippingInAppPersistsSkippedOnTheAnsweredSlotAndDate`,
+        the api37 test a control run had caught failing, passed on api37 in both
+        (1.17s and 1.62s).
+
+        All result XML was parsed with xml.etree.ElementTree rather than a
+        regex, since a self-closing <testcase/> makes a naive regex blame the
+        wrong test — the same misattribution this item is about. That mattered
+        in practice: Gradle's console counter reported "api31 Tests 92/91
+        completed" on the second run, while the XML for that leg held exactly 91
+        testcases with no duplicates. The log line was the artefact; the parsed
+        result was not.
+
+        The teardown drain costs nothing measurable. api31's suite time was
+        172.02s before the change and 169.52s / 171.35s across the two runs
+        after it, so the bounded cancelAndJoin is completing promptly rather
+        than sitting on its 5s timeout.
+
+        The guard was proved to bite rather than assumed to: planting
+        HabitListViewModel(fixture.habitRepository) back into
+        HabitListArchiveComposeTest failed testDebugUnitTest with the offending
+        file and line named, and reverting it went green again.
+      resolution_caveat: >
+        A race can never be proven absent. Two clean matrix runs raise
+        confidence and prove no regression; they do not establish that the
+        window is closed, and the pre-fix baseline in this very item was itself
+        green — which is the point. Three green runs in a row, one of them on
+        the unfixed code, is exactly what an intermittent defect looks like from
+        close up, so the run count is the weakest part of this evidence. What is stronger than the run count is the argument: teardown now
+        joins the cancelled scopes instead of merely signalling them, so the
+        collector cannot still be running when close() returns unless the 5s
+        drain bound is hit — and the enforcement test means a future test cannot
+        quietly reintroduce the old shape. If this ever fires again, suspect the
+        drain timing out silently first; that is the one path left where close()
+        proceeds with work still in flight.
     - id: "today-row-answering-is-cramped-and-always-on"
       title: "Today's answer buttons never fit, and never go away once answered"
       status: open
