@@ -172,6 +172,15 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
+// ControlStrokeCallSiteTest reads :app's own main sources as text. It has to: the thing it guards
+// is a control added with no `border` argument at all, and such a call site names nothing that
+// detekt's ForbiddenMethodCall could forbid — the default is evaluated inside material3. See that
+// test's KDoc. Handing the path over explicitly beats resolving it from the test's working
+// directory: a wrong or missing path then fails loudly rather than scanning nothing and passing.
+tasks.withType<Test>().configureEach {
+    systemProperty("constanza.mainSourceDir", layout.projectDirectory.dir("src/main/kotlin").asFile.absolutePath)
+}
+
 dependencies {
     implementation(project(":domain"))
 
@@ -296,31 +305,49 @@ detekt {
     config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
 }
 
+/** AGP's artifact-type attribute, used to ask a configuration for jars instead of raw `.aar`s. */
+private val ARTIFACT_TYPE_ATTRIBUTE = org.gradle.api.attributes.Attribute.of("artifactType", String::class.java)
+
 // detekt 1.23.8 does not hook AGP 9's variant API, so it registers no `detekt<Variant>` tasks for
 // this module — only a plain, PSI-only `detekt`. The task below is registered by hand so :app gets
 // detekt coverage at all.
 //
-// KNOWN GAP, stated here so a green build is not mistaken for a guarantee: `ForbiddenMethodCall`
-// — the clock-access ban — does NOT fire in this module. It was probed, not assumed: inserting
-// `java.time.LocalDate.now()` into OccurrencePlanner fails `:domain:detektMain` and passes here,
-// with an identical shared config and a 74-entry classpath. Semantic rules need type resolution
-// that this hand-rolled task does not obtain under AGP 9, and 1.23.8 is the latest release, so
-// there is nothing to upgrade to.
+// THE CLASSPATH IS THE WHOLE POINT OF THIS TASK, and it took two corrections to make real. Until
+// test/guard-control-strokes this block passed `debugCompileClasspath` straight through and left
+// the platform out, and the result was a task that ran every PSI rule but silently resolved almost
+// nothing — `ForbiddenMethodCall`, the clock ban, did not fire here at all. That was recorded as an
+// unfixable AGP 9 limitation. It was not one; it was two defects in these four lines:
 //
-// What this task DOES enforce here is every PSI rule — LongParameterList, ReturnCount,
-// MaxLineLength, LoopWithTooManyJumpStatements, MagicNumber and the rest — which is real value and
-// already caught six findings on first run.
+//  1. `debugCompileClasspath` resolves to what the *dependency graph* holds, which for an Android
+//     app is mostly `.aar` files — measured here at 70 of 92 entries. The Kotlin frontend cannot
+//     read an `.aar`, so every AndroidX and Compose symbol came back unresolved while `java.time`,
+//     which needs no classpath entry at all, resolved fine. That asymmetry is exactly what made the
+//     old probe look like a wholesale type-resolution failure. Asking the same configuration for
+//     the `android-classes-jar` view runs AGP's own transforms and hands over readable jars.
+//  2. `android.jar` was absent entirely. Nothing that touches the framework could resolve without
+//     it, which is most of this module.
 //
-// In :app the clock ban therefore rests on the TimeProvider convention and on review, exactly as
-// it did before this change. Revisit when detekt supports AGP 9 variants.
+// Both were probed rather than assumed, in both directions: with the view and the platform in
+// place, `ForbiddenMethodCall` fires on a planted `java.time.LocalDate.now()` in
+// `habit/ScheduleEditors.kt` and on the real `ButtonDefaults.outlinedButtonBorder` call in
+// `core/ui/theme/ControlDefaults.kt`; with either one removed, neither fires.
+//
+// So the clock ban and the control-stroke ban (config/detekt/detekt.yml) are now genuinely enforced
+// in :app rather than resting on convention and review, and turning resolution on surfaced exactly
+// one finding in existing code, handled at InjectDispatcher in that same config.
 val detektMain by tasks.registering(io.gitlab.arturbosch.detekt.Detekt::class) {
     description = "Runs detekt on :app main sources with type resolution."
     setSource(files("src/main/kotlin"))
     config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
     buildUponDefaultConfig = true
     classpath.setFrom(
-        configurations.getByName("debugCompileClasspath"),
+        // The `android-classes-jar` view, not the raw configuration: see the note above.
+        configurations.getByName("debugCompileClasspath").incoming.artifactView {
+            attributes.attribute(ARTIFACT_TYPE_ATTRIBUTE, "android-classes-jar")
+        }.files,
         tasks.named("compileDebugKotlin").map { it.outputs.files },
+        // android.jar. Without it nothing that touches the framework resolves, which is most of :app.
+        androidComponents.sdkComponents.bootClasspath,
     )
     jvmTarget = "11"
     reports {

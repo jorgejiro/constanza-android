@@ -42,10 +42,15 @@ private val ChipBorderWidth = 1.dp
  * either — its `outlineVariant` measures 1.99:1, under the floor. So the roles stay split by job and
  * the controls Material routes through the wrong one are pointed back by hand, in one place.
  *
- * **The guard's blind spot, stated plainly.** `ColorContrastTest` asserts that the *tones* clear
- * their floors, and it reads the real `ColorScheme` so it catches a role being rebound. It cannot
- * see a call site that forgets to come here. A new outlined control that takes M3's default border
- * will be invisible again and no test will say so.
+ * **What guards this, and which guard catches what.** `ColorContrastTest` asserts that the *tones*
+ * clear their floors, and it reads the real `ColorScheme` so it catches a role being rebound. It
+ * cannot see a call site that forgets to come here, and two guards were added for that afterwards
+ * because neither covers it alone. `config/detekt/detekt.yml` forbids the eight Material default
+ * border factories that resolve to `outlineVariant`, with this file as the single exemption — that
+ * catches a border sourced from the wrong place. `ControlStrokeCallSiteTest` requires every call to
+ * a guarded outlined composable to pass `border = ConstanzaControlDefaults.…` — that catches a
+ * border never sourced at all, which the detekt ban provably cannot see, since a call site that
+ * simply omits the argument names nothing forbidden.
  */
 object ConstanzaControlDefaults {
 
