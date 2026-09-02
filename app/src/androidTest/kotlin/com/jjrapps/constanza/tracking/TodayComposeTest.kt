@@ -5,7 +5,6 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.lifecycle.viewModelScope
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jjrapps.constanza.R
@@ -14,12 +13,7 @@ import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
 import com.jjrapps.constanza.habit.HabitRepositoryTestFixture
 import com.jjrapps.constanza.habit.newHabit
-import com.jjrapps.constanza.reminding.NotificationPoster
-import com.jjrapps.constanza.scheduling.AlarmScheduler
 import com.jjrapps.constanza.scheduling.insertHabitWithSchedule
-import io.mockk.every
-import io.mockk.mockk
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -54,37 +48,14 @@ class TodayComposeTest {
 
     @Before
     fun setUp() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        fixture = HabitRepositoryTestFixture(context)
-        val entryWriter = EntryWriter(
-            fixture.database, fixture.database.entryDao(), fixture.database.reminderOccurrenceDao(),
-            mockk<AlarmScheduler>(relaxed = true), NotificationPoster(context), fixture.timeProvider,
-        )
-        // Explicitly stubbed for the same reason as EntryWriteParityTest: a relaxed mock's default
-        // false would spuriously arm task 6b.9's banner branch in a test that is not about it.
-        val alarmScheduler = mockk<AlarmScheduler>(relaxed = true)
-        every { alarmScheduler.canScheduleExactAlarms() } returns true
-        viewModel = TodayViewModel(
-            fixture.habitRepository, fixture.database.entryDao(), fixture.database.reminderOccurrenceDao(),
-            entryWriter, alarmScheduler, grantedNotificationPermission(),
-            neverAskedReminderSettingsStore(), fixture.timeProvider,
-        )
+        fixture = HabitRepositoryTestFixture(ApplicationProvider.getApplicationContext<Context>())
+        viewModel = fixture.todayViewModel()
     }
 
-    /**
-     * The scope is cancelled BEFORE the database closes, and that order is the whole point.
-     * [TodayViewModel.uiState] is `stateIn(viewModelScope, SharingStarted.Eagerly, ...)`, and this
-     * test builds the ViewModel by bare constructor rather than through a `ViewModelProvider`, so
-     * nothing ever clears it. Left running, that eager collector keeps querying a database this
-     * `close()` has already shut, and the resulting `SQLiteConnectionPool` "connection pool has been
-     * closed" surfaces asynchronously — attributed to whichever test happens to be running at the
-     * time, not to this one. Found as an intermittent failure in a class it had nothing to do with.
-     */
+    /** Ordering lives in [HabitRepositoryTestFixture.close] — see its KDoc for why the ViewModel
+     *  scopes must die before the database, and what the old per-class teardown was preventing. */
     @After
-    fun tearDown() {
-        viewModel.viewModelScope.cancel()
-        fixture.close()
-    }
+    fun tearDown() = fixture.close()
 
     private fun text(resId: Int) = ApplicationProvider.getApplicationContext<Context>().getString(resId)
 

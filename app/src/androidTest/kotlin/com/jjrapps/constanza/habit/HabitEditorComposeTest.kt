@@ -45,8 +45,9 @@ class HabitEditorComposeTest {
     /** Call this outside `setContent`, never inside it: a view model built in the composable
      *  lambda is rebuilt on every recomposition and the editor would silently lose its state.
      *  Lint's `ViewModelConstructorInComposable` cannot see the construction through this helper,
-     *  so the call site is the only place the rule can be honoured. */
-    private fun newViewModel() = HabitEditorViewModel(fixture.habitRepository, fixture.timeProvider)
+     *  so the call site is the only place the rule can be honoured. Goes through the fixture so the
+     *  editor's scope is cancelled before the database closes — see [HabitRepositoryTestFixture.close]. */
+    private fun newViewModel() = fixture.habitEditorViewModel()
 
     private fun text(resId: Int) = ApplicationProvider.getApplicationContext<Context>().getString(resId)
 

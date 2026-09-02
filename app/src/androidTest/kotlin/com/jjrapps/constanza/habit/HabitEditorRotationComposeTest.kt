@@ -69,7 +69,7 @@ class HabitEditorRotationComposeTest {
         // re-invokes that lambda to rebuild the composition, and it must close over the SAME
         // instance (matching how a real ViewModelStore hands back the same retained instance after
         // an actual rotation) rather than a fresh one every recomposition.
-        val viewModel = HabitEditorViewModel(fixture.habitRepository, fixture.timeProvider)
+        val viewModel = fixture.habitEditorViewModel()
         val restorationTester = StateRestorationTester(composeTestRule)
         restorationTester.setContent {
             HabitEditorRoute(habitId = null, onDone = {}, onBack = {}, viewModel = viewModel)
@@ -97,7 +97,7 @@ class HabitEditorRotationComposeTest {
      */
     @Test
     fun rotatingRestoresFocusToTheFieldThatHadIt() {
-        val viewModel = HabitEditorViewModel(fixture.habitRepository, fixture.timeProvider)
+        val viewModel = fixture.habitEditorViewModel()
         val restorationTester = StateRestorationTester(composeTestRule)
         restorationTester.setContent {
             HabitEditorRoute(habitId = null, onDone = {}, onBack = {}, viewModel = viewModel)
@@ -124,7 +124,7 @@ class HabitEditorRotationComposeTest {
      */
     @Test
     fun rotatingWithTheTimePickerOpenKeepsTheDialogAndTheUnconfirmedTime() {
-        val viewModel = HabitEditorViewModel(fixture.habitRepository, fixture.timeProvider)
+        val viewModel = fixture.habitEditorViewModel()
         val restorationTester = StateRestorationTester(composeTestRule)
         restorationTester.setContent {
             HabitEditorRoute(habitId = null, onDone = {}, onBack = {}, viewModel = viewModel)
