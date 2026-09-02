@@ -1,5 +1,7 @@
 package com.jjrapps.constanza.reminding
 
+import android.annotation.SuppressLint
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -49,8 +51,36 @@ class NotificationPoster @Inject constructor(@ApplicationContext private val con
      */
     fun postReminder(occurrenceId: Long, habitName: String, question: String?, colorArgb: Int): Boolean {
         if (!canPost()) return false
-        manager.notify(occurrenceId.toInt(), buildNotification(occurrenceId, habitName, question, colorArgb))
+        postToSystem(occurrenceId, buildNotification(occurrenceId, habitName, question, colorArgb))
         return true
+    }
+
+    /**
+     * Named `postToSystem`, not `notify`, only to stay clearly distinct from `Object.notify()`.
+     *
+     * The suppression is scoped to this one-line function rather than to [postReminder] so that it
+     * covers exactly the guarded call and nothing else: `@SuppressLint` cannot target a statement,
+     * and a wider scope would silence a future unguarded call added to the same body.
+     *
+     * `POST_NOTIFICATIONS` is declared in the manifest, and the real guard is [canPost], which
+     * [postReminder] evaluates immediately before this call: its `areNotificationsEnabled()` check
+     * returns `false` from API 33 on whenever the permission is denied — denial blocks every
+     * channel, and `areNotificationsEnabled()` is the platform's own documented pre-send check.
+     * Lint cannot follow that guard one call deep into a helper, so it reports a false positive.
+     *
+     * The rejected alternative was an inline permission check lint could see. That would duplicate
+     * the SDK-branched logic that [NotificationPermission] already owns as this app's single source
+     * of truth — including its API 31-32 branch, where the permission does not exist and must never
+     * be checked. Two owners of a subtle version-branched check is a worse correctness risk than
+     * the lint warning it would silence, and drift between them would be invisible.
+     *
+     * Deliberately not `@RequiresPermission`: that would push the requirement onto the
+     * [postReminder] callers, which are `Worker`s designed to gate rather than crash and can do
+     * nothing useful with it.
+     */
+    @SuppressLint("MissingPermission")
+    private fun postToSystem(occurrenceId: Long, notification: Notification) {
+        manager.notify(occurrenceId.toInt(), notification)
     }
 
     /** design.md §9.1: cancels [occurrenceId]'s posted notification, a no-op when none is showing.
@@ -87,7 +117,7 @@ class NotificationPoster @Inject constructor(@ApplicationContext private val con
         habitName: String,
         question: String?,
         colorArgb: Int,
-    ): android.app.Notification =
+    ): Notification =
         NotificationCompat.Builder(context, REMINDER_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_reminder)
             .setColor(colorArgb)

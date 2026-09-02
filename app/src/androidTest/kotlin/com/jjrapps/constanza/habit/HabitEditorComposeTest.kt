@@ -42,6 +42,10 @@ class HabitEditorComposeTest {
     @After
     fun tearDown() = fixture.close()
 
+    /** Call this outside `setContent`, never inside it: a view model built in the composable
+     *  lambda is rebuilt on every recomposition and the editor would silently lose its state.
+     *  Lint's `ViewModelConstructorInComposable` cannot see the construction through this helper,
+     *  so the call site is the only place the rule can be honoured. */
     private fun newViewModel() = HabitEditorViewModel(fixture.habitRepository, fixture.timeProvider)
 
     private fun text(resId: Int) = ApplicationProvider.getApplicationContext<Context>().getString(resId)
@@ -49,8 +53,9 @@ class HabitEditorComposeTest {
     @Test
     fun creatingAHabitEndToEndPersistsTheHabitAndADailySchedule() {
         var done = false
+        val viewModel = newViewModel()
         composeTestRule.setContent {
-            HabitEditorRoute(habitId = null, onDone = { done = true }, viewModel = newViewModel())
+            HabitEditorRoute(habitId = null, onDone = { done = true }, viewModel = viewModel)
         }
 
         composeTestRule.onNodeWithText(text(R.string.habit_editor_name_label)).performTextInput("Drink water")
@@ -66,8 +71,9 @@ class HabitEditorComposeTest {
     @Test
     fun saveIsBlockedAndNoHabitIsPersistedWhileTheNameIsEmpty() {
         var done = false
+        val viewModel = newViewModel()
         composeTestRule.setContent {
-            HabitEditorRoute(habitId = null, onDone = { done = true }, viewModel = newViewModel())
+            HabitEditorRoute(habitId = null, onDone = { done = true }, viewModel = viewModel)
         }
 
         composeTestRule.onNodeWithText(text(R.string.habit_editor_save)).performClick()

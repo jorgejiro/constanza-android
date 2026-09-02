@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.jjrapps.constanza.R
@@ -34,7 +35,6 @@ import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
 import java.time.DayOfWeek
 import java.time.format.TextStyle
-import java.util.Locale
 
 private const val MIN_STEPPER_VALUE = 1
 private const val MAX_DAY_OF_MONTH = 31
@@ -228,18 +228,26 @@ private fun NumberStepper(
     }
 }
 
+/**
+ * Reads the locale from [LocalLocale] rather than `Locale.getDefault()`: the latter is not
+ * observable Compose state, so the day labels would keep rendering in the old language after an
+ * in-app or system locale change until something else happened to invalidate this composable.
+ * [LocalLocale] makes the read a real recomposition dependency, and `.platformLocale` hands the
+ * `java.util.Locale` that [DayOfWeek.getDisplayName] requires straight back.
+ */
 @Composable
 private fun DayOfWeekPicker(
     selected: DayOfWeek,
     onDayOfWeekChange: (DayOfWeek) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val locale = LocalLocale.current.platformLocale
     FlowRow(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         DayOfWeek.entries.forEach { day ->
             FilterChip(
                 selected = day == selected,
                 onClick = { onDayOfWeekChange(day) },
-                label = { Text(day.getDisplayName(TextStyle.SHORT, Locale.getDefault())) },
+                label = { Text(day.getDisplayName(TextStyle.SHORT, locale)) },
             )
         }
     }
