@@ -287,6 +287,36 @@ carried_forward_open_items:
         Pixel can make this assertion — it requires this specific device
         class and a multi-day observation window.
       owner_condition: "Resolve when the Fold 7 (or an equivalent One-UI device) is available for an unattended multi-day idle window."
+    - id: "notification-permission-blocked-after-one-ask"
+      title: "Constanza flips to BLOCKED after one denial, spending the user's second native prompt early"
+      status: open
+      origin: >
+        Recorded on 2026-09-02 by first-run-onboarding's design.md §2.3, while designing the
+        onboarding permission screen. This conservatism predates that change;
+        first-run-onboarding is what makes it the common path rather than a rare one, since every
+        install now reaches the permission ask through onboarding.
+      reason: >
+        `NotificationPermission.decide` treats any prior ask as permanent: it cannot tell "the
+        user was asked once and denied" apart from "the system has permanently blocked further
+        prompts", because that distinction needs `shouldShowRequestPermissionRationale`, which
+        needs an `Activity` reference the class deliberately does not hold (see its own KDoc).
+        `ReminderSettingsStore.hasRequestedNotificationPermission()` is a single boolean latch, set
+        the first time the dialog is shown, whatever the answer. So a user who denies once during
+        onboarding immediately loses the second native prompt Android would still have shown them,
+        and is routed to system settings instead.
+      why_it_matters: >
+        The error direction fails safe — the approximation can only ever under-prompt, never
+        over-prompt, and `BLOCKED` always offers `ACTION_APP_NOTIFICATION_SETTINGS` as a working
+        way out, never a dead end. But it does cost a real user a real extra tap through system
+        settings where the platform would otherwise have shown a second in-app dialog, and
+        first-run-onboarding made that cost visible on every fresh install rather than hidden
+        behind a Today banner most users never tapped.
+      owner_condition: >
+        Any future change that is already touching `NotificationPermission`'s Activity-free
+        contract. Fixing it standalone means giving the decision table an `Activity` reference (or
+        an equivalent capability) it deliberately does not have today, which is a bigger change
+        than the gap it closes; it is cheap only when a change that already needs that reference
+        lands anyway.
 
 stack:
   status: ratified

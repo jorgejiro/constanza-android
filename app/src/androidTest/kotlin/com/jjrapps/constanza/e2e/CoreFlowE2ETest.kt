@@ -25,8 +25,6 @@ import androidx.test.uiautomator.UiDevice
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.MainActivity
 import com.jjrapps.constanza.domain.model.EntryStatus
-import com.jjrapps.constanza.reminding.NotificationPermission
-import com.jjrapps.constanza.reminding.NotificationPermissionDecision
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -56,11 +54,11 @@ private const val REMINDED_HABIT = "Meditate"
 private const val REMOVED_HABIT = "Stretch"
 
 /**
- * The device-free core-flow proof: on an emulator with nothing plugged in, the app grants the
- * notification permission through the REAL system dialog, takes on a habit through its own UI,
- * delivers that habit's reminder as a real posted notification, records the answer tapped on it,
- * and lets the habit be removed again — each step driven and observed the way a person would
- * cause it, not by calling into a repository.
+ * The device-free core-flow proof: on an emulator with nothing plugged in, the app walks a
+ * fresh-install user through onboarding (with the REAL system permission dialog), takes on a habit
+ * through its own UI, delivers that habit's reminder as a real posted notification, records the
+ * answer tapped on it, and lets the habit be removed again — each step driven and observed the way
+ * a person would cause it, not by calling into a repository.
  *
  * See `openspec/config.yaml`'s "Device-free verification" convention for the standing requirement
  * this class exists to satisfy, the exact Gradle command that runs it on both API levels, and —
@@ -70,10 +68,10 @@ private const val REMOVED_HABIT = "Stretch"
  * ## What is real and what is substituted
  *
  * Real: Hilt's own object graph, the singleton `AppDatabase` and its file, `MainActivity` and every
- * Compose screen, the `com.android.permissioncontroller` dialog, the manifest-declared
- * `ReminderFireReceiver` and `ActionReceiver`, the process-wide `WorkManager` that
- * `ConstanzaApplication` configured with `HiltWorkerFactory`, and `NotificationPoster` posting to
- * the actual `NotificationManager`.
+ * Compose screen — including the first-run onboarding gate (first-run-onboarding) — the
+ * `com.android.permissioncontroller` dialog, the manifest-declared `ReminderFireReceiver` and
+ * `ActionReceiver`, the process-wide `WorkManager` that `ConstanzaApplication` configured with
+ * `HiltWorkerFactory`, and `NotificationPoster` posting to the actual `NotificationManager`.
  *
  * Substituted: exactly one thing — the alarm clock. See
  * [CoreFlowTestFixture.fireArmedAlarmFor] for why `androidx.work.testing` is the wrong lever here
@@ -86,17 +84,20 @@ private const val REMOVED_HABIT = "Stretch"
  * `UiAutomation.revokeRuntimePermission`, by any route — kills the app process, and the
  * instrumentation lives in that process, so a test cannot put the permission back. This was
  * measured on the API 37 emulator, not assumed: the run dies with "Instrumentation run failed due
- * to Process crashed". The two permission tests therefore have to observe the ungranted state
- * before anything grants it, and their names sort first (`al` < `ap` < `c` < `r`) so they do.
+ * to Process crashed". [a1DenyingTheOnboardingPromptLeavesTodayOfferingNotificationSettings] and
+ * [a2AllowingTheOnboardingPromptLeavesTodayWithNoNotificationBanner] therefore observe the
+ * ungranted/once-denied state before either answers the dialog for real, and their names sort
+ * first (`a1` < `a2` < `a3` < `c` < `r`) so they do, ahead of every method that pre-seeds
+ * `onboarding_done` and would otherwise skip past the dialog entirely.
  *
  * The same one-way door applies across classes. `NotificationPosterInstrumentedTest` and
  * `NotificationActionWiringInstrumentedTest` also grant the permission, and they are the only other
  * classes in this module that do; both live in `com.jjrapps.constanza.reminding`, which the runner
  * reaches after `com.jjrapps.constanza.e2e` because dex stores class definitions ordered by type
- * descriptor. [allowingNotificationsThroughTheRealSystemDialogClearsTheTodayBanner] asserts that
- * precondition instead of trusting it, and says what to do when it is violated — so if a future
- * test class in an earlier-sorting package ever grants `POST_NOTIFICATIONS`, this fails loudly
- * rather than quietly stopping to test the dialog.
+ * descriptor. [a1DenyingTheOnboardingPromptLeavesTodayOfferingNotificationSettings] asserts its
+ * ungranted precondition instead of trusting it, and says what to do when it is violated — so if a
+ * future test class in an earlier-sorting package ever grants `POST_NOTIFICATIONS`, this fails
+ * loudly rather than quietly stopping to test the dialog.
  */
 @RunWith(AndroidJUnit4::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
@@ -130,18 +131,21 @@ class CoreFlowE2ETest {
     }
 
     /**
-     * Step 1, API 33+: start denied, and reach granted by tapping what a person taps.
+     * The corrected `BLOCKED`-reachability scenario (design.md §2.2): a denial is one recorded ask
+     * plus no grant, reachable in a single instrumented step — not the "two denials, unreachable on
+     * the matrix" claim `specs/onboarding/spec.md` carried before this change corrected it.
      *
-     * The banner's action is asserted to be "Allow" and not "Open settings" before it is clicked.
-     * That is not cosmetic — the two labels are the visible difference between `SHOULD_REQUEST` and
-     * `BLOCKED`, and only the first leads to the system dialog. Checking it turns "the dialog never
-     * appeared" into a diagnosis one line earlier than the UiAutomator timeout would.
+     * Walks a fresh install through onboarding, denies the real system dialog on screen 2, finishes
+     * onboarding (landing on the seeded habit editor per design.md §5.1), backs out to Today and
+     * confirms its banner offers the settings deep link, then relaunches the app and confirms
+     * onboarding does not reappear — design.md §5.3's "back from the seeded editor entry reaches
+     * Today" and §9's "onboarding never repeats" made concrete in one run.
      */
     @Test
-    fun allowingNotificationsThroughTheRealSystemDialogClearsTheTodayBanner() {
+    fun a1DenyingTheOnboardingPromptLeavesTodayOfferingNotificationSettings() {
         assumeTrue(
-            "POST_NOTIFICATIONS does not exist below API $RUNTIME_PERMISSION_SDK; the API 31 leg " +
-                "of the matrix covers that half in apiBelow33ShowsNoNotificationBanner...",
+            "POST_NOTIFICATIONS does not exist below API $RUNTIME_PERMISSION_SDK; " +
+                "a3ApiBelow33SkipsTheOnboardingPermissionScreenEntirely covers that leg",
             Build.VERSION.SDK_INT >= RUNTIME_PERMISSION_SDK,
         )
         assertFalse(
@@ -151,49 +155,96 @@ class CoreFlowE2ETest {
             hasNotificationPermission(),
         )
 
-        launchApp()
-        awaitText(string(R.string.today_notification_permission_banner))
-        compose.onNodeWithText(string(R.string.today_notification_permission_allow)).assertIsDisplayed()
+        launchFirstRunApp()
+        awaitText(string(R.string.onboarding_screen1_title))
+        compose.onNodeWithText(string(R.string.onboarding_action_continue)).performClick()
 
-        compose.onNodeWithText(string(R.string.today_notification_permission_allow)).performClick()
-        device.tapAllowOnTheSystemPermissionDialog()
+        awaitText(string(R.string.onboarding_screen2_title))
+        compose.onNodeWithText(string(R.string.onboarding_permission_should_request_action)).performClick()
+        device.tapDenyOnTheSystemPermissionDialog()
 
-        awaitTextGone(string(R.string.today_notification_permission_banner))
-        assertTrue(
-            "The dialog was accepted, so the app must actually hold POST_NOTIFICATIONS",
+        awaitText(string(R.string.onboarding_permission_blocked_body))
+        assertFalse(
+            "the dialog was denied, so POST_NOTIFICATIONS must still be missing",
             hasNotificationPermission(),
         )
-        assertTrue(
-            "A granted POST_NOTIFICATIONS must leave notifications enabled",
-            notificationManager.areNotificationsEnabled(),
-        )
+        compose.onNodeWithText(string(R.string.onboarding_action_finish)).performClick()
+
+        awaitContentDescription(string(R.string.action_back))
+        compose.onNodeWithContentDescription(string(R.string.action_back)).performClick()
+
+        awaitText(string(R.string.today_notification_permission_open_settings))
+
+        relaunchOnboardedApp()
+        compose.onNodeWithText(string(R.string.onboarding_screen1_title)).assertDoesNotExist()
     }
 
     /**
-     * Step 1, inverted for API 31-32: there is no runtime permission here, so the banner must never
-     * render — `NotificationPermission.decide` answers `NOT_APPLICABLE` and
-     * `TodayBanners.needsBanner()` excludes it.
-     *
-     * This is the reason API 31 is in the matrix at all. Asserting the decision AND the absence of
-     * the banner together is deliberate: the decision alone is already covered by a JVM unit test,
-     * and the absence alone would also pass if the screen simply never rendered.
+     * The grant half of the deny/grant pair (design.md §8.3). The deny scenario above records the
+     * "already asked" latch, so this scenario seeds it back to unasked first — restoring the app's
+     * approximation to the system's real remaining-prompt state, which still permits one more
+     * dialog after a single denial. That is the only place in the suite this happens, and the
+     * design records why it is not cheating.
      */
     @Test
-    fun apiBelow33ShowsNoNotificationBannerBecauseThePermissionDoesNotExist() {
+    fun a2AllowingTheOnboardingPromptLeavesTodayWithNoNotificationBanner() {
+        assumeTrue(
+            "POST_NOTIFICATIONS does not exist below API $RUNTIME_PERMISSION_SDK; " +
+                "a3ApiBelow33SkipsTheOnboardingPermissionScreenEntirely covers that leg",
+            Build.VERSION.SDK_INT >= RUNTIME_PERMISSION_SDK,
+        )
+        runBlocking { fixture.seedNotificationPermissionUnasked() }
+
+        launchFirstRunApp()
+        awaitText(string(R.string.onboarding_screen1_title))
+        compose.onNodeWithText(string(R.string.onboarding_action_continue)).performClick()
+
+        awaitText(string(R.string.onboarding_screen2_title))
+        compose.onNodeWithText(string(R.string.onboarding_permission_should_request_action)).performClick()
+        device.tapAllowOnTheSystemPermissionDialog()
+
+        awaitText(string(R.string.onboarding_permission_granted_body))
+        assertTrue(
+            "the dialog was accepted, so the app must actually hold POST_NOTIFICATIONS",
+            hasNotificationPermission(),
+        )
+        compose.onNodeWithText(string(R.string.onboarding_action_finish)).performClick()
+
+        awaitContentDescription(string(R.string.action_back))
+        compose.onNodeWithContentDescription(string(R.string.action_back)).performClick()
+
+        awaitText(string(R.string.today_title))
+        compose.onNodeWithText(string(R.string.today_notification_permission_banner)).assertDoesNotExist()
+    }
+
+    /**
+     * design.md §7's API 31-32 divergence, proven end to end: the permission screen never renders,
+     * screen 1 is the last page so its primary action reads "Finish" rather than "Continue" — the
+     * API-31 label trap `OnboardingUiStateTest` guards at the unit level — and Today shows no
+     * banner once onboarding hands off, because the permission does not exist on this API level at
+     * all.
+     */
+    @Test
+    fun a3ApiBelow33SkipsTheOnboardingPermissionScreenEntirely() {
         assumeTrue(
             "This is the API 31-32 half of the permission boundary; API 33+ is covered by " +
-                "allowingNotificationsThroughTheRealSystemDialogClearsTheTodayBanner",
+                "a1DenyingTheOnboardingPromptLeavesTodayOfferingNotificationSettings and " +
+                "a2AllowingTheOnboardingPromptLeavesTodayWithNoNotificationBanner",
             Build.VERSION.SDK_INT < RUNTIME_PERMISSION_SDK,
         )
-        assertEquals(
-            NotificationPermissionDecision.NOT_APPLICABLE,
-            NotificationPermission(context).decide(hasRequestedBefore = false),
-        )
 
-        launchApp()
+        launchFirstRunApp()
+        awaitText(string(R.string.onboarding_screen1_title))
+        compose.onNodeWithText(string(R.string.onboarding_screen2_title)).assertDoesNotExist()
+        compose.onNodeWithText(string(R.string.onboarding_action_finish)).assertIsDisplayed()
 
+        compose.onNodeWithText(string(R.string.onboarding_action_finish)).performClick()
+
+        awaitContentDescription(string(R.string.action_back))
+        compose.onNodeWithContentDescription(string(R.string.action_back)).performClick()
+
+        awaitText(string(R.string.today_title))
         compose.onNodeWithText(string(R.string.today_notification_permission_banner)).assertDoesNotExist()
-        compose.onNodeWithText(string(R.string.today_notification_permission_allow)).assertDoesNotExist()
         assertTrue(
             "Below API $RUNTIME_PERMISSION_SDK notifications are enabled with no runtime prompt",
             notificationManager.areNotificationsEnabled(),
@@ -203,6 +254,10 @@ class CoreFlowE2ETest {
     /**
      * Steps 2, 3 and 4: add a habit through the UI, see it on Today, have its reminder actually
      * arrive, and answer from the notification itself.
+     *
+     * `onboarding_done` is pre-seeded (design.md §8.4) — this test's own concern is the reminder
+     * pipeline, not the gate, which [a1DenyingTheOnboardingPromptLeavesTodayOfferingNotificationSettings]
+     * and [a2AllowingTheOnboardingPromptLeavesTodayWithNoNotificationBanner] already cover.
      *
      * The answer half is included because the existing
      * `NotificationActionWiringInstrumentedTest` shape made it nearly free — the posted
@@ -219,10 +274,10 @@ class CoreFlowE2ETest {
     @Test
     fun creatingAHabitThroughTheUiDeliversItsReminderAndRecordsTheAnswerTappedOnIt() {
         grantNotificationPermission()
-        launchApp()
+        launchOnboardedApp()
 
         addHabitThroughTheUi(REMINDED_HABIT)
-        relaunchApp()
+        relaunchOnboardedApp()
         awaitText(REMINDED_HABIT)
 
         val habit = runBlocking { fixture.requireHabitNamed(REMINDED_HABIT) }
@@ -248,6 +303,9 @@ class CoreFlowE2ETest {
     /**
      * Step 5: remove the habit through the UI, and see it gone from Today and from the database.
      *
+     * `onboarding_done` is pre-seeded (design.md §8.4), for the same reason as the reminder test
+     * above.
+     *
      * **Archive IS this app's removal gesture; there is no hard delete.** `HabitRepository` exposes
      * `setArchived` and `deleteSlot`, and the habit list offers "Archive"/"Un-archive" — nothing
      * anywhere deletes a habit row, by design, because a deleted habit would take its history with
@@ -259,7 +317,7 @@ class CoreFlowE2ETest {
      */
     @Test
     fun removingAHabitThroughTheUiTakesItOffTodayAndOutOfTheSchedule() {
-        launchApp()
+        launchOnboardedApp()
         addHabitThroughTheUi(REMOVED_HABIT)
         val habit = runBlocking { fixture.requireHabitNamed(REMOVED_HABIT) }
         assertTrue(
@@ -271,7 +329,7 @@ class CoreFlowE2ETest {
         compose.onNodeWithText(string(R.string.habit_list_archive)).performClick()
         awaitTextGone(REMOVED_HABIT)
 
-        relaunchApp()
+        relaunchOnboardedApp()
         compose.onNodeWithText(REMOVED_HABIT).assertDoesNotExist()
         awaitText(string(R.string.today_empty))
 
@@ -310,17 +368,30 @@ class CoreFlowE2ETest {
         awaitText(name)
     }
 
-    private fun launchApp() {
+    /** For a fresh-install world: onboarding is un-onboarded (design.md §8.2's `reset()` default),
+     *  so the gate renders its first page rather than [MainActivity]'s post-onboarding app. */
+    private fun launchFirstRunApp() {
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        awaitText(string(R.string.onboarding_screen1_title))
+    }
+
+    /** For a world that has already onboarded: seeds the flag durably before launch — `edit`'s
+     *  suspend contract does not return until the write commits, so the gate's first read is
+     *  guaranteed to observe it (design.md §8.3) — then awaits the post-onboarding app directly. No
+     *  default `launchApp()` exists (design.md §8.4): every call site states which world it is in. */
+    private fun launchOnboardedApp() {
+        runBlocking { fixture.seedOnboardingDone() }
         scenario = ActivityScenario.launch(MainActivity::class.java)
         awaitText(string(R.string.today_title))
     }
 
     /** The habit list has no route back to Today — `MainActivity` hoists a one-way `ConstanzaRoute`
-     *  and registers no `BackHandler` — so re-opening the app is how a person gets back there after
-     *  creating a habit, and it is what this does. */
-    private fun relaunchApp() {
+     *  and registers no `BackHandler` of its own — so re-opening the app is how a person gets back
+     *  there after creating a habit, and it is what this does. Onboarding is already done in every
+     *  caller of this helper, so relaunching goes straight to the post-onboarding app. */
+    private fun relaunchOnboardedApp() {
         scenario?.close()
-        launchApp()
+        launchOnboardedApp()
     }
 
     /**
@@ -329,8 +400,9 @@ class CoreFlowE2ETest {
      * This is the existing `NotificationPosterInstrumentedTest` shape and the same lesson: the
      * grant returns before the notification state reflects it, and posting into that window is
      * silently refused. The dialog route is covered by
-     * [allowingNotificationsThroughTheRealSystemDialogClearsTheTodayBanner]; repeating it here
-     * would only make the reminder test fail for permission reasons rather than reminder reasons.
+     * [a1DenyingTheOnboardingPromptLeavesTodayOfferingNotificationSettings] and
+     * [a2AllowingTheOnboardingPromptLeavesTodayWithNoNotificationBanner]; repeating it here would
+     * only make the reminder test fail for permission reasons rather than reminder reasons.
      */
     private fun grantNotificationPermission() {
         if (Build.VERSION.SDK_INT < RUNTIME_PERMISSION_SDK) return

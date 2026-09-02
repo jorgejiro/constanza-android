@@ -4,13 +4,19 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.service.notification.StatusBarNotification
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
 import androidx.room.Room
 import com.jjrapps.constanza.core.data.AppDatabase
 import com.jjrapps.constanza.core.data.entity.EntryEntity
 import com.jjrapps.constanza.core.data.entity.HabitEntity
 import com.jjrapps.constanza.core.data.entity.ReminderOccurrenceEntity
+import com.jjrapps.constanza.core.di.ReminderSettingsDataStoreEntryPoint
+import com.jjrapps.constanza.reminding.ReminderSettingsStore
 import com.jjrapps.constanza.scheduling.AlarmScheduler
 import com.jjrapps.constanza.scheduling.ReminderFireReceiver
+import dagger.hilt.android.EntryPointAccessors
 
 private const val POLL_TIMEOUT_MS = 15_000L
 private const val POLL_INTERVAL_MS = 50L
@@ -53,14 +59,44 @@ class CoreFlowTestFixture(private val context: Context) {
 
     private val notificationManager = context.getSystemService(NotificationManager::class.java)
 
+    /** The app's own `reminder_settings` [DataStore], reached through [ReminderSettingsDataStoreEntryPoint]
+     *  rather than a second `preferencesDataStore` delegate (design.md §8.1). */
+    private val settings: DataStore<Preferences> =
+        EntryPointAccessors.fromApplication(context, ReminderSettingsDataStoreEntryPoint::class.java)
+            .reminderSettingsDataStore()
+
     /** Clears everything a previous test could have left behind. `habits` cascades through
      *  `schedules`, `reminder_slots`, `entries` and `reminder_occurrences` (design.md §8.1), so one
      *  statement empties the dataset. Alarms armed against the deleted occurrences survive in
      *  `AlarmManager`, which is harmless: `ReminderFireHandler` loads the occurrence first and
-     *  returns when the row is gone. */
+     *  returns when the row is gone.
+     *
+     *  The default is un-onboarded (design.md §8.2), which is the state a real clean install is in;
+     *  a test that does not care about onboarding opts out by calling [seedOnboardingDone].
+     *  Deliberately does NOT touch `requested_notification_permission` — granting
+     *  `POST_NOTIFICATIONS` is a one-way door within an installation, and blanket-resetting that
+     *  latch would desynchronise the app's approximation from the system's real state for whichever
+     *  test ran next (design.md §8.2). */
     suspend fun reset() {
         database.habitDao().deleteAll()
         notificationManager.cancelAll()
+        settings.edit { it[ReminderSettingsStore.ONBOARDING_DONE_KEY] = false }
+    }
+
+    /** Opts a test out of the onboarding gate entirely, so it can launch straight into
+     *  [com.jjrapps.constanza.core.ui.MainActivity]'s post-onboarding app (design.md §8.1). `edit`
+     *  does not return until the write is durable, so a caller that awaits this before
+     *  `ActivityScenario.launch` is guaranteed the gate's first read observes it (design.md §8.3). */
+    suspend fun seedOnboardingDone() {
+        settings.edit { it[ReminderSettingsStore.ONBOARDING_DONE_KEY] = true }
+    }
+
+    /** Clears the "already asked" latch so a test can observe the real permission dialog a second
+     *  time in one installation (design.md §8.3). This is the one deliberate exception to [reset]'s
+     *  own rule of leaving that latch alone — used only by the scenario that needs the system's
+     *  actual remaining-prompt budget rather than the app's conservative approximation of it. */
+    suspend fun seedNotificationPermissionUnasked() {
+        settings.edit { it[ReminderSettingsStore.REQUESTED_NOTIFICATION_PERMISSION_KEY] = false }
     }
 
     suspend fun habitNamed(name: String): HabitEntity? =
