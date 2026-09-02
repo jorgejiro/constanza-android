@@ -1,5 +1,6 @@
 package com.jjrapps.constanza.core.ui.theme
 
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.graphics.Color
 import kotlin.test.Test
 import kotlin.test.assertNotEquals
@@ -318,6 +319,98 @@ class ColorContrastTest {
             background = DarkColors.primaryContainer,
             minimum = CONTRAST_FLOOR,
             label = "onPrimaryContainer on primaryContainer",
+        )
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // The tertiary family, bound by fix/time-format-consistency.
+    //
+    // Until that change these four roles were audited as deliberately unbound, because nothing in
+    // the app rendered them — and `habit.ReminderTimeField` hardcoded its time picker to 24-hour
+    // partly to keep that true. Making the picker follow the device's 12/24-hour setting renders
+    // M3's AM/PM period selector, which in material3 1.4.0 is the ONLY consumer of the tertiary
+    // family in `TimePickerTokens`/`TimeInputTokens`. So the roles are bound now, and these guard
+    // both halves of that: that they are not M3's stock violet, and that the pair they were given
+    // is legible.
+    // ------------------------------------------------------------------------------------------
+
+    /**
+     * The assertion that fails if someone deletes the tertiary bindings from `Theme.kt`, or adds a
+     * role to `darkColorScheme(...)` and forgets this family again.
+     *
+     * It compares against M3's own unseeded dark baseline rather than against a hex constant, so it
+     * keeps meaning "not Material's default" across a material3 upgrade instead of pinning today's
+     * value. The AM/PM selector is a real, reachable screen in a warm-dark app; a violet slab in it
+     * is the exact regression this change had to go back and fix.
+     */
+    @Test
+    fun `the tertiary roles are bound to the warm ramp rather than left at M3's violet default`() {
+        val m3Default = darkColorScheme()
+        listOf(
+            Triple("tertiary", DarkColors.tertiary, m3Default.tertiary),
+            Triple("onTertiary", DarkColors.onTertiary, m3Default.onTertiary),
+            Triple("tertiaryContainer", DarkColors.tertiaryContainer, m3Default.tertiaryContainer),
+            Triple("onTertiaryContainer", DarkColors.onTertiaryContainer, m3Default.onTertiaryContainer),
+        ).forEach { (role, bound, default) ->
+            assertNotEquals(
+                illegal = default,
+                actual = bound,
+                message = "$role is still Material 3's stock dark default. The time picker's AM/PM period " +
+                    "selector is the app's one consumer of this family, and it would render violet in the " +
+                    "middle of the warm ramp.",
+            )
+        }
+    }
+
+    /**
+     * The selected AM/PM label sits on the selected AM/PM container and has to be readable there.
+     *
+     * The text floor rather than the non-text floor, deliberately: `AM`/`PM` is text, and SC 1.4.3
+     * applies to it whatever role happens to paint it.
+     */
+    @Test
+    fun `the selected period label is legible on its own container`() {
+        assertRatioAtLeast(
+            foreground = DarkColors.onTertiaryContainer,
+            background = DarkColors.tertiaryContainer,
+            minimum = CONTRAST_FLOOR,
+            label = "onTertiaryContainer on tertiaryContainer",
+        )
+    }
+
+    /**
+     * The unselected AM/PM label draws in `onSurfaceVariant` over a transparent container — M3 sets
+     * `periodSelectorUnselectedContainerColor = Color.Transparent`, so what is actually behind it is
+     * the dialog's own `surfaceContainerHigh`.
+     */
+    @Test
+    fun `the unselected period label is legible on the dialog container behind it`() {
+        assertRatioAtLeast(
+            foreground = DarkColors.onSurfaceVariant,
+            background = DarkColors.surfaceContainerHigh,
+            minimum = SECONDARY_TEXT_FLOOR,
+            label = "onSurfaceVariant on surfaceContainerHigh",
+        )
+    }
+
+    /**
+     * Which half of the AM/PM toggle is active has to be visible, and in this ramp it cannot be the
+     * fill that says so — `tertiaryContainer` is [ConstanzaColors.SurfaceSelected], 1.17:1 against
+     * the background, for the arithmetic reason `Theme.kt` sets out for every selected fill here.
+     * The distinction is carried by the label tone instead, exactly as the hour/minute selector
+     * already does, so what is enforceable is that the two label tones cannot collapse into one.
+     *
+     * SC 1.4.11 itself is satisfied separately and structurally: M3 strokes the whole toggle with
+     * `outline`, which the sweep above already measures on every surface.
+     */
+    @Test
+    fun `the selected period label is a different tone from the unselected one`() {
+        assertNotEquals(
+            illegal = DarkColors.onSurfaceVariant,
+            actual = DarkColors.onTertiaryContainer,
+            message = "the AM/PM toggle draws its selected label in onTertiaryContainer and its unselected " +
+                "label in onSurfaceVariant. Bound to the same tone, nothing on screen says which period is " +
+                "selected — the same collision onPrimaryContainer/onSurface had on the hour/minute selector.",
         )
     }
 
