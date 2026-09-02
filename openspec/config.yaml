@@ -172,7 +172,7 @@ carried_forward_open_items:
       owner_condition: "Its own small PR. Needs an adaptive icon (foreground/background layers) plus a monochrome layer for themed icons."
     - id: "release-build-never-produced"
       title: "No release build has ever been assembled, and the R8 path is unexercised"
-      status: open
+      status: resolved
       origin: "Found on 2026-09-02 while choosing a build type to install for hands-on testing."
       reason: >
         app/build.gradle.kts has no `signingConfigs` block, so a release APK
@@ -190,6 +190,98 @@ carried_forward_open_items:
         Its own PR: add a signing config (a local keystore kept out of the repo),
         assemble release, install it, and run the instrumented suite against the
         minified build. Expect proguard rules to be needed.
+      resolution: >
+        Done on 2026-09-02. The project's first release build exists and has been
+        exercised, not merely compiled.
+
+        WHAT THE SIGNING CONFIG NEEDED. A top-level `Properties()` in
+        app/build.gradle.kts loaded from `rootProject.file("keystore.properties")`
+        behind an `if (file.exists())` guard, a `signingConfigs` block that only
+        calls `create("release")` when `storeFile` is actually present, and
+        `signingConfig = signingConfigs.findByName("release")` inside
+        `buildTypes.release`. Both guards are load-bearing rather than defensive:
+        the keystore and its properties file are gitignored, so without them a
+        fresh clone would fail at CONFIGURATION time and could not even build
+        debug. The guard was not assumed to work — keystore.properties was
+        temporarily moved aside and both variants rebuilt: debug succeeds, and
+        assembleRelease also succeeds but emits `app-release-unsigned.apk`
+        instead of `app-release.apk`, so the secret is only ever needed to
+        produce something installable. Mirrors the pattern already proven in the
+        sibling sleep-noise-android project.
+        isMinifyEnabled/isShrinkResources were left exactly as they were.
+
+        WHICH PROGUARD RULES WERE NEEDED: NONE. This is the headline finding and
+        it contradicts the owner_condition's own expectation above, so it was
+        checked three separate ways rather than inferred from a green build.
+        `:app:assembleRelease` succeeded on the very first attempt with an empty
+        rules file. The release DEX was then inspected directly and every
+        reflection-adjacent symbol this app depends on survives: Room's
+        `AppDatabase_Impl` is present unobfuscated (androidx.room's own consumer
+        rule keeps it), HiltWorkerFactory's five worker class-name map keys
+        survive as string literals with the worker classes unobfuscated,
+        manifest-declared components are kept by the AAPT-generated rules, and
+        kotlinx-serialization needs nothing because every call site passes an
+        explicit `BackupFile.serializer()` instead of the reflective
+        `serializer(typeOf<T>())` path. Two rules commonly added by reflex were
+        tested and rejected: `-keepattributes SourceFile,LineNumberTable` is
+        redundant because R8 8.x already writes sourceFile records and line
+        mappings into mapping.txt (proven by feeding an obfuscated frame to
+        cmdline-tools retrace, which recovered
+        `BackupImporter.insertHabit(BackupImporter.kt:113)` exactly), and a
+        blanket `-keep class com.jjrapps.constanza.** { *; }` would defeat the
+        shrinking this build type exists for. app/proguard-rules.pro now records
+        that evidence in place of its former speculative note, so the next reader
+        does not add a defensive blob on a hunch.
+
+        SIGNATURE VERIFIED. `apksigner verify --print-certs` (build-tools 37.0.0)
+        reports one signer, `CN=Constanza, OU=jjrapps, O=jjrapps, L=Unknown,
+        ST=Unknown, C=ES`, RSA 4096, certificate SHA-256
+        59659af67e6ae8dd806e7cc9fe4ff575f3bd0e8237adfb971735323e64c912d0.
+        Schemes present: v2 only. v1 is off because minSdk is 31, and v3 is off
+        because that is the AGP default — worth knowing before key rotation is
+        ever wanted, though Play App Signing makes it moot for store delivery.
+
+        SIZE. Release 3,059,614 bytes (2.9 MiB) against debug 36,489,028 bytes
+        (35 MiB), both freshly assembled from the same tree. R8 and resource
+        shrinking are doing real work.
+
+        RUNTIME VERIFICATION, AND EXACTLY WHERE. The signed release APK was
+        installed on the running API 37 emulator (emulator-5554,
+        sdk_gphone16k_arm64) and driven by hand through: cold launch, the
+        onboarding welcome and notification-permission steps including the real
+        POST_NOTIFICATIONS system dialog, creating and saving a habit, answering
+        it Yes on Today, the Progress screen computing streak and compliance, a
+        backup export written through the SAF picker and read back off the device
+        as correct JSON with correct field names, and a backup import replacing
+        all data. The reflective worker chain was exercised for real rather than
+        simulated: a habit was given a reminder two minutes out, the RTC_WAKEUP
+        alarm fired into `.scheduling.ReminderFireReceiver`, WorkManager logged
+        `Worker result SUCCESS` for ReminderFireWorker, the notification posted on
+        the `reminders` channel with its three actions and accent colour, and
+        tapping its Yes action dispatched through ActionReceiver into AnswerWorker
+        (also SUCCESS) whose Room write then showed up on Today as
+        "14:15 — COMPLETED". Zero FATAL/AndroidRuntime entries in logcat across
+        the whole session and zero dropbox crash entries.
+
+        CAVEATS — WHAT WAS NOT VERIFIED. (1) The instrumented suite was NOT run
+        against the minified build, so the owner_condition above is only partly
+        met. Doing that needs `testBuildType = "release"`, and a minified
+        androidTest variant would in turn need keep rules for the test classes
+        themselves — a defensive blob whose only purpose is to make the tests
+        link, which would obscure exactly the signal this item was opened to get.
+        The hand-driven exercise above was chosen instead, deliberately. The debug
+        matrix still passes unchanged. (2) The five boot/time/package reschedule
+        receivers could not be triggered: their intents are protected system
+        broadcasts that adb cannot send, so BootReceiver, PackageReplacedReceiver,
+        TimeChangeReceiver and ExactAlarmPermissionReceiver are unproven under
+        R8 — they are structurally identical to ReminderFireReceiver and
+        ActionReceiver, which both work, but that is an inference and not a
+        measurement. (3) MidnightSweepWorker and ReconcileWorker never actually
+        ran; WorkManager refuses to execute periodic work ahead of schedule, so
+        only their enqueue was observed. (4) Nothing was verified on physical
+        hardware and nothing was installed on the maintainer's phone. (5) Room
+        has no migrations yet, so the migration path under R8 is untested by
+        construction.
     - id: "exact-alarm-banner-false-positive-question"
       title: "Unresolved: did the exact-alarm banner show on a device where the permission is allowed?"
       status: resolved
