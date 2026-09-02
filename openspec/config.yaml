@@ -183,6 +183,75 @@ carried_forward_open_items:
         timeout: make teardown deterministic so the collector cannot outlive
         the database. Worth auditing every instrumented test that constructs a
         ViewModel by bare constructor, not just these two.
+    - id: "today-row-answering-is-cramped-and-always-on"
+      title: "Today's answer buttons never fit, and never go away once answered"
+      status: open
+      severity: "this is the screen the app exists for, used every day"
+      origin: >
+        Reported by the maintainer on 2026-09-02 from a screenshot of their own
+        Galaxy S25 with two real habits on it. "Skip" was wrapping onto two
+        lines as "Ski / p".
+      reason: >
+        Three separate defects stack on the same row, and only the first is
+        visible at a glance.
+
+        1. LAYOUT. TodayScreen.kt's `SlotRow` lays its status text and its
+        button group in a `Row` with `Arrangement.SpaceBetween` and NO
+        `weight(1f)` on the text. The text takes whatever width it wants and
+        the buttons are squeezed into what is left, so "Skip" wraps. This is
+        the exact failure `ExactAlarmBanner` carries a load-bearing comment
+        about, three functions away in the same file — the fix was learned
+        once and not applied here.
+
+        2. RAW ENUM IN THE UI. `slotStatusText`'s fallback is
+        `slot.status.name`, so the screen renders the Kotlin constant
+        "COMPLETED" rather than a localised string. Every other piece of copy
+        in the app comes from strings.xml.
+
+        3. INTERACTION. All three actions render for every slot at all times,
+        including slots that are already answered. In the reported screenshot
+        both habits read COMPLETED and both still offer Yes / No / Skip with
+        equal weight. Once a slot is answered the need is to see that it is
+        done and to be able to correct it — not to be re-asked.
+      why_it_matters: >
+        Today is the screen the product exists for and the one a user opens
+        every day. It is also where onboarding now lands them. Three equal
+        buttons per row means the screen never communicates progress at a
+        glance: a finished day and an untouched day look almost identical.
+      maintainer_proposal: >
+        Do not show the answer buttons by default; reveal them on swipe or by
+        some other gesture.
+      analysis_to_do: >
+        Worth designing rather than patching, and the options trade off
+        differently:
+
+        - Swipe to answer (the maintainer's suggestion). Fast once learned,
+          but invisible: nothing on screen says the gesture exists. Risky as
+          the ONLY route to the primary daily action; needs an affordance or a
+          first-run hint.
+        - Tap the row to expand its actions inline. Discoverable, costs one
+          extra tap on the common path.
+        - Single tap cycles the state, long-press for the rest. What Loop
+          does. Fastest for the overwhelming majority case (Yes) and hides the
+          other two behind a deliberate gesture.
+        - Keep the buttons but make them compact icon buttons. Smallest
+          possible change, fixes the wrapping, changes no interaction — a
+          reasonable interim if the redesign is deferred.
+        - Collapse an ANSWERED slot to a state chip with an undo affordance,
+          and show actions only on unanswered ones. This is orthogonal to the
+          others and probably the highest-value part: it is what makes the
+          screen readable at a glance.
+
+        The last one plus any of the first four is likely the answer. Whatever
+        is chosen must keep every action reachable without a gesture for
+        accessibility — a swipe-only control is unusable with TalkBack.
+      owner_condition: >
+        Its own change, and probably SDD: it modifies `habit-entry-tracking`'s
+        published "Day-Level Rollup and Per-Slot Display" and "Slot
+        Independence" requirements, and `TodayAdaptiveComposeTest` asserts row
+        heights at sw>=600dp. Defects 1 and 2 are small enough to fix
+        immediately and independently if the redesign is deferred; do not let
+        them wait on it.
     - id: "no-launcher-icon"
       title: "The app ships with the stock Android launcher icon"
       status: resolved
