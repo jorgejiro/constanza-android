@@ -2,21 +2,30 @@ build:
   maxIssues: 0
 
 style:
-  # The clock-access ban (design.md §4), now enforced in BOTH modules.
+  # Two bans, both semantic, both enforced in BOTH modules.
   #
-  # :domain must never read the clock at all — time and zone arrive as parameters, which is what
-  # makes "what happens on 29 February" a test rather than a four-year wait.
+  # 1. CLOCK ACCESS (design.md §4). :domain must never read the clock at all — time and zone arrive
+  #    as parameters, which is what makes "what happens on 29 February" a test rather than a
+  #    four-year wait. :app is allowed exactly one adapter, SystemTimeProvider. Every other call
+  #    site — mappers, repositories, workers, receivers, the scheduler — takes time through the
+  #    TimeProvider interface or an injected ZoneId.
   #
-  # :app is allowed exactly one adapter, SystemTimeProvider, and this rule is what turns that
-  # promise from a KDoc comment into something the build enforces. Every other call site — mappers,
-  # repositories, workers, receivers, the scheduler — takes time through the TimeProvider interface
-  # or an injected ZoneId.
+  # 2. MATERIAL DEFAULT BORDERS. Every entry below resolves, in material3 1.4.0, to
+  #    `ColorSchemeKeyTokens.OutlineVariant` — the decorative-divider role, which Theme.kt binds to
+  #    a 1.26:1 hairline. On an operable control that is a WCAG 2.1 SC 1.4.11 failure (3:1 required)
+  #    and, in this palette, an invisible control. ConstanzaControlDefaults exists to correct that,
+  #    and this ban is what makes going through it compulsory rather than customary.
   #
-  # Note this fires only under `detektMain`/`detektTest`; the plain `detekt` task is PSI-only and
+  # Note these fire only under `detektMain`/`detektTest`; the plain `detekt` task is PSI-only and
   # cannot resolve the fully-qualified names these entries match on.
+  #
+  # ControlDefaults.kt is exempt for the same reason SystemTimeProvider is: it is the adapter, the
+  # one place allowed to touch what everyone else is banned from. The cost is stated rather than
+  # hidden — a file-level exclude exempts that file from the clock ban too, which is acceptable only
+  # because it is a `@Composable` border object with no business reading a clock in the first place.
   ForbiddenMethodCall:
     active: true
-    excludes: ['**/core/time/TimeProvider.kt']
+    excludes: ['**/core/time/TimeProvider.kt', '**/core/ui/theme/ControlDefaults.kt']
     methods:
       - value: 'java.time.Instant.now'
         reason: 'reads the clock directly; take an Instant parameter or inject TimeProvider (design.md §4).'
@@ -34,6 +43,27 @@ style:
         reason: 'reads ambient state directly; inject a Clock instead (design.md §4).'
       - value: 'java.lang.System.currentTimeMillis'
         reason: 'reads the clock directly; pass time in as a parameter instead (design.md §4).'
+      # Resolved tokens read from material3-android-1.4.0-sources.jar, not guessed from the names.
+      # Only three call sites exist today; the rest are listed because a guard added after the
+      # control it guards has already failed. OutlinedTextField is deliberately absent —
+      # OutlinedTextFieldTokens.OutlineColor resolves to `Outline`, the control-stroke role, so its
+      # default is already correct here.
+      - value: 'androidx.compose.material3.ButtonDefaults.outlinedButtonBorder'
+        reason: 'OutlinedButtonTokens.OutlineColor is `outlineVariant`, a 1.26:1 hairline here, so this border is invisible; use ConstanzaControlDefaults.outlinedButtonBorder.'
+      - value: 'androidx.compose.material3.FilterChipDefaults.filterChipBorder'
+        reason: 'FilterChipTokens.FlatUnselectedOutlineColor is `outlineVariant`, so an unselected chip reads as a bare label; use ConstanzaControlDefaults.filterChipBorder.'
+      - value: 'androidx.compose.material3.AssistChipDefaults.assistChipBorder'
+        reason: 'AssistChipTokens.FlatOutlineColor is `outlineVariant`; add an AssistChip factory to ConstanzaControlDefaults rather than inlining a colour here.'
+      - value: 'androidx.compose.material3.SuggestionChipDefaults.suggestionChipBorder'
+        reason: 'SuggestionChipTokens.FlatOutlineColor is `outlineVariant`; add a SuggestionChip factory to ConstanzaControlDefaults rather than inlining a colour here.'
+      - value: 'androidx.compose.material3.InputChipDefaults.inputChipBorder'
+        reason: 'InputChipTokens.UnselectedOutlineColor is `outlineVariant`; add an InputChip factory to ConstanzaControlDefaults rather than inlining a colour here.'
+      - value: 'androidx.compose.material3.CardDefaults.outlinedCardBorder'
+        reason: 'OutlinedCardTokens.OutlineColor is `outlineVariant`; add an OutlinedCard factory to ConstanzaControlDefaults rather than inlining a colour here.'
+      - value: 'androidx.compose.material3.IconButtonDefaults.outlinedIconButtonBorder'
+        reason: 'OutlinedIconButtonTokens.OutlineColor is `outlineVariant`; add an OutlinedIconButton factory to ConstanzaControlDefaults rather than inlining a colour here.'
+      - value: 'androidx.compose.material3.IconButtonDefaults.outlinedIconToggleButtonBorder'
+        reason: 'OutlinedIconButtonTokens.UnselectedOutlineColor is `outlineVariant`; add a factory to ConstanzaControlDefaults rather than inlining a colour here.'
 
   # Guard clauses are the point of these early returns — `not due` and `already in flight` read far
   # better as exits than as nesting. Recognise them rather than raising the limit.

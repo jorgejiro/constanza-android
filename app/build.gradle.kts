@@ -172,6 +172,15 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
+// ControlStrokeCallSiteTest reads :app's own main sources as text. It has to: the thing it guards
+// is a control added with no `border` argument at all, and such a call site names nothing that
+// detekt's ForbiddenMethodCall could forbid — the default is evaluated inside material3. See that
+// test's KDoc. Handing the path over explicitly beats resolving it from the test's working
+// directory: a wrong or missing path then fails loudly rather than scanning nothing and passing.
+tasks.withType<Test>().configureEach {
+    systemProperty("constanza.mainSourceDir", layout.projectDirectory.dir("src/main/kotlin").asFile.absolutePath)
+}
+
 dependencies {
     implementation(project(":domain"))
 
