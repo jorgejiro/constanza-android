@@ -20,6 +20,12 @@ import javax.inject.Inject
  * [currentSnoozeDuration] is the one-shot suspend read work unit 5-ii's `SnoozeWorker` needs;
  * [snoozeDuration] is the continuously-observed [Flow] the future settings screen (task 6b.5)
  * binds to.
+ *
+ * [onboardingDone] and [setOnboardingDone] back `first-run-onboarding`'s once-per-install gate
+ * (design.md §4.1, §8.1, A6). The companion object is `internal`, not `private`: the androidTest
+ * `CoreFlowTestFixture` seeds through the app's own singleton `DataStore` (design.md §8.1, A5) and
+ * references [ONBOARDING_DONE_KEY] directly, so a rename in production breaks the seeding fixture
+ * at compile time instead of silently seeding a key nobody reads.
  */
 class ReminderSettingsStore @Inject constructor(
     private val dataStore: DataStore<Preferences>,
@@ -29,6 +35,10 @@ class ReminderSettingsStore @Inject constructor(
     }
 
     suspend fun currentSnoozeDuration(): SnoozeDuration = snoozeDuration.first()
+
+    /** Absent means `false` (design.md A6): every pre-existing install onboards exactly once,
+     *  with no migration inferring prior use from [hasRequestedNotificationPermission]. */
+    val onboardingDone: Flow<Boolean> = dataStore.data.map { it[ONBOARDING_DONE_KEY] ?: false }
 
     // RedundantSuspendModifier is suppressed on these three functions, not disabled project-wide:
     // `:app:detektMain`'s hand-rolled task cannot resolve `DataStore<Preferences>.edit`'s suspend
@@ -51,8 +61,17 @@ class ReminderSettingsStore @Inject constructor(
         dataStore.edit { it[REQUESTED_NOTIFICATION_PERMISSION_KEY] = true }
     }
 
-    private companion object {
+    /** Onboarding's write-once completion flag (design.md §9). There is deliberately no way to
+     *  un-onboard from production code — only `CoreFlowTestFixture.reset()` writes `false`, through
+     *  this same shared [DataStore]. */
+    @Suppress("RedundantSuspendModifier")
+    suspend fun setOnboardingDone() {
+        dataStore.edit { it[ONBOARDING_DONE_KEY] = true }
+    }
+
+    internal companion object {
         val SNOOZE_DURATION_MINUTES_KEY = intPreferencesKey("snooze_duration_minutes")
         val REQUESTED_NOTIFICATION_PERMISSION_KEY = booleanPreferencesKey("requested_notification_permission")
+        val ONBOARDING_DONE_KEY = booleanPreferencesKey("onboarding_done")
     }
 }

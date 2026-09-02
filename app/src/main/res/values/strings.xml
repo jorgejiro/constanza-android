@@ -125,4 +125,16 @@
     <string name="action_back">Back</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_dismiss">Dismiss</string>
+
+    <!-- first-run-onboarding: two-screen, API-conditional first-run flow (design.md §6, §7). -->
+    <string name="onboarding_screen1_title">Welcome to Constanza</string>
+    <string name="onboarding_screen1_body">Track your habits without the noise. Add a habit, and Constanza reminds you when it is time.</string>
+    <string name="onboarding_screen2_title">Stay on track with reminders</string>
+    <string name="onboarding_permission_should_request_body">Allow notifications so Constanza can remind you when a habit is due.</string>
+    <string name="onboarding_permission_should_request_action">Allow</string>
+    <string name="onboarding_permission_granted_body">Notifications are on. Reminders will reach you when a habit is due.</string>
+    <string name="onboarding_permission_blocked_body">Notifications are off. Open settings to turn them back on so reminders can reach you.</string>
+    <string name="onboarding_permission_blocked_action">Open settings</string>
+    <string name="onboarding_action_continue">Continue</string>
+    <string name="onboarding_action_finish">Finish</string>
 </resources>
