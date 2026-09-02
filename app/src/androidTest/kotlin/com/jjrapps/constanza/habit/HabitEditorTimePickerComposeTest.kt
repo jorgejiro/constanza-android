@@ -87,7 +87,7 @@ class HabitEditorTimePickerComposeTest {
     }
 
     private fun openEditor(habitId: Long, onDone: () -> Unit = {}) {
-        val viewModel = HabitEditorViewModel(fixture.habitRepository, fixture.timeProvider)
+        val viewModel = fixture.habitEditorViewModel()
         composeTestRule.setContent {
             HabitEditorRoute(habitId = habitId, onDone = onDone, onBack = {}, viewModel = viewModel)
         }

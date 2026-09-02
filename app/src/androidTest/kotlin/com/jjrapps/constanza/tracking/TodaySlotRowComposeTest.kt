@@ -11,17 +11,11 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewModelScope
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.habit.HabitRepositoryTestFixture
-import com.jjrapps.constanza.reminding.NotificationPoster
-import com.jjrapps.constanza.scheduling.AlarmScheduler
 import com.jjrapps.constanza.scheduling.insertHabitWithSchedule
-import io.mockk.every
-import io.mockk.mockk
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -75,30 +69,14 @@ class TodaySlotRowComposeTest {
 
     @Before
     fun setUp() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        fixture = HabitRepositoryTestFixture(context)
-        val entryWriter = EntryWriter(
-            fixture.database, fixture.database.entryDao(), fixture.database.reminderOccurrenceDao(),
-            mockk<AlarmScheduler>(relaxed = true), NotificationPoster(context), fixture.timeProvider,
-        )
-        // Explicitly stubbed for the same reason as the sibling Today tests: a relaxed mock's
-        // default false would add a banner item and eat vertical space this test measures within.
-        val alarmScheduler = mockk<AlarmScheduler>(relaxed = true)
-        every { alarmScheduler.canScheduleExactAlarms() } returns true
-        viewModel = TodayViewModel(
-            fixture.habitRepository, fixture.database.entryDao(), fixture.database.reminderOccurrenceDao(),
-            entryWriter, alarmScheduler, grantedNotificationPermission(),
-            neverAskedReminderSettingsStore(), fixture.timeProvider,
-        )
+        fixture = HabitRepositoryTestFixture(ApplicationProvider.getApplicationContext<Context>())
+        viewModel = fixture.todayViewModel()
     }
 
-    /** Scope cancelled before the database closes; see [TodayComposeTest.tearDown] for why the
-     *  order matters and what it prevents attributing to an unrelated test. */
+    /** Ordering lives in [HabitRepositoryTestFixture.close] — see its KDoc for why the ViewModel
+     *  scopes must die before the database, and what the old per-class teardown was preventing. */
     @After
-    fun tearDown() {
-        viewModel.viewModelScope.cancel()
-        fixture.close()
-    }
+    fun tearDown() = fixture.close()
 
     private fun text(resId: Int) = ApplicationProvider.getApplicationContext<Context>().getString(resId)
 

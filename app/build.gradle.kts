@@ -177,8 +177,17 @@ ksp {
 // detekt's ForbiddenMethodCall could forbid — the default is evaluated inside material3. See that
 // test's KDoc. Handing the path over explicitly beats resolving it from the test's working
 // directory: a wrong or missing path then fails loudly rather than scanning nothing and passing.
+//
+// ViewModelTeardownCallSiteTest reads the androidTest sources the same way, for a related reason:
+// `detektMain` below is :app's only type-resolved detekt task and its source is main only, so a
+// ForbiddenMethodCall ban on the bare ViewModel constructors would not resolve in androidTest at
+// all. Same argument for handing the path over rather than inferring it.
 tasks.withType<Test>().configureEach {
     systemProperty("constanza.mainSourceDir", layout.projectDirectory.dir("src/main/kotlin").asFile.absolutePath)
+    systemProperty(
+        "constanza.androidTestSourceDir",
+        layout.projectDirectory.dir("src/androidTest/kotlin").asFile.absolutePath,
+    )
 }
 
 dependencies {

@@ -56,7 +56,7 @@ class HabitScheduleKindComposeTest {
         // Constructed outside `setContent`, not inside it: a view model built in the composable
         // lambda is rebuilt on every recomposition, so the editor would silently lose the state
         // each test is driving. Hoisting it gives the whole test one stable instance.
-        val viewModel = HabitEditorViewModel(fixture.habitRepository, fixture.timeProvider)
+        val viewModel = fixture.habitEditorViewModel()
         composeTestRule.setContent {
             HabitEditorRoute(habitId = null, onDone = { done = true }, onBack = {}, viewModel = viewModel)
         }
