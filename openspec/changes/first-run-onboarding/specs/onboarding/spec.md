@@ -59,10 +59,9 @@ tracker afterward.
 
 WHEN the permission is already permanently denied (`BLOCKED`) on entry to screen 2, the screen MUST
 render the blocked variant with a deep link to `ACTION_APP_NOTIFICATION_SETTINGS` and MUST NOT
-re-invoke the runtime prompt. Reaching `BLOCKED` requires two denials within the same install and is
-not reachable on the device-free instrumented matrix, because the harness cannot script two real
-system-dialog denials in one continuous automated run; this state mapping is verified by a unit test
-instead.
+re-invoke the runtime prompt. `BLOCKED` is one recorded ask plus no grant — not two denials — so it
+is reachable in a single instrumented step: deny the real dialog once during onboarding, and the
+state is observable on relaunch.
 
 #### Scenario: Blocked state on entry offers the settings deep link
 - GIVEN the permission is already `BLOCKED` before onboarding starts
