@@ -30,6 +30,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.component.HabitColorDot
+import com.jjrapps.constanza.core.ui.theme.Spacing
 import com.jjrapps.constanza.domain.model.DayStatus
 import com.jjrapps.constanza.domain.model.EntryStatus
 import java.time.Instant
@@ -48,6 +49,7 @@ private val TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm")
 @Composable
 fun TodayRoute(
     onManageHabits: () -> Unit,
+    onAddHabit: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     viewModel: TodayViewModel = hiltViewModel(),
 ) {
@@ -68,6 +70,7 @@ fun TodayRoute(
         onToggleExpanded = viewModel::toggleExpanded,
         onAnswer = viewModel::answer,
         onManageHabits = onManageHabits,
+        onAddHabit = onAddHabit,
         onOpenSettings = onOpenSettings,
         onNotificationPermissionRequested = viewModel::recordNotificationPermissionRequested,
     )
@@ -88,6 +91,7 @@ fun TodayScreen(
     onToggleExpanded: (Long) -> Unit,
     onAnswer: (Long, TodaySlot, InAppEntryStatus) -> Unit,
     onManageHabits: () -> Unit,
+    onAddHabit: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onNotificationPermissionRequested: () -> Unit = {},
 ) {
@@ -107,7 +111,7 @@ fun TodayScreen(
         },
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
-            TodayContent(state, onToggleExpanded, onAnswer, onNotificationPermissionRequested)
+            TodayContent(state, onToggleExpanded, onAnswer, onAddHabit, onNotificationPermissionRequested)
         }
     }
 }
@@ -117,28 +121,28 @@ private fun TodayContent(
     state: TodayUiState,
     onToggleExpanded: (Long) -> Unit,
     onAnswer: (Long, TodaySlot, InAppEntryStatus) -> Unit,
+    onAddHabit: () -> Unit,
     onNotificationPermissionRequested: () -> Unit,
 ) {
+    // Two layouts, chosen by whether there is a list at all, rather than one LazyColumn with an
+    // empty branch inside it. A `fillParentMaxSize` item is sized against the whole viewport and
+    // knows nothing about the banners above it, so with both banners showing the "centred" action
+    // was pushed into the bottom third of a real screen — seen on the emulator, not reasoned about.
+    // A Column whose empty state takes `weight(1f)` centres in the space that is actually left.
+    // Nothing scrolls in that case anyway: at most two banners and one call to action.
+    if (state.rows.isEmpty()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            TodayPermissionBanners(state, onNotificationPermissionRequested)
+            TodayEmptyState(onAddHabit, modifier = Modifier.weight(1f))
+        }
+        return
+    }
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        // Above the exact-alarm banner deliberately: a late reminder is a degraded reminder, a
-        // missing permission is no reminder at all.
-        if (state.notificationPermission.needsBanner()) {
-            item {
-                NotificationPermissionBanner(
-                    decision = state.notificationPermission,
-                    onPermissionRequested = onNotificationPermissionRequested,
-                )
-            }
-        }
-        if (!state.canScheduleExactAlarms) {
-            item { ExactAlarmBanner() }
-        }
-        if (state.rows.isEmpty()) {
-            item { Text(stringResource(R.string.today_empty), modifier = Modifier.padding(16.dp)) }
-        }
+        item { TodayPermissionBanners(state, onNotificationPermissionRequested) }
         items(state.rows, key = { it.habitId }) { row ->
             HabitRollupRow(row, row.habitId in state.expandedHabitIds, state.zone, onToggleExpanded, onAnswer)
         }
+        item { TrailingAddHabitAction(onAddHabit) }
     }
 }
 
@@ -156,7 +160,10 @@ private fun HabitRollupRow(
         val slot = row.slots.firstOrNull()
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
             Row(
-                modifier = Modifier.padding(start = 16.dp, top = 8.dp),
+                // `end` padding added with the SlotRow width fix below: a long habit name — the
+                // reported case was a full sentence — otherwise runs to the very edge of the
+                // screen with nothing between it and the bezel.
+                modifier = Modifier.padding(start = 16.dp, end = Spacing.lg, top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 HabitColorDot(row.colorArgb)
@@ -195,8 +202,18 @@ private fun SlotRow(
             .fillMaxWidth()
             .padding(start = if (indented) 32.dp else 16.dp, end = 16.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(slotStatusText(slot, zone))
+        // `weight(1f)` is load bearing, not styling, and is the same fix ExactAlarmBanner and
+        // NotificationPermissionBanner already carry in TodayBanners.kt. Without it the status text
+        // takes whatever width it wants and `SpaceBetween` squeezes the button group into the
+        // remainder, so "Skip" wrapped mid-word as "Ski / p" — reported from a real Galaxy S25.
+        // The buttons keep their intrinsic width and the text wraps instead, which is the right way
+        // round: a wrapped sentence is readable, a wrapped control label is not.
+        Text(
+            slotStatusText(slot, zone),
+            modifier = Modifier.weight(1f).padding(end = Spacing.sm),
+        )
         AnswerButtons(onAnswer = { status -> onAnswer(habitId, slot, status) })
     }
 }
@@ -224,15 +241,31 @@ private fun slotStatusText(slot: TodaySlot, zone: ZoneId): String {
     val time = slot.minuteOfDay?.let { minute ->
         "%02d:%02d".format(minute / MINUTES_PER_HOUR, minute % MINUTES_PER_HOUR)
     }
-    val statusText = when {
-        slot.snoozedUntilEpochMs != null -> stringResource(
+    val statusText = if (slot.snoozedUntilEpochMs != null) {
+        // Still ahead of the status itself: a snoozed slot is pending WITH a time attached, and
+        // that time is the more useful half of the sentence.
+        stringResource(
             R.string.today_slot_pending_snoozed_until,
             TIME_FORMATTER.format(Instant.ofEpochMilli(slot.snoozedUntilEpochMs).atZone(zone)),
         )
-        slot.status == EntryStatus.UNKNOWN -> stringResource(R.string.today_slot_pending)
-        else -> slot.status.name
+    } else {
+        stringResource(slotStatusLabel(slot.status))
     }
     return if (time != null) "$time — $statusText" else statusText
+}
+
+/** today-row-answering-is-cramped-and-always-on, defect 2. The fallback here used to be
+ *  `slot.status.name`, which put the Kotlin constant `COMPLETED` on screen; this mirrors
+ *  [dayStatusLabel]'s existing shape instead, which is what it should have done from the start.
+ *
+ *  Exhaustive over [EntryStatus] with no `else`, deliberately: adding a member to that enum must
+ *  break this compile rather than silently reach a default. [EntryStatus.UNKNOWN] is the pending
+ *  case and keeps the string it already had. */
+private fun slotStatusLabel(status: EntryStatus) = when (status) {
+    EntryStatus.COMPLETED -> R.string.today_slot_completed
+    EntryStatus.MISSED -> R.string.today_slot_missed
+    EntryStatus.SKIPPED -> R.string.today_slot_skipped
+    EntryStatus.UNKNOWN -> R.string.today_slot_pending
 }
 
 private fun dayStatusLabel(status: DayStatus) = when (status) {

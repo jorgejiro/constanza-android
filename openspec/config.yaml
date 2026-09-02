@@ -129,7 +129,7 @@ carried_forward_open_items:
         editor with unsaved edits should confirm before discarding.
     - id: "today-has-no-add-habit-affordance"
       title: "Today offers no way to add a habit, and reads as broken when it is empty"
-      status: open
+      status: resolved
       origin: >
         Raised by the maintainer on 2026-09-02 while designing onboarding. A
         first-run user finishing onboarding lands on Today with zero habits,
@@ -155,6 +155,65 @@ carried_forward_open_items:
         case is better served by a FAB than by a trailing list item, and
         whether Today's empty state should instead route straight into the
         habit editor.
+      resolution: >
+        Shipped as the maintainer asked, in both presentations and with one
+        shared `today_add_habit` label, because it is one action rather than
+        two. Empty: a centred filled Button under the existing
+        `today_empty` sentence — the sentence says what the state is, the
+        button says what to do about it. Populated: the same filled Button,
+        centred, in a trailing `LazyColumn` item after the last habit row.
+        Both live in the new `tracking/TodayAddHabitAction.kt`, kept out of
+        `TodayScreen.kt` for the reason `TodayBanners.kt` already exists.
+
+        NOT a FloatingActionButton for the populated case, and the
+        owner_condition's open question above is answered rather than dodged:
+        `HabitListScreen` already has a FAB for creating a habit and is one
+        tap away behind "Manage habits", so a second, differently shaped
+        create affordance would leave the two screens disagreeing about what
+        creating a habit looks like. A centred filled pill cannot be read as a
+        habit row either — every row here starts with a colour dot at the
+        leading edge — which was the risk a trailing list item carried.
+
+        Routing: `ConstanzaRoute.EditorOrigin` gained a third member, `Today`,
+        mapping to `leaveTo = Today`. Deliberately not reusing `Onboarding`,
+        whose exit is identical today: they are different journeys, and the
+        `HabitList` origin would have stranded the user, since `HabitListRoute`
+        takes no `onBack`.
+
+        The empty state does NOT sit in the `LazyColumn`. A `fillParentMaxSize`
+        item is measured against the whole viewport and knows nothing about the
+        permission banners above it, and on the emulator, with both banners
+        showing, the "centred" action landed in the bottom third of the screen.
+        `TodayContent` now renders a plain `Column` when there are no rows, with
+        the empty state taking `weight(1f)` of what is actually left. The
+        populated path keeps the `LazyColumn` and its scrolling unchanged. The
+        two banners moved behind one `TodayPermissionBanners` composable so both
+        layouts place the pair identically.
+      verified: >
+        `:app:testDebugUnitTest`, `:app:detekt`, `:app:detektMain` and
+        `:app:lintDebug` green. `:app:emulatorMatrixGroupDebugAndroidTest`
+        green on both legs, 91 tests each (api31 0 failures, api37 0 failures)
+        — five of those tests are new: `TodayAddHabitComposeTest` (empty shows
+        the centred action and not the trailing one, and vice versa; the
+        trailing action's bounds sit below both the habit name and its answer
+        buttons, so it cannot be occupying a row's place) and
+        `TodayAddHabitE2ETest`, which drives the real `MainActivity` because
+        only that has the hoisted route: tap the centred action, reach the
+        editor, back out to Today rather than the habit list, then save from it
+        and land on Today with the action now trailing.
+
+        Installed on the API 37 emulator and both states screenshotted and
+        read. Empty: the sentence and the pill are centred in the space under
+        the two permission banners, not stranded at the top and not pushed
+        below the fold. Populated (with the reported 65-character habit name):
+        the pill sits clearly below the row, centred, with no leading dot — it
+        reads as an action, not a stray row.
+      not_verified: >
+        Nothing on the physical Galaxy S25 — emulator only. The empty state's
+        `weight(1f)` column has no scroll of its own, so on a screen short
+        enough for two banners plus the call to action to exceed it the action
+        would be clipped rather than scrolled to; not reachable on any device
+        in the matrix and not tested for.
     - id: "compose-test-db-teardown-race"
       title: "TodayComposeTest's async DB teardown can crash the whole instrumentation process"
       status: open
@@ -252,6 +311,52 @@ carried_forward_open_items:
         heights at sw>=600dp. Defects 1 and 2 are small enough to fix
         immediately and independently if the redesign is deferred; do not let
         them wait on it.
+      partial_resolution: >
+        Defects 1 and 2 are fixed and shipped on the `today-add-habit` branch,
+        at the maintainer's explicit request, taking the owner_condition's own
+        offer to fix them without waiting for the redesign. Defect 3 is
+        untouched and this item STAYS OPEN for it.
+
+        1. LAYOUT. `SlotRow`'s status `Text` now carries
+        `Modifier.weight(1f).padding(end = Spacing.sm)` and the row aligns its
+        children `CenterVertically` — the same fix `ExactAlarmBanner` and
+        `NotificationPermissionBanner` already carry in `TodayBanners.kt`. The
+        buttons keep their intrinsic width and the status text wraps instead,
+        which is the right way round: a wrapped sentence is readable, a wrapped
+        control label is not. The single-slot row's name `Row` also gained
+        `end = Spacing.lg` padding, since a full-sentence habit name otherwise
+        ran to the bezel.
+
+        2. RAW ENUM. `slotStatusText`'s `else -> slot.status.name` is gone.
+        `slotStatusLabel(EntryStatus)` mirrors the `dayStatusLabel(DayStatus)`
+        already in that file and is exhaustive with no `else`, so adding an
+        `EntryStatus` member breaks the compile rather than silently reaching a
+        default. Three new strings — `today_slot_completed` ("Done"),
+        `today_slot_missed` ("Missed"), `today_slot_skipped` ("Skipped");
+        `UNKNOWN` keeps the `today_slot_pending` it already had. Shorter than
+        their day-level counterparts on purpose: the slot line already carries
+        its time and shares one row with three buttons.
+      partial_resolution_verified: >
+        `TodaySlotRowComposeTest` is new and pins both halves at a 360dp window
+        — pinned rather than inherited, since a width defect proven only at the
+        connected device's width proves nothing. It seeds the reported habit
+        name verbatim ("Hacer ejercicios de movilidad en la primera hora tras
+        despertarme") and asserts "Skip"'s bounds are no taller than "Yes"'s,
+        which is what a wrapped label breaks, plus that the group stays inside
+        the screen. `TodayComposeTest`'s two status assertions were updated
+        from `EntryStatus.<X>.name` to the string resources and now also assert
+        the raw constant does NOT appear.
+
+        Both confirmed on the API 37 emulator with that habit name on screen:
+        the row reads "08:00 — Pending" with Yes / No / Skip all on one line,
+        and after tapping Yes it reads "08:00 — Done", not "COMPLETED". The
+        `uiautomator` dump backs the screenshot — all three labels 53px tall,
+        right edge 998 of 1080.
+      still_open: >
+        Defect 3 only: all three actions still render on every slot, answered
+        or not. Unchanged, deliberately — it is the interaction redesign this
+        item's analysis_to_do describes and it touches published
+        `habit-entry-tracking` requirements.
     - id: "no-launcher-icon"
       title: "The app ships with the stock Android launcher icon"
       status: resolved

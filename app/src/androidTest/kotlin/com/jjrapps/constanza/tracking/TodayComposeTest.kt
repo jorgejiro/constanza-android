@@ -28,7 +28,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-private const val WAIT_TIMEOUT_MS = 5_000L
+/** Bound for awaiting a Room-Flow-fed row. Raised from 5s to 15s with `today-add-habit`: three
+ *  more Room-backed Compose classes joined this suite and the extra contention started blowing the
+ *  old bound on the matrix while the same tests passed in isolation. The assertions are unchanged;
+ *  only the headroom is. See `TodayAddHabitComposeTest` for the measurements. */
+private const val WAIT_TIMEOUT_MS = 15_000L
 private const val MORNING_MINUTE = 8 * 60
 private const val EVENING_MINUTE = 20 * 60
 
@@ -96,10 +100,15 @@ class TodayComposeTest {
         awaitNodeWithText(text(R.string.today_expand))
         composeTestRule.onNodeWithText(text(R.string.today_expand)).performClick()
         composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes))[0].performClick()
+        // The localised label, not `EntryStatus.COMPLETED.name`, which is what this row used to
+        // render (today-row-answering-is-cramped-and-always-on, defect 2). Keeping the assertion on
+        // the string resource is also what stops the raw constant coming back unnoticed — the
+        // explicit check below says so directly.
         composeTestRule.waitUntil(WAIT_TIMEOUT_MS) {
-            composeTestRule.onAllNodesWithText(EntryStatus.COMPLETED.name, substring = true)
+            composeTestRule.onAllNodesWithText(text(R.string.today_slot_completed), substring = true)
                 .fetchSemanticsNodes().isNotEmpty()
         }
+        composeTestRule.onNodeWithText(EntryStatus.COMPLETED.name, substring = true).assertDoesNotExist()
 
         // The sibling slot's own row still reads pending — never touched by the first slot's answer.
         composeTestRule.onNodeWithText(text(R.string.today_slot_pending), substring = true).assertExists()
@@ -136,10 +145,12 @@ class TodayComposeTest {
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
         awaitNodeWithText(text(R.string.today_answer_skip))
         composeTestRule.onNodeWithText(text(R.string.today_answer_skip)).performClick()
+        // Again the localised label rather than the enum constant; see the sibling test above.
         composeTestRule.waitUntil(WAIT_TIMEOUT_MS) {
-            composeTestRule.onAllNodesWithText(EntryStatus.SKIPPED.name, substring = true)
+            composeTestRule.onAllNodesWithText(text(R.string.today_slot_skipped), substring = true)
                 .fetchSemanticsNodes().isNotEmpty()
         }
+        composeTestRule.onNodeWithText(EntryStatus.SKIPPED.name, substring = true).assertDoesNotExist()
 
         val entry = fixture.database.entryDao().findByHabitId(habitId).single()
         assertEquals(EntryStatus.SKIPPED.name, entry.status)

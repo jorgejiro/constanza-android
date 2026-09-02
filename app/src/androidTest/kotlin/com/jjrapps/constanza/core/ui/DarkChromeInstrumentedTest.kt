@@ -27,8 +27,15 @@ private const val NIGHT_MODE_POLL_INTERVAL_MS = 100L
 private const val NIGHT_MODE_LIGHT = "no"
 
 /** Every token `cmd uimode night` will accept back, so a restore cannot write a value the
- *  framework rejects and silently leave the device on whatever this test set. */
-private val ACCEPTED_NIGHT_MODES = setOf("yes", "no", "auto", "custom")
+ *  framework rejects and silently leave the device on whatever this test set.
+ *
+ *  `custom_bedtime` and `custom_schedule` were missing and made this class fail on the API 37
+ *  matrix leg for a reason that had nothing to do with system bars: the emulator's own dark-theme
+ *  schedule flips its setting to `custom_bedtime` in the evening, `readNightMode` reported a token
+ *  this set did not contain, and the precondition refused. Both were verified to round-trip on
+ *  API 37 (`cmd uimode night custom_bedtime` then `cmd uimode night` reports it back), which is
+ *  the only property this set is asserting, so they belong in it. */
+private val ACCEPTED_NIGHT_MODES = setOf("yes", "no", "auto", "custom", "custom_schedule", "custom_bedtime")
 
 /**
  * Task 1.13 (`ui-design-system` spec "Cold-Start Window Background And System Bar Icons"). Closes

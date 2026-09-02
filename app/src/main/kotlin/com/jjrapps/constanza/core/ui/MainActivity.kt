@@ -79,11 +79,16 @@ private sealed interface ConstanzaRoute : java.io.Serializable {
     data object Today : ConstanzaRoute
     data object HabitList : ConstanzaRoute
 
-    /** first-run-onboarding design.md §5.1: the editor is reachable from two places that must
-     *  leave to DIFFERENT screens — the habit list, which is its own caller, and the end of
-     *  onboarding, whose user has never seen the list and cannot reach Today from it, since
-     *  [HabitList] has no back route at all. */
-    enum class EditorOrigin { HabitList, Onboarding }
+    /** first-run-onboarding design.md §5.1: the editor is reachable from places that must leave to
+     *  DIFFERENT screens — the habit list, which is its own caller, and the end of onboarding,
+     *  whose user has never seen the list and cannot reach Today from it, since [HabitList] has no
+     *  back route at all.
+     *
+     *  [Today] (today-add-habit) is a third caller with the SAME exit as [Onboarding] and is
+     *  deliberately not folded into it: they leave to the same screen today, but they are different
+     *  journeys, and reusing `Onboarding` for a tap on Today would make the route lie about where
+     *  the user came from the first time the two need to diverge. */
+    enum class EditorOrigin { HabitList, Onboarding, Today }
 
     data class HabitEditor(val habitId: Long?, val origin: EditorOrigin = EditorOrigin.HabitList) : ConstanzaRoute
     data class Progress(val habitId: Long) : ConstanzaRoute
@@ -106,6 +111,15 @@ private fun ConstanzaApp(startRoute: ConstanzaRoute = ConstanzaRoute.Today) {
     when (val current = route) {
         is ConstanzaRoute.Today -> TodayRoute(
             onManageHabits = { route = ConstanzaRoute.HabitList },
+            // today-add-habit: tagged Today, never HabitList — the editor's exits both follow
+            // `origin`, and a HabitList-tagged entry would leave a user who never asked for the
+            // list stranded on it, since HabitListRoute takes no onBack.
+            onAddHabit = {
+                route = ConstanzaRoute.HabitEditor(
+                    habitId = null,
+                    origin = ConstanzaRoute.EditorOrigin.Today,
+                )
+            },
             onOpenSettings = { route = ConstanzaRoute.Settings },
         )
 
@@ -125,6 +139,7 @@ private fun ConstanzaApp(startRoute: ConstanzaRoute = ConstanzaRoute.Today) {
             val leaveTo = when (current.origin) {
                 ConstanzaRoute.EditorOrigin.HabitList -> ConstanzaRoute.HabitList
                 ConstanzaRoute.EditorOrigin.Onboarding -> ConstanzaRoute.Today
+                ConstanzaRoute.EditorOrigin.Today -> ConstanzaRoute.Today
             }
             HabitEditorRoute(
                 habitId = current.habitId,

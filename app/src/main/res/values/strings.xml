@@ -69,6 +69,10 @@
     <string name="today_title">Today</string>
     <string name="today_manage_habits">Manage habits</string>
     <string name="today_empty">Nothing due today.</string>
+    <!-- today-add-habit: one label for both presentations of the same action — centred when the
+         list is empty, trailing the last row once it is not. Deliberately shared: it is one
+         action, and two wordings would read as two different things. -->
+    <string name="today_add_habit">Add habit</string>
     <string name="today_status_all_completed">All done</string>
     <string name="today_status_partial">In progress</string>
     <string name="today_status_any_missed">Missed something</string>
@@ -79,6 +83,14 @@
 
     <!-- reminder-response: pending/snoozed rendering by reading reminder_occurrences (task 6b.3, design D3). -->
     <string name="today_slot_pending">Pending</string>
+    <!-- today-row-answering-is-cramped-and-always-on, defect 2: one per EntryStatus, so a slot's
+         answered state is copy like everything else instead of the Kotlin constant leaking through
+         `EntryStatus.name`. Deliberately shorter than their day-level counterparts above — a slot
+         line already carries its time, and this sits beside three buttons on one row. UNKNOWN maps
+         to today_slot_pending, which already existed and already said the right thing. -->
+    <string name="today_slot_completed">Done</string>
+    <string name="today_slot_missed">Missed</string>
+    <string name="today_slot_skipped">Skipped</string>
     <string name="today_slot_pending_snoozed_until">Pending, snoozed until %1$s</string>
 
     <!-- habit-entry-tracking: in-app Entry write path, SKIPPED is in-app only (task 6b.2). -->
