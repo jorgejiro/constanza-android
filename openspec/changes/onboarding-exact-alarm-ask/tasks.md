@@ -113,3 +113,45 @@ actually judged against is the code-only figure above, which clears 800 comforta
       correction round agrees with.
 - Verify: `./gradlew :app:testDebugUnitTest`, `./gradlew :app:detekt :app:detektMain :app:lintDebug`,
   `./gradlew :app:emulatorMatrixGroupDebugAndroidTest --rerun-tasks` (both legs).
+
+## Phase 8 — Second Correction Round (`sdd-verify` re-run FAIL: 2 CRITICAL)
+(Verify report second pass: CRITICAL-4/5 unchanged, no longer accepted as
+architectural-only proof — see `verify-report.md`.)
+
+- [x] 8.1 The verifier's own re-verify pass reflected on Phase 7.5's acceptance and reversed it: the
+      hard rule ("a scenario is compliant only when a covering test passed at runtime") has no
+      carve-out for negative/structural-absence claims, however strong the grep evidence, and
+      `gentle-ai sdd-verify-validate` mechanically refused to admit a passing verdict without runtime
+      coverage for these two scenarios a second time. The orchestrator's ruling: write the test, do
+      not seek a waiver. Added
+      `app/src/test/kotlin/com/jjrapps/constanza/reminding/NoExactAlarmAskPersistenceTest.kt` — a
+      reflection-based JVM unit test, not a fixation on the current grep result. It enumerates
+      `AlarmScheduler`'s and `ReminderSettingsStore`'s actual declared public members (methods and
+      fields, via `java.lang.reflect`) and asserts none is persistence-shaped for exact alarms,
+      deriving the check from a name-shape pattern (`record*`/`has*`/`is*`/`get*`/`set*` combined
+      with a completion noun — asked/requested/declined/prompted/flag/consumed/done) rather than a
+      hand-listed roster of forbidden method names that would rot. `AlarmScheduler`'s check is
+      unconditional (it has no legitimate persistence-shaped member today); `ReminderSettingsStore`'s
+      check additionally requires the name to reference "exact alarm", since that store already
+      legitimately carries `hasRequestedNotificationPermission`/`recordRequestedNotificationPermission`
+      for `POST_NOTIFICATIONS` — the same shape, for a different, already-shipped permission.
+- [x] 8.2 Proved the guard bites, not just compiles. Planted `fun recordExactAlarmAsked(): Boolean =
+      true` on `AlarmScheduler` — `NoExactAlarmAskPersistenceTest` failed with the offending member
+      named and the reasoning stated ("a persisted \"we asked\" flag here would let declining during
+      onboarding suppress the standing exact-alarm banner later"). Reverted; green again. Repeated the
+      same proof for the `ReminderSettingsStore`-scoped check with a planted `suspend fun
+      hasRequestedExactAlarm(): Boolean = false` — same fail/revert/green cycle. Neither planted
+      method reached a commit.
+- [x] 8.3 Recorded, not fixed: `openspec/config.yaml` gained the carried-forward item
+      `today-slot-row-compose-test-timeout-flakiness`, consolidating what were previously two
+      separately-known flakes (from this change's own launch brief) with two newly-observed ones from
+      this session's three `--rerun-tasks` matrix runs (2 of 3 failed, each a different method and
+      API leg, both in the pre-existing, untouched `TodaySlotRowComposeTest`) into one item: four
+      distinct flaky methods now known across two verify sessions, all through the same
+      `awaitNodeWithText` helper. Carries the verifier's own suggested remediation (retry-once policy
+      or a targeted look/quarantine on that helper) as the owner condition. Explicitly out of scope
+      for this change.
+- Verify: `./gradlew :app:testDebugUnitTest --rerun-tasks`,
+  `./gradlew :app:detekt :app:detektMain :app:lintDebug`,
+  `./gradlew :app:emulatorMatrixGroupDebugAndroidTest --rerun-tasks` (re-run any
+  `TodaySlotRowComposeTest` failure before attributing it, per the item above).
