@@ -73,8 +73,43 @@ actually judged against is the code-only figure above, which clears 800 comforta
 
 | Spec requirement (scenarios) | Task(s) | Proof, honestly stated |
 |---|---|---|
-| onboarding: Two-Screen Flow, Applicability-Derived (4) | 2.1, 2.4, 3.3, 4.2 | Unit (page-list legs, incl. both API 31-32 legs — simulated via mocks, never a real API 31 emulator) + Instrumented (row order on the two-row leg) |
+| onboarding: Two-Screen Flow, Applicability-Derived (4) | 2.1, 2.4, 3.3, 4.2, 7.1, 7.2 | Unit (page-list legs, incl. both API 31-32 legs — simulated via mocks, never a real API 31 emulator) + Instrumented (row order on the two-row leg, the "granted shows a confirmation, not an ask" combination, and the API 31 one-row leg's *rendering*, not just its page list) |
 | onboarding: Non-Blocking Permission Ask (4) | 2.3, 3.1, 4.4 | Structural (Scaffold's bottom action never routes through a permission control, unchanged) + Unit (`refresh()`) + Instrumented (non-auto-launch) |
-| onboarding: Exact-Alarm Onboarding Row [ADDED] (3) | 3.1-3.4, 4.2-4.4 | Instrumented only — copy, no-auto-launch, no-restart-on-grant |
-| reminder-delivery: Exact-Alarm Permission States (4) | 3 scenarios: pre-existing (`AlarmSchedulerTest`, `ReconcileWorkerTest`), unmodified; 4th ("declining costs nothing"): 5.2 | Unit for 3; architectural-only, untested, for the 4th |
-| reminder-delivery: Exact-Alarm Banner, Standing Fallback [ADDED] (4) | 3 scenarios: pre-existing (`TodayViewModelTest`), unmodified; 4th ("declining doesn't suppress"): 5.2 | Unit for 3; architectural-only, untested, for the 4th |
+| onboarding: Exact-Alarm Onboarding Row [ADDED] (3) | 3.1-3.4, 4.2-4.4, 7.3 | Instrumented — copy, no-auto-launch, and (as of the correction round) an actual instrumented no-restart-on-grant test: a live `mutableStateOf` drives a recomposition of the same composition and asserts the row swaps from ask to confirmation without a new `setContent` call |
+| reminder-delivery: Exact-Alarm Permission States (4) | 3 scenarios: pre-existing (`AlarmSchedulerTest`, `ReconcileWorkerTest`), unmodified; 4th ("declining costs nothing"): 5.2 | Unit for 3; architectural-only for the 4th — accepted as sufficient (see Correction Round below): the claim is a structural absence, and a repo-wide grep for any `record*`/persisted exact-alarm method finding none is stronger evidence than a unit test could offer, since a unit test would need to fabricate the very persisted flag the requirement forbids |
+| reminder-delivery: Exact-Alarm Banner, Standing Fallback [ADDED] (4) | 3 scenarios: pre-existing (`TodayViewModelTest`), unmodified; 4th ("declining doesn't suppress"): 5.2 | Unit for 3; architectural-only for the 4th — same acceptance as above |
+
+## Phase 7 — Correction Round (`sdd-verify` FAIL response)
+(Verify report: 5 CRITICAL, 3 WARNING, 2 SUGGESTION. See `verify-report.md`.)
+
+- [x] 7.1 **Spec fix, not a code fix (CRITICAL-1).** The delta spec's scenario "API 37 with exact
+      alarms already granted shows one row" literally said screen 2 renders "exactly one row, for
+      notifications" when granted+undecided. The shipped code (and design decision 2) correctly
+      renders both rows in that case — the exact-alarm row as a confirmation line, matching how the
+      notification row already treats `GRANTED`. The scenario text was wrong, not the code: reworded
+      to "API 37 with exact alarms already granted shows a confirmation, not an ask", asserting both
+      rows render with only the notification row still asking. See `specs/onboarding/spec.md`.
+- [x] 7.2 `OnboardingComposeTest.kt`: added
+      `theExactAlarmRowShowsAConfirmationWhileTheNotificationRowIsStillAsking` (closes CRITICAL-1's
+      test gap — no case previously paired `canScheduleExactAlarms = true` with a non-`GRANTED`
+      notification state) and
+      `aNotApplicableNotificationStateRendersNoNotificationContentLeavingOnlyTheExactAlarmRow`
+      (closes CRITICAL-3 — the API 31 one-row leg was previously proven only at the page-list level,
+      never at rendering).
+- [x] 7.3 `OnboardingComposeTest.kt`: added
+      `theExactAlarmRowDropsItsAskAndShowsTheConfirmationOnTheSameCompositionWhenGrantedLive`
+      (closes CRITICAL-2 — `tasks.md`'s Promise Coverage table previously claimed instrumented
+      coverage for "no-restart-on-grant" that did not exist; this is now a real instrumented test
+      using a live `mutableStateOf` to drive recomposition without a new `setContent` call).
+- [x] 7.4 `design.md`: corrected a cosmetic misattribution (verify report WARNING-3) — the
+      `exactAlarmsAllowedScheduler()` reference actually lives in `design.md`'s own Testing Strategy
+      section, not `tasks.md`, and no such named factory function exists anywhere in the codebase;
+      the actual pattern is the defaulted `alarmScheduler` parameter inline in
+      `TodayViewModelTest.buildViewModel` (`TodayViewModelTest.kt:333-334`). Corrected to name that
+      call site directly instead of an invented function name.
+- [x] 7.5 CRITICAL-4/5 (`reminder-delivery`: "declining costs nothing later" / "does not suppress
+      the banner"): judged and accepted as architectural-only proof, not rework. See Promise
+      Coverage table above and `verify-report.md`'s own WARNING-1 recommendation, which this
+      correction round agrees with.
+- Verify: `./gradlew :app:testDebugUnitTest`, `./gradlew :app:detekt :app:detektMain :app:lintDebug`,
+  `./gradlew :app:emulatorMatrixGroupDebugAndroidTest --rerun-tasks` (both legs).

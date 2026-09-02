@@ -181,8 +181,9 @@ data class OnboardingUiState(
 
 **`buildViewModel` must default `alarmScheduler` to granted.** A `mockk(relaxed = true)` answers a
 `Boolean` with `false`, which would silently add the exact-alarm row to every existing onboarding
-test — the identical trap `exactAlarmsAllowedScheduler()` was written for on the Today side. Stub it
-explicitly; do not inherit the relaxed default.
+test — the identical trap the defaulted `alarmScheduler` parameter in `TodayViewModelTest.kt:333-334`
+(`buildViewModel`) exists to avoid on the Today side. Stub it explicitly; do not inherit the relaxed
+default.
 
 **The instrumented test renders the presentational composables, not the ViewModel.** Two reasons.
 First, `OnboardingViewModel` is in `ViewModelTeardownCallSiteTest.GUARDED_VIEW_MODELS`, so a bare
