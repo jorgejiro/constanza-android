@@ -22,6 +22,37 @@ carried_forward_open_items:
     decision. Item 7.5 was closed this way by warm-dark-design-system, which
     wrote the app's first Room migration and so met its owner condition.
   items:
+    - id: "colour-dot-fold-unfold"
+      title: "Habit colour dot across a real fold/unfold configuration change"
+      status: blocked
+      origin: >
+        The one sub-item of warm-dark-design-system task 6.5 that could not be
+        closed. Its other two halves ARE closed and automated: the notification
+        accent by NotificationPosterInstrumentedTest, and rendering at
+        sw >= 600dp during that change's verification. Promoted out of the
+        archived tasks.md deliberately — an unchecked box inside
+        openspec/changes/archive/ is invisible to anyone opening a new change,
+        which is the whole reason this section exists.
+      reason: >
+        A fold/unfold is a configuration change no phone can produce. The
+        emulator can host it in principle: the pixel_fold, pixel_9_pro_fold and
+        pixel_10_pro_fold skins are installed and sdklib.jar carries the
+        pixel_fold definition with a foldable-region, but the cmdline-tools SDK
+        package is NOT installed, so there is no avdmanager to create the AVD
+        from the command line. It has to go through Android Studio's Device
+        Manager, or cmdline-tools has to be installed first. A phone AVD reports
+        only DEFAULT to `adb shell cmd device_state print-states`.
+      why_it_matters: >
+        habit-tracking-mvp already discharged a fold/unfold on the real Fold 7,
+        but for the habit EDITOR, not the colour dot, so it does not transfer.
+        The dot sits in a ListItem leadingContent slot chosen precisely because
+        it does not change a row's measured height — the property that keeps
+        ui-adaptive-layout's sw >= 600dp no-overlap assertion passing. A
+        fold/unfold is the configuration change most likely to disturb that.
+      owner_condition: >
+        Either install cmdline-tools and create a foldable AVD, or attach a
+        foldable. Note the Galaxy S25 (SM-S931B) seen on this machine is NOT a
+        foldable and reports only DEFAULT.
     - id: "G.7-throttling-row"
       title: "One UI \"put unused apps to sleep\" survival row (Galaxy Z Fold 7)"
       status: blocked
