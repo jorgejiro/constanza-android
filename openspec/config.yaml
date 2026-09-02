@@ -318,6 +318,87 @@ carried_forward_open_items:
         than the gap it closes; it is cheap only when a change that already needs that reference
         lands anyway.
 
+    - id: "no-shared-time-of-day-formatter"
+      title: "The app never honours the device's 12/24-hour setting; every screen hardcodes 24-hour"
+      status: open
+      origin: >
+        Recorded on 2026-09-02 by fix/control-contrast, which was auditing the habit editor for
+        WCAG 1.4.11 non-text contrast and read the reminder-time code paths on the way through.
+        The gap predates that change and is untouched by it.
+      reason: >
+        There is no one place that renders a time, so there is nothing to teach. `TodayScreen`
+        holds a hardcoded `HH:mm` `TIME_FORMATTER` and, separately, its own `"%02d:%02d"` literal
+        in `slotStatusText`; the habit editor's reminder rows format their own. None consults
+        `android.text.format.DateFormat.is24HourFormat(context)`, so a user whose device is set to
+        12-hour sees `21:15` everywhere regardless.
+      why_it_matters: >
+        It is a locale-correctness gap rather than a defect: the times shown are accurate, just
+        not in the notation the user chose system-wide. It is listed because the natural fix is
+        cheap and structural — one shared `formatTimeOfDay(minuteOfDay, is24Hour)` that every call
+        site reads — and because the duplication that makes it a gap will otherwise keep growing:
+        the same literal already exists twice in `TodayScreen` alone, and the unmerged time-picker
+        work adds a third copy whose KDoc explicitly notes it is matching `slotStatusText`
+        "character for character" precisely because no shared helper exists.
+      owner_condition: >
+        No blocker, but it must be done app-wide in one change or not at all. Converting a single
+        screen would put `9:15 PM` in the editor and `21:15` on Today for the same slot, which is
+        worse than one consistent convention. Any change already touching how times are rendered
+        on more than one screen should absorb it.
+
+    - id: "fab-and-selected-chip-fills-below-the-non-text-floor"
+      title: "Two filled controls identify themselves by a 1.17:1 fill; only their content carries them"
+      status: open
+      origin: >
+        Recorded on 2026-09-02 by fix/control-contrast, which fixed every *stroked* control's
+        WCAG 1.4.11 contrast and measured, but deliberately did not change, the *filled* ones.
+      reason: >
+        `FloatingActionButton` fills with `primaryContainer` and the selected `FilterChip` fills
+        with `secondaryContainer`; both are `ConstanzaColors.SurfaceSelected`, which measures
+        1.17:1 against `Background` — below SC 1.4.11's 3:1. Raising either is not a tuning
+        exercise: 3:1 against `Background` needs relative luminance >= 0.111, and the whole surface
+        ramp tops out at 0.0092, so any conforming fill is a light slab rather than a surface tone.
+      why_it_matters: >
+        Both controls remain identifiable, which is why this is an open item and not a defect:
+        SC 1.4.11 is satisfied by any boundary that identifies the component, and the FAB has
+        Material's own elevation shadow plus (after this change) an accent `+`, while the selected
+        chip gained an accent stroke. What is missing is a fill that carries them on its own. Note
+        the FAB's glyph is now `onPrimaryContainer` = `Accent`, so it reads 8.11:1 against its own
+        container rather than the 13.98:1 the old off-white gave — still far above any floor, and
+        traded deliberately for marking the app's primary action in the accent.
+      owner_condition: >
+        Any change that revisits the surface ramp itself, or one that decides the FAB should be a
+        filled accent button (`primaryContainer` = `Accent`, `onPrimaryContainer` = `OnAccent`).
+        That second option was considered and rejected here only because it would also turn M3's
+        time-picker selected-hour box into a solid amber block, which the unmerged time-picker
+        work had already judged too loud on a real screenshot — an argument that stops applying
+        the moment that work ratifies a different look.
+
+    - id: "control-stroke-overrides-are-not-guarded-by-a-test"
+      title: "Three call sites must opt into ConstanzaControlDefaults, and nothing fails if a fourth forgets"
+      status: open
+      origin: >
+        Recorded on 2026-09-02 by fix/control-contrast, as a known limit of the guard that change
+        introduced rather than a discovery about existing code.
+      reason: >
+        material3 1.4.0 routes `OutlinedButton` and unselected `FilterChip` borders through
+        `outlineVariant`, the decorative-divider role, alongside `HorizontalDivider`. One token
+        cannot clear the 3:1 floor and stay a hairline, so those controls take their stroke from
+        `ConstanzaControlDefaults` by hand. `ColorContrastTest` asserts the tones and the role
+        bindings — it reads the real `ColorScheme`, so it catches a rebinding — but it cannot see
+        a call site that never calls in.
+      why_it_matters: >
+        The failure is silent and looks exactly like the defect this change fixed: a new
+        `OutlinedButton`, `AssistChip`, `InputChip`, `SuggestionChip`, `OutlinedCard` or
+        `OutlinedIconButton` added later will take M3's default border and be invisible, with a
+        green test suite. The same applies to any future `HorizontalDivider`, in reverse: it will
+        correctly get the quiet tone, which is right, but nothing states that intent at the call
+        site.
+      owner_condition: >
+        A lint rule or a detekt `ForbiddenMethodCall` on `ButtonDefaults.outlinedButtonBorder` and
+        `FilterChipDefaults.filterChipBorder` would close it mechanically and is the cheapest real
+        guard. Worth doing when a fourth such control appears, which is the point at which the
+        convention stops being memorable from the three existing examples.
+
 stack:
   status: ratified
   note: >
