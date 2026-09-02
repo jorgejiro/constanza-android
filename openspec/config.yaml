@@ -99,6 +99,34 @@ carried_forward_open_items:
         `adb shell dumpsys package com.jjrapps.constanza | rg POST_NOTIFICATIONS`
         and `adb shell dumpsys notification_manager | rg -A3 com.jjrapps.constanza`
         — before treating this as closed on device.
+    - id: "habit-editor-has-no-cancel-affordance"
+      title: "The habit editor cannot be backed out of; cancelling closes the app"
+      status: open
+      origin: >
+        Found on 2026-09-02 while settling first-run-onboarding's finish
+        destination. Verified in source, not inferred.
+      reason: >
+        `HabitEditorTopBar` (HabitEditorScreen.kt:191-193) is
+        `TopAppBar(title = { Text(stringResource(titleRes)) })` with no
+        navigation icon. `onDone` fires only from `viewModel.events`
+        (HabitEditorScreen.kt:77), which emits after a successful save. And
+        `BackHandler` does not appear anywhere in app/src/main, so system back
+        falls through to the Activity default and finishes it. There is
+        therefore no way to leave the editor without saving except closing the
+        app.
+      why_it_matters: >
+        Tolerable today, because every current route into the editor is one the
+        user chose from the habit list. It stops being tolerable the moment
+        anything else lands them there. first-run-onboarding scopes a
+        BackHandler into its own gate for exactly that reason, which fixes the
+        onboarding entry and leaves every other entry point unchanged — so this
+        item survives that change rather than being closed by it.
+      owner_condition: >
+        The same change that resolves `today-has-no-add-habit-affordance`,
+        since adding an add-habit affordance to Today creates a second entry
+        point into the editor and makes the missing escape reachable by
+        ordinary use. Needs a real decision, not just a back arrow: whether an
+        editor with unsaved edits should confirm before discarding.
     - id: "today-has-no-add-habit-affordance"
       title: "Today offers no way to add a habit, and reads as broken when it is empty"
       status: open
