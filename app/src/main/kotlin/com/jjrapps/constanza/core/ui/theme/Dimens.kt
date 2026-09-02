@@ -24,6 +24,12 @@ object Spacing {
  * `first-run-onboarding`'s progress indicator (design.md §12, A7) — a size, not a gap, so it belongs
  * here as a `Dimens` token rather than being reused from `Spacing`, which is a scale of gaps and
  * padding, not sizes.
+ *
+ * [FieldBorder] is Material 3's own unfocused outlined-text-field border width, named here so a
+ * control that is *shaped* like a form field without *being* an `OutlinedTextField` can line up
+ * with the real ones instead of guessing (`habit.ScheduleEditors`'s reminder-time row). It is
+ * deliberately not merged with [SwatchBorder]: that one is a 3dp selection ring around a colour
+ * swatch and has no reason to move when M3's field outline does.
  */
 object Dimens {
     val HabitDot = 12.dp
@@ -31,4 +37,5 @@ object Dimens {
     val Swatch = 40.dp
     val SwatchBorder = 3.dp
     val PagerDot = 8.dp
+    val FieldBorder = 1.dp
 }
