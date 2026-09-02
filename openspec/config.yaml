@@ -99,6 +99,34 @@ carried_forward_open_items:
         `adb shell dumpsys package com.jjrapps.constanza | rg POST_NOTIFICATIONS`
         and `adb shell dumpsys notification_manager | rg -A3 com.jjrapps.constanza`
         — before treating this as closed on device.
+    - id: "today-has-no-add-habit-affordance"
+      title: "Today offers no way to add a habit, and reads as broken when it is empty"
+      status: open
+      origin: >
+        Raised by the maintainer on 2026-09-02 while designing onboarding. A
+        first-run user finishing onboarding lands on Today with zero habits,
+        which is the state the screen handles worst.
+      reason: >
+        TodayScreen renders only `R.string.today_empty` as a bare Text when
+        `state.rows.isEmpty()`, and the sole route to habit creation is the
+        "Manage habits" TextButton in the TopAppBar actions, which reads as
+        navigation rather than as the primary action. There is no add
+        affordance on Today itself in either the empty or the populated state.
+      why_it_matters: >
+        This is the first screen of the app and, on a clean install, it is
+        empty by definition. An empty list with no call to action is
+        indistinguishable from a broken screen. It also leaves the onboarding
+        flow unfinished: the flow ends by handing the user a screen that does
+        not tell them what to do next.
+      owner_condition: >
+        Its own change, sequenced after onboarding since onboarding is what
+        makes the empty state the guaranteed first thing a new user sees. Two
+        distinct presentations were requested: a centred "Add habit" action
+        when there are no habits, and the same action at the end of the list
+        once habits exist. Worth deciding at that point whether the populated
+        case is better served by a FAB than by a trailing list item, and
+        whether Today's empty state should instead route straight into the
+        habit editor.
     - id: "no-launcher-icon"
       title: "The app ships with the stock Android launcher icon"
       status: open
