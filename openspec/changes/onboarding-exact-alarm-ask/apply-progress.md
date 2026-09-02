@@ -153,8 +153,100 @@ See git log for exact hashes — conventional commits, no AI attribution, pushed
 - Docs (excluded from code budget per repo convention): `design.md` (3+2), `specs/onboarding/spec.md`
   (3+2), `tasks.md` (39+4) = 53 lines.
 
+## Second Correction Round (`sdd-verify` re-run FAIL: 2 CRITICAL)
+
+`sdd-verify` re-ran and returned FAIL again: 5 CRITICAL down to 2 (CRITICAL-1/2/3 confirmed genuinely
+closed from source, not relayed). The remaining CRITICAL-4/5 — reminder-delivery's "declining
+onboarding's offer costs nothing later" and "declining onboarding's ask does not suppress the
+banner" — were the same finding twice, still proven only by architectural absence. The verifier
+agreed the grep evidence was strong but held the hard rule with no carve-out for negative claims:
+a scenario is compliant only when a covering test passes at runtime, and `gentle-ai
+sdd-verify-validate` mechanically refused a passing verdict without it, for a second time. See
+`verify-report.md`. The orchestrator's ruling this round: write the test, do not seek a waiver.
+
+- **CRITICAL-4/5, closed with a real test (Phase 8.1-8.2).** Added
+  `app/src/test/kotlin/com/jjrapps/constanza/reminding/NoExactAlarmAskPersistenceTest.kt` — a
+  reflection-based JVM unit test (`java.lang.reflect`, no `kotlin-reflect` dependency needed) that
+  enumerates `AlarmScheduler`'s and `ReminderSettingsStore`'s actual declared public members
+  (methods and fields, `Modifier.isPublic`, non-synthetic) and asserts none is persistence-shaped
+  for exact alarms. The check is derived from a name-shape pattern — a verb prefix
+  (`record`/`has`/`is`/`get`/`set`) combined with a completion noun
+  (asked/requested/declined/prompted/flag/consumed/done) — rather than a hand-listed roster of
+  forbidden method names, so it does not rot as new legitimate methods are added.
+  `AlarmScheduler`'s check is unconditional (it has zero legitimate persistence-shaped members
+  today: only `schedule`, `cancel`, `canScheduleExactAlarms`). `ReminderSettingsStore`'s check
+  additionally requires the name to reference "exact alarm" (regex `exact.?alarm`, case-insensitive),
+  since that store already legitimately carries
+  `hasRequestedNotificationPermission`/`recordRequestedNotificationPermission` for
+  `POST_NOTIFICATIONS` — the identical shape, for a different, already-shipped permission — and a
+  blanket ban would false-positive on it. A third test asserts the scan actually reaches both
+  types' real members (non-empty), so an accidental empty scan cannot pass silently.
+
+  **Proved it bites, not just compiles.** Planted `fun recordExactAlarmAsked(): Boolean = true` on
+  `AlarmScheduler` — the guard failed with:
+  `AlarmScheduler gained recordExactAlarmAsked, which reads as recording or checking an "already
+  asked" flag for exact alarms. AlarmScheduler must only ever re-check the live system permission
+  via canScheduleExactAlarms() — a persisted "we asked" flag here would let declining during
+  onboarding suppress the standing exact-alarm banner later, which reminder-delivery's spec
+  forbids. Delete the member rather than renaming it.`
+  Reverted; `NoExactAlarmAskPersistenceTest` passed green again (3/3). Repeated the same
+  plant/fail/revert/pass cycle for the `ReminderSettingsStore`-scoped check with a planted
+  `suspend fun hasRequestedExactAlarm(): Boolean = false` — failed with the equivalent message
+  naming that member, reverted, passed again. Neither planted method reached a commit; `git status`
+  confirmed both production files clean before staging.
+
+- **WARNING-1/2 (matrix trustworthiness), recorded not fixed (Phase 8.3).** The verifier's re-run
+  hit the matrix three times (as instructed, to avoid attributing without a re-run) and it failed
+  twice of three, each time exactly one failure in the pre-existing, untouched
+  `TodaySlotRowComposeTest`, always `ComposeTimeoutException` in `awaitNodeWithText`, but a
+  **different** specific method and API leg each time —
+  `theSlotTimeReadsInTheDeviceHourCycle[api37]` and
+  `anAnsweredSlotReadsAsCopyRatherThanTheEnumConstant[api31]` — neither of which matches the two
+  flakes this change's own first correction round already knew about
+  (`theAnswerLabelsStayOnOneLineNextToALongHabitNameOnAPhone`,
+  `TodayAddHabitComposeTest`'s add-action test). That is four distinct flaky methods now known
+  across two verify sessions, all through the same helper. Added carried-forward item
+  `today-slot-row-compose-test-timeout-flakiness` to `openspec/config.yaml`, consolidating the
+  evidence and carrying the verifier's own suggested remediation (a documented retry-once policy
+  for the managed-device matrix task, or a targeted look/quarantine on `awaitNodeWithText`
+  specifically) as the owner condition. Explicitly not fixed here: unrelated to this change's own
+  scope, and the file was never touched by it.
+
+### Verification (real output, second correction round)
+
+- `./gradlew :app:testDebugUnitTest --rerun-tasks` — BUILD SUCCESSFUL, 34/34 tasks executed. Parsed
+  via `xml.etree.ElementTree` across `app/build/test-results/testDebugUnitTest/*.xml`: **190 tests,
+  0 failures** (up from 187 — the 3 new `NoExactAlarmAskPersistenceTest` methods).
+- `./gradlew :app:detekt :app:detektMain :app:lintDebug` — BUILD SUCCESSFUL (`:app:detekt`
+  UP-TO-DATE; `:app:detektMain` and `:app:lintDebug` executed clean).
+- `./gradlew :app:emulatorMatrixGroupDebugAndroidTest --rerun-tasks` — BUILD SUCCESSFUL in 5m 45s,
+  first attempt, no re-run needed for attribution. Parsed via `xml.etree.ElementTree` against
+  `app/build/outputs/androidTest-results/managedDevice/debug/{api31,api37}/*.xml`:
+  - api31: 103 testcases, 0 failures, 0 errors, 2 skipped.
+  - api37: 103 testcases, 0 failures, 0 errors, 1 skipped.
+  - No `TodaySlotRowComposeTest` flake occurred on this run; matches the prior clean baseline
+    exactly, consistent with the item above describing an intermittent, not constant, failure.
+- `adb devices` returned empty before starting; the matrix uses Gradle-managed local AVDs only.
+  Neither the physical device (`RFCY21GNC5Y`) nor the shared `emulator-5554` were touched.
+
+### Changed-Line Count (second correction round)
+
+- Code: `app/src/test/kotlin/com/jjrapps/constanza/reminding/NoExactAlarmAskPersistenceTest.kt` —
+  133 additions, 0 deletions = **133 changed lines** (one new file, committed alone).
+- Docs (excluded from code budget per repo convention): `tasks.md` (+42), `openspec/config.yaml`
+  (+43) = 85 lines, committed separately.
+
+### Commits (second correction round, on `feat/onboarding-exact-alarm-ask`)
+
+1. `3e41436` test(reminding): guard against a persisted exact-alarm ask flag
+2. `4e80a3e` docs(openspec): close the last 2 CRITICALs, flag matrix flakiness
+
+Both pushed to `origin/feat/onboarding-exact-alarm-ask`. No PR opened, no merge.
+
 ## Status
 
-24/24 original tasks + 5/5 correction-round tasks (7.1-7.5) complete. All verify-report CRITICALs
-addressed (2 fixed by spec correction, 3 by new instrumented tests); both remaining CRITICALs judged
-and accepted as architectural-only proof, with reasoning recorded. Ready for re-verify.
+24/24 original tasks + 5/5 first-correction-round tasks (7.1-7.5) + 3/3 second-correction-round
+tasks (8.1-8.3) complete — 32/32 total. Both remaining CRITICALs from the second verify pass are
+now closed with a real, proven-to-bite runtime test rather than an accepted architectural argument.
+The matrix-flakiness WARNING is recorded as its own carried-forward item, explicitly out of this
+change's scope. Ready for re-verify.
