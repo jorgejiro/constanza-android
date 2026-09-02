@@ -67,71 +67,71 @@ surface in this change. No RED-test threat-matrix tasks are required.
 
 ## Phase 0: Blocking External Precondition
 
-- [ ] 0.1 Confirm `fix/habit-editor-cancel` has merged into `main` and `HabitEditorRoute`
+- [x] 0.1 Confirm `fix/habit-editor-cancel` has merged into `main` and `HabitEditorRoute`
       (`habit/HabitEditorScreen.kt` (read-only)) accepts `onBack: () -> Unit`. `sdd-apply` MUST NOT
       begin against a two-parameter `HabitEditorRoute` (design §2.1, §15).
 
 ## Phase 1: Spec Correction & Data Foundation
 
-- [ ] 1.1 Correct `specs/onboarding/spec.md`'s "Permission Screen Never Offers A Prompt The System
+- [x] 1.1 Correct `specs/onboarding/spec.md`'s "Permission Screen Never Offers A Prompt The System
       Will Silently Refuse" requirement text: replace "requires two denials ... not reachable on the
       device-free instrumented matrix ... verified by a unit test instead" with the corrected
       reachability — `BLOCKED` is one recorded ask plus no grant, reachable in a single instrumented
       step (design §2.2).
-- [ ] 1.2 Modify `reminding/ReminderSettingsStore.kt`: add `ONBOARDING_DONE_KEY`,
+- [x] 1.2 Modify `reminding/ReminderSettingsStore.kt`: add `ONBOARDING_DONE_KEY`,
       `onboardingDone: Flow<Boolean>`, suspend `setOnboardingDone()`; change the companion object
       from `private` to `internal` (design §8.1, A5; onboarding spec "Once-Per-Install Onboarding
       Gate").
-- [ ] 1.3 Modify `core/ui/theme/Dimens.kt`: add `PagerDot = 8.dp` (design §12, A7).
-- [ ] 1.4 Modify `res/values/strings.xml`: add onboarding copy for both screens, the
+- [x] 1.3 Modify `core/ui/theme/Dimens.kt`: add `PagerDot = 8.dp` (design §12, A7).
+- [x] 1.4 Modify `res/values/strings.xml`: add onboarding copy for both screens, the
       `GRANTED`/`BLOCKED` permission-screen variants, and Continue/Finish labels (design §6, §12).
 
 ## Phase 2: Gate & Handoff (`MainActivity.kt`) — depends on Phase 0
 
-- [ ] 2.1 Modify `core/ui/MainActivity.kt`: add `ConstanzaRoute.EditorOrigin` enum and a defaulted
+- [x] 2.1 Modify `core/ui/MainActivity.kt`: add `ConstanzaRoute.EditorOrigin` enum and a defaulted
       `origin` field on `HabitEditor` (design §5.1, A3).
-- [ ] 2.2 Modify `core/ui/MainActivity.kt`: add the `startRoute` parameter to `ConstanzaApp` and the
+- [x] 2.2 Modify `core/ui/MainActivity.kt`: add the `startRoute` parameter to `ConstanzaApp` and the
       `leaveTo` branch wiring both `onDone` and `onBack` per `origin` (design §5.1, §5.2, §5.3;
       onboarding spec "Finish Handoff Into Habit Creation With A Back Escape").
-- [ ] 2.3 Modify `core/ui/MainActivity.kt`: add `FirstRunGateViewModel`
+- [x] 2.3 Modify `core/ui/MainActivity.kt`: add `FirstRunGateViewModel`
       (`StateFlow<Boolean?>` from `ReminderSettingsStore.onboardingDone` via
       `stateIn(..., Eagerly, null)`) and the `FirstRunGate` composable wrapping `setContent`'s
       tri-state `when`, with `rememberSaveable` `startRoute` seeded inside `onFinished` (design §4.1,
       A1, A2).
-- [ ] 2.4 Add KDoc to `FirstRunGateViewModel` documenting it as the app's second top-level state
+- [x] 2.4 Add KDoc to `FirstRunGateViewModel` documenting it as the app's second top-level state
       holder and why the blank `null` branch renders nothing (design §4.2).
 
 ## Phase 3: Onboarding Package (production) — depends on Phase 1
 
-- [ ] 3.1 Create `onboarding/OnboardingViewModel.kt`: `pages` computed once from
+- [x] 3.1 Create `onboarding/OnboardingViewModel.kt`: `pages` computed once from
       `includesPermissionPage`, `index`, live `NotificationPermission` decision, `next()`,
       `recordRequestedNotificationPermission()`, `finish()` (design §7, §9, A4; onboarding spec
       "Two-Screen Flow, API-Conditional").
-- [ ] 3.2 Create `onboarding/OnboardingPermissionAction.kt`: the four-state control with its own
+- [x] 3.2 Create `onboarding/OnboardingPermissionAction.kt`: the four-state control with its own
       `LocalContext`, `RequestPermission()` launcher, and the `ACTION_APP_NOTIFICATION_SETTINGS`
       intent, mirroring `TodayBanners.kt:82-89` (design §6; onboarding spec "Permission Screen Never
       Offers A Prompt The System Will Silently Refuse").
-- [ ] 3.3 Create `onboarding/OnboardingScreen.kt`: `OnboardingScaffold` (bottom-slot primary action,
+- [x] 3.3 Create `onboarding/OnboardingScreen.kt`: `OnboardingScaffold` (bottom-slot primary action,
       conditional progress dots via `Dimens.PagerDot`) and the two page bodies (design §6, §7, §12).
-- [ ] 3.4 Create `onboarding/OnboardingRoute.kt`: `hiltViewModel()` container, `ON_RESUME` re-read
+- [x] 3.4 Create `onboarding/OnboardingRoute.kt`: `hiltViewModel()` container, `ON_RESUME` re-read
       via `DisposableEffect`+`LifecycleEventObserver` (mirrors `TodayScreen.kt:55-61`), `onFinished`
       hoisted, and the `onPrimaryAction` ordering contract — `onFinished()` before
       `viewModel.finish()` (design §6, §9).
 
 ## Phase 4: Unit Tests — depends on Phases 2, 3
 
-- [ ] 4.1 `FirstRunGateViewModelTest`: tri-state `null` → `false`/`true`, Turbine over the
+- [x] 4.1 `FirstRunGateViewModelTest`: tri-state `null` → `false`/`true`, Turbine over the
       `StateFlow`, fake `ReminderSettingsStore` backed by `MutableStateFlow`. Verify:
       `./gradlew :app:testDebugUnitTest` (design §10 row 1; onboarding spec "Once-Per-Install
       Onboarding Gate").
-- [ ] 4.2 `OnboardingViewModelTest` — page list: 2 pages when applicable, 1 when `NOT_APPLICABLE`;
+- [x] 4.2 `OnboardingViewModelTest` — page list: 2 pages when applicable, 1 when `NOT_APPLICABLE`;
       MockK on `NotificationPermission` is mandatory (`SDK_INT` is `0` under
       `isReturnDefaultValues`). Verify: `./gradlew :app:testDebugUnitTest` (onboarding spec
       "Two-Screen Flow, API-Conditional").
-- [ ] 4.3 `OnboardingUiStateTest` — `isLastPage`/`showsProgress` at both page counts, the API-31
+- [x] 4.3 `OnboardingUiStateTest` — `isLastPage`/`showsProgress` at both page counts, the API-31
       label-trap regression guard. Verify: `./gradlew :app:testDebugUnitTest` (design §7; onboarding
       spec scenario "API 31 shows only screen 1").
-- [ ] 4.4 `OnboardingViewModelTest` — all four permission states map to the right control, and
+- [x] 4.4 `OnboardingViewModelTest` — all four permission states map to the right control, and
       `finish()` writes the flag through a fake store. Verify: `./gradlew :app:testDebugUnitTest`
       (onboarding spec "Non-Blocking Permission Ask", "Completion Commits At Handoff, Never On A
       Content Outcome").
