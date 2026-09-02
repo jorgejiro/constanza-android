@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        The adaptive icon's background layer. It is a flat fill, so it is a colour resource rather
+        than a drawable: <adaptive-icon>'s <background> accepts a colour directly, and a
+        one-colour vector or shape drawable would only be another file to keep in sync.
+
+        Must match ConstanzaColors.BACKGROUND_ARGB (#110B06), the same warm-dark ground as
+        colors.xml's window_background.
+    -->
+    <color name="ic_launcher_background">#110B06</color>
+</resources>

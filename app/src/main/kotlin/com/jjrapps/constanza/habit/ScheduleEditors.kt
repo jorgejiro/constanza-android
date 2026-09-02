@@ -32,6 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.theme.ConstanzaControlDefaults
+import com.jjrapps.constanza.core.ui.theme.Spacing
 import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
 import java.time.DayOfWeek
@@ -39,9 +40,6 @@ import java.time.format.TextStyle
 
 private const val MIN_STEPPER_VALUE = 1
 private const val MAX_DAY_OF_MONTH = 31
-private const val MINUTES_PER_HOUR = 60
-private const val MAX_HOUR = 23
-private const val MAX_MINUTE = 59
 
 
 /** Task 6a.1, slice ii-a (habit-scheduling: Six Frequency Kinds). Always shows the kind picker,
@@ -125,7 +123,12 @@ private fun ReminderTimeEditor(slot: ReminderSlot?, onSlotAction: (SlotAction) -
             )
         }
         if (slot != null) {
-            ReminderTimeRow(slot = slot, onSlotAction = onSlotAction)
+            ReminderTimeField(
+                minuteOfDay = slot.minuteOfDay,
+                onMinuteOfDayChange = { onSlotAction(SlotAction.SetTime(0, it)) },
+                label = stringResource(R.string.habit_editor_reminder_time_label),
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm),
+            )
         } else {
             Text(
                 stringResource(R.string.habit_editor_reminder_time_none),
@@ -134,35 +137,6 @@ private fun ReminderTimeEditor(slot: ReminderSlot?, onSlotAction: (SlotAction) -
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
-    }
-}
-
-/** The single reminder time's hour/minute row — the same field pair as [ReminderSlotRow], minus
- *  the enabled checkbox and remove button, since [ReminderTimeEditor]'s switch already owns both
- *  of those for the one slot this editor can ever hold. */
-@Composable
-private fun ReminderTimeRow(slot: ReminderSlot, onSlotAction: (SlotAction) -> Unit) {
-    val hour = slot.minuteOfDay / MINUTES_PER_HOUR
-    val minute = slot.minuteOfDay % MINUTES_PER_HOUR
-    Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        OutlinedTextField(
-            value = hour.toString(),
-            onValueChange = { text ->
-                val newHour = text.toIntOrNull()?.coerceIn(0, MAX_HOUR) ?: hour
-                onSlotAction(SlotAction.SetTime(0, newHour * MINUTES_PER_HOUR + minute))
-            },
-            label = { Text(stringResource(R.string.habit_editor_slot_hour_label)) },
-            modifier = Modifier.weight(1f),
-        )
-        OutlinedTextField(
-            value = minute.toString(),
-            onValueChange = { text ->
-                val newMinute = text.toIntOrNull()?.coerceIn(0, MAX_MINUTE) ?: minute
-                onSlotAction(SlotAction.SetTime(0, hour * MINUTES_PER_HOUR + newMinute))
-            },
-            label = { Text(stringResource(R.string.habit_editor_slot_minute_label)) },
-            modifier = Modifier.weight(1f).padding(start = 8.dp),
-        )
     }
 }
 
@@ -318,26 +292,11 @@ private fun ReminderSlotEditor(slots: List<ReminderSlot>, slotsError: Boolean, o
 
 @Composable
 private fun ReminderSlotRow(index: Int, slot: ReminderSlot, onSlotAction: (SlotAction) -> Unit) {
-    val hour = slot.minuteOfDay / MINUTES_PER_HOUR
-    val minute = slot.minuteOfDay % MINUTES_PER_HOUR
     Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        OutlinedTextField(
-            value = hour.toString(),
-            onValueChange = { text ->
-                val newHour = text.toIntOrNull()?.coerceIn(0, MAX_HOUR) ?: hour
-                onSlotAction(SlotAction.SetTime(index, newHour * MINUTES_PER_HOUR + minute))
-            },
-            label = { Text(stringResource(R.string.habit_editor_slot_hour_label)) },
+        ReminderTimeField(
+            minuteOfDay = slot.minuteOfDay,
+            onMinuteOfDayChange = { onSlotAction(SlotAction.SetTime(index, it)) },
             modifier = Modifier.weight(1f),
-        )
-        OutlinedTextField(
-            value = minute.toString(),
-            onValueChange = { text ->
-                val newMinute = text.toIntOrNull()?.coerceIn(0, MAX_MINUTE) ?: minute
-                onSlotAction(SlotAction.SetTime(index, hour * MINUTES_PER_HOUR + newMinute))
-            },
-            label = { Text(stringResource(R.string.habit_editor_slot_minute_label)) },
-            modifier = Modifier.weight(1f).padding(start = 8.dp),
         )
         Checkbox(
             checked = slot.enabled,

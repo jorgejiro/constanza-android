@@ -4,9 +4,15 @@ import android.content.Context
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.junit4.StateRestorationTester
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jjrapps.constanza.R
@@ -15,6 +21,12 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+
+/** The time a brand-new reminder slot is seeded at (`HabitEditorViewModel`'s
+ *  `DEFAULT_MINUTE_OF_DAY`), and the hour typed over it to make the in-progress edit visible. */
+private const val DEFAULT_TIME = "08:00"
+private const val DEFAULT_HOUR = "08"
+private const val EDITED_HOUR = "07"
 
 /**
  * Task 6a.7 (ui-adaptive-layout: Habit create/edit screen survives a landscape rotation).
@@ -97,5 +109,41 @@ class HabitEditorRotationComposeTest {
 
         composeTestRule.onNodeWithText("after the news").assertIsFocused()
         composeTestRule.onNodeWithText(text(R.string.habit_editor_name_label)).assertIsNotFocused()
+    }
+
+    /**
+     * The reminder-time picker (`fix/habit-editor-time-picker`) across a configuration change. The
+     * two bare text fields it replaced needed no test like this: their value lived in
+     * [HabitEditorUiState], which the retained ViewModel already carried across a rotation. A
+     * dialog does not — whether it is open, and the hour and minute the user has moved to but not
+     * yet confirmed, are composition-local, so both had to be made saveable deliberately
+     * (`rememberSaveable` for the open flag, and `rememberTimePickerState`'s own saver for the
+     * in-progress time). This asserts the harder half: not merely that the dialog is still up, but
+     * that the **uncommitted** 07 the user typed is still in the field rather than the stored 08
+     * the dialog opened with — a plain `remember` would have silently reverted it.
+     */
+    @Test
+    fun rotatingWithTheTimePickerOpenKeepsTheDialogAndTheUnconfirmedTime() {
+        val viewModel = HabitEditorViewModel(fixture.habitRepository, fixture.timeProvider)
+        val restorationTester = StateRestorationTester(composeTestRule)
+        restorationTester.setContent {
+            HabitEditorRoute(habitId = null, onDone = {}, onBack = {}, viewModel = viewModel)
+        }
+        // A brand-new habit seeds one reminder slot at the default 08:00 the moment the switch
+        // goes on, which is what gives this test a row to tap without persisting a fixture habit.
+        // Addressed as "the one toggleable on the screen" because the Switch and its label are
+        // separate nodes here and only the Switch carries the click; a DAILY editor has no other.
+        composeTestRule.onNode(isToggleable()).performClick()
+        composeTestRule.onNodeWithText(DEFAULT_TIME).performClick()
+        composeTestRule.onNodeWithTag(REMINDER_TIME_MODE_TOGGLE_TEST_TAG).performClick()
+        // hasSetTextAction picks the editable field over Material 3's read-only display of the
+        // same digits — both carry the text, only one takes input.
+        composeTestRule.onNode(hasText(DEFAULT_HOUR) and hasSetTextAction())
+            .performTextReplacement(EDITED_HOUR)
+
+        restorationTester.emulateSavedInstanceStateRestore()
+
+        composeTestRule.onNodeWithText(text(R.string.action_ok)).assertExists()
+        composeTestRule.onNode(hasText(EDITED_HOUR) and hasSetTextAction()).assertExists()
     }
 }

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     // AGP 9 has built-in Kotlin support; org.jetbrains.kotlin.android is no longer applied here.
     alias(libs.plugins.android.application)
@@ -9,6 +11,22 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     alias(libs.plugins.detekt)
+}
+
+/**
+ * The upload signing key, when it is present.
+ *
+ * `keystore.properties` and the `.jks` it points at are deliberately outside version control
+ * (see `.gitignore`), so the `exists()` guard is load-bearing rather than defensive: without it a
+ * fresh clone would fail at CONFIGURATION time and could not even build `debug`. With it, a
+ * keyless clone builds, tests and lints normally; `assembleRelease` still succeeds there but
+ * emits `app-release-unsigned.apk` instead of `app-release.apk`, so the secret is only ever
+ * required to produce something installable. Verified by temporarily removing the properties
+ * file and building both variants.
+ */
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
 }
 
 android {
@@ -44,8 +62,24 @@ android {
         testInstrumentationRunnerArguments["notAnnotation"] = "com.jjrapps.constanza.seed.SeedOnly"
     }
 
+    signingConfigs {
+        // Registered only when the properties file was actually found, so a keyless clone
+        // configures cleanly instead of throwing on a missing `storeFile`.
+        if (keystoreProperties.containsKey("storeFile")) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            }
+        }
+    }
+
     buildTypes {
         release {
+            // `findByName` rather than `getByName`: on a keyless clone this resolves to null,
+            // which leaves the release build unsigned instead of failing configuration.
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

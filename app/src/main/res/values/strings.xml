@@ -57,13 +57,12 @@
     <string name="habit_editor_slots_error">Add at least one reminder time</string>
     <string name="habit_editor_slot_add">Add time</string>
     <string name="habit_editor_slot_remove">Remove</string>
-    <string name="habit_editor_slot_hour_label">Hour</string>
-    <string name="habit_editor_slot_minute_label">Minute</string>
     <string name="habit_editor_slot_enabled_label">Enabled</string>
 
     <!-- habit-scheduling: single optional reminder time for the five non-TIMES_PER_DAY kinds
          (task 6a.8, ratified 2026-09-01). -->
     <string name="habit_editor_reminder_time_switch">Remind me</string>
+    <string name="habit_editor_reminder_time_label">Reminder time</string>
     <string name="habit_editor_reminder_time_none">No reminder set. You can still track this habit in the app.</string>
 
     <!-- habit-entry-tracking: Today screen, expandable per-habit rollup rows (task 6b.1, OA-2). -->
@@ -123,6 +122,7 @@
     <string name="portability_import_success">Import complete.</string>
 
     <string name="action_back">Back</string>
+    <string name="action_ok">OK</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_dismiss">Dismiss</string>
 

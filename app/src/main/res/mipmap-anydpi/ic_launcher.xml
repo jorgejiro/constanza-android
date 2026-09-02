@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    minSdk = 31, so adaptive icons are the only path this app can take and every launcher that can
+    install it supports them. That is why there are deliberately NO legacy raster mipmaps in this
+    module: no mipmap-mdpi/hdpi/xhdpi/xxhdpi/xxxhdpi PNG buckets and no ic_launcher.png anywhere.
+    Those exist solely for API < 26, which this app does not support. Their absence is a decision,
+    not an omission — do not "fix" it by generating a raster set.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
+</adaptive-icon>
