@@ -34,11 +34,12 @@ so screen 2's existence is now derived from applicability instead.)
 - WHEN the user completes screen 1
 - THEN screen 2 renders exactly one row, for exact alarms
 
-#### Scenario: API 37 with exact alarms already granted shows one row
+#### Scenario: API 37 with exact alarms already granted shows a confirmation, not an ask
 - GIVEN an API 37 device where `SCHEDULE_EXACT_ALARM` is already granted and `POST_NOTIFICATIONS`
   is still undecided
 - WHEN the user completes screen 1
-- THEN screen 2 renders exactly one row, for notifications
+- THEN screen 2 renders both rows: the notification row is the only one still asking for action,
+  and the exact-alarm row renders its granted confirmation line, with no button
 
 ### Requirement: Non-Blocking Permission Ask
 
