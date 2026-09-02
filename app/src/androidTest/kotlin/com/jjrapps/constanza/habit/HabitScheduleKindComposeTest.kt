@@ -58,7 +58,7 @@ class HabitScheduleKindComposeTest {
         // each test is driving. Hoisting it gives the whole test one stable instance.
         val viewModel = HabitEditorViewModel(fixture.habitRepository, fixture.timeProvider)
         composeTestRule.setContent {
-            HabitEditorRoute(habitId = null, onDone = { done = true }, viewModel = viewModel)
+            HabitEditorRoute(habitId = null, onDone = { done = true }, onBack = {}, viewModel = viewModel)
         }
         composeTestRule.onNodeWithText(text(R.string.habit_editor_name_label)).performTextInput(name)
         if (targetKindLabelRes != null) {

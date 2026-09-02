@@ -3,7 +3,6 @@ package com.jjrapps.constanza.habit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jjrapps.constanza.core.time.TimeProvider
-import com.jjrapps.constanza.core.ui.theme.HabitPalette
 import com.jjrapps.constanza.domain.model.Habit
 import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
@@ -51,6 +50,17 @@ private const val MINUTES_PER_DAY = 24 * 60
  * keeps its own multi-slot behaviour unchanged. No validation requires a slot to be present for any
  * of the five kinds — the ratified decision is that a reminder-less habit MUST still save and stay
  * trackable, never blocked.
+ *
+ * **[HabitEditorUiState.isDirty] is derived, never latched** (carried-forward item
+ * `habit-editor-has-no-cancel-affordance`). The editor's cancel affordance has to know whether
+ * anything was actually touched, and the obvious shape — a `dirty = true` line in every field
+ * handler — rots the moment a seventh field is added and its handler forgets that line. Instead
+ * [pristineForm] holds the exact form the editor opened with (a blank [HabitEditorUiState] for a
+ * new habit, the loaded one for an edit) and every mutation funnels through [updateState], which
+ * recomputes the flag by comparing the whole state through [formSignature]. The comparison is
+ * total: a new field on [HabitEditorUiState] participates automatically, and the only way to
+ * exclude one is to name it explicitly in [formSignature]. Editing a field back to its original
+ * value therefore makes the form clean again, which a latch could never do.
  */
 @HiltViewModel
 class HabitEditorViewModel @Inject constructor(
@@ -64,9 +74,24 @@ class HabitEditorViewModel @Inject constructor(
     private val _events = Channel<HabitEditorEvent>(Channel.BUFFERED)
     val events: Flow<HabitEditorEvent> = _events.receiveAsFlow()
 
+    /** The baseline every dirty check compares against — the form as the editor opened it. */
+    private var pristineForm: HabitEditorUiState = HabitEditorUiState().formSignature()
+
+    /** The single write path into [_uiState]. Applies [transform], then re-derives
+     *  [HabitEditorUiState.isDirty] from the result so the flag can never drift out of step with
+     *  the form it describes. */
+    private fun updateState(transform: (HabitEditorUiState) -> HabitEditorUiState) {
+        _uiState.update { current ->
+            val next = transform(current)
+            next.copy(isDirty = next.formSignature() != pristineForm)
+        }
+    }
+
     /** habit-management: Habit Creation — resets the form to a blank, unsaved new habit. */
     fun startCreate() {
-        _uiState.value = HabitEditorUiState()
+        val blank = HabitEditorUiState()
+        pristineForm = blank.formSignature()
+        _uiState.value = blank
     }
 
     /** habit-management: Habit Editing — loads the persisted habit, its [Schedule], and its
@@ -77,7 +102,7 @@ class HabitEditorViewModel @Inject constructor(
             val habit = habitRepository.findById(habitId) ?: return@launch
             val schedule = habitRepository.findScheduleFor(habitId) ?: Schedule.Daily()
             val slots = habitRepository.findSlotsFor(habitId)
-            _uiState.value = HabitEditorUiState(
+            val loaded = HabitEditorUiState(
                 habitId = habit.id,
                 name = habit.name,
                 question = habit.question.orEmpty(),
@@ -87,22 +112,24 @@ class HabitEditorViewModel @Inject constructor(
                 slots = slots,
                 anchorDateText = if (schedule is Schedule.EveryNDays) schedule.anchor.toString() else "",
             )
+            pristineForm = loaded.formSignature()
+            _uiState.value = loaded
         }
     }
 
-    fun onNameChange(value: String) = _uiState.update { it.copy(name = value, nameError = false) }
+    fun onNameChange(value: String) = updateState { it.copy(name = value, nameError = false) }
 
-    fun onQuestionChange(value: String) = _uiState.update { it.copy(question = value) }
+    fun onQuestionChange(value: String) = updateState { it.copy(question = value) }
 
-    fun onColorChange(colorArgb: Int) = _uiState.update { it.copy(colorArgb = colorArgb) }
+    fun onColorChange(colorArgb: Int) = updateState { it.copy(colorArgb = colorArgb) }
 
-    fun onNotesChange(value: String) = _uiState.update { it.copy(notes = value) }
+    fun onNotesChange(value: String) = updateState { it.copy(notes = value) }
 
     /** habit-scheduling: Six Frequency Kinds/N_TIMES_PER_WEEK/WEEKLY/MONTHLY/EVERY_N_DAYS —
      *  dispatches on [ScheduleParamAction]'s variant. An action whose variant does not match the
      *  current [Schedule] subtype (a stale UI event after a kind switch mid-flight) is a no-op. */
     fun onScheduleParamChange(action: ScheduleParamAction) {
-        _uiState.update { state ->
+        updateState { state ->
             when (action) {
                 is ScheduleParamAction.Kind -> applyKindChange(state, action.kind, timeProvider.today())
                 is ScheduleParamAction.TimesPerWeek -> applyTimesPerWeek(state, action.times)
@@ -117,7 +144,7 @@ class HabitEditorViewModel @Inject constructor(
     /** habit-scheduling: Reminder Slots for TIMES_PER_DAY — add/remove/enable/reschedule one slot,
      *  addressed by [HabitEditorUiState.slots] index. */
     fun onSlotAction(action: SlotAction) {
-        _uiState.update { state ->
+        updateState { state ->
             when (action) {
                 SlotAction.Add -> addSlot(state)
                 is SlotAction.Remove -> state.copy(slots = state.slots.filterIndexed { i, _ -> i != action.index })
@@ -143,11 +170,11 @@ class HabitEditorViewModel @Inject constructor(
         val state = _uiState.value
         val error = validationError(state)
         if (error != null) {
-            _uiState.update { error.apply(it) }
+            updateState { error.apply(it) }
             return
         }
         viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true) }
+            updateState { it.copy(isSaving = true) }
             val habit = Habit(
                 id = state.habitId ?: 0L,
                 name = state.name.trim(),
@@ -164,18 +191,9 @@ class HabitEditorViewModel @Inject constructor(
             } else {
                 habitRepository.update(habit, state.schedule, state.slots)
             }
-            _uiState.update { it.copy(isSaving = false) }
+            updateState { it.copy(isSaving = false) }
             _events.send(HabitEditorEvent.Saved)
         }
-    }
-
-    private fun validationError(state: HabitEditorUiState): SaveValidationError? = when {
-        state.name.isBlank() -> SaveValidationError.NameBlank
-        state.schedule is Schedule.TimesPerDay && state.slots.isEmpty() -> SaveValidationError.SlotsEmpty
-        state.schedule is Schedule.EveryNDays && state.anchorDateText.toLocalDateOrNull() == null ->
-            SaveValidationError.InvalidAnchor
-
-        else -> null
     }
 }
 
@@ -258,8 +276,6 @@ private fun applyAnchorDate(state: HabitEditorUiState, text: String): HabitEdito
     )
 }
 
-private fun String.toLocalDateOrNull(): LocalDate? = runCatching { LocalDate.parse(this) }.getOrNull()
-
 /** The six frequency kinds a habit's [Schedule] can take (habit-scheduling: Six Frequency Kinds) —
  *  a UI-facing, stable identifier for the schedule-kind picker; [Schedule] itself has no such
  *  discriminator beyond its own sealed subtype. */
@@ -301,37 +317,6 @@ sealed interface SlotAction {
     data class SetEnabled(val index: Int, val enabled: Boolean) : SlotAction
     data class SetTime(val index: Int, val minuteOfDay: Int) : SlotAction
 }
-
-private sealed interface SaveValidationError {
-    fun apply(state: HabitEditorUiState): HabitEditorUiState
-
-    data object NameBlank : SaveValidationError {
-        override fun apply(state: HabitEditorUiState) = state.copy(nameError = true)
-    }
-
-    data object SlotsEmpty : SaveValidationError {
-        override fun apply(state: HabitEditorUiState) = state.copy(slotsError = true)
-    }
-
-    data object InvalidAnchor : SaveValidationError {
-        override fun apply(state: HabitEditorUiState) = state.copy(anchorDateError = true)
-    }
-}
-
-data class HabitEditorUiState(
-    val habitId: Long? = null,
-    val name: String = "",
-    val question: String = "",
-    val colorArgb: Int = HabitPalette.DEFAULT,
-    val notes: String = "",
-    val schedule: Schedule = Schedule.Daily(),
-    val slots: List<ReminderSlot> = emptyList(),
-    val anchorDateText: String = "",
-    val nameError: Boolean = false,
-    val slotsError: Boolean = false,
-    val anchorDateError: Boolean = false,
-    val isSaving: Boolean = false,
-)
 
 sealed interface HabitEditorEvent {
     data object Saved : HabitEditorEvent

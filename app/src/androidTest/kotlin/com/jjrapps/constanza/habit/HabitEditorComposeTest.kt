@@ -55,7 +55,7 @@ class HabitEditorComposeTest {
         var done = false
         val viewModel = newViewModel()
         composeTestRule.setContent {
-            HabitEditorRoute(habitId = null, onDone = { done = true }, viewModel = viewModel)
+            HabitEditorRoute(habitId = null, onDone = { done = true }, onBack = {}, viewModel = viewModel)
         }
 
         composeTestRule.onNodeWithText(text(R.string.habit_editor_name_label)).performTextInput("Drink water")
@@ -73,7 +73,7 @@ class HabitEditorComposeTest {
         var done = false
         val viewModel = newViewModel()
         composeTestRule.setContent {
-            HabitEditorRoute(habitId = null, onDone = { done = true }, viewModel = viewModel)
+            HabitEditorRoute(habitId = null, onDone = { done = true }, onBack = {}, viewModel = viewModel)
         }
 
         composeTestRule.onNodeWithText(text(R.string.habit_editor_save)).performClick()

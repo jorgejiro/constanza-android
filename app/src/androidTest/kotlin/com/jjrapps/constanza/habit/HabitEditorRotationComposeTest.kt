@@ -60,7 +60,7 @@ class HabitEditorRotationComposeTest {
         val viewModel = HabitEditorViewModel(fixture.habitRepository, fixture.timeProvider)
         val restorationTester = StateRestorationTester(composeTestRule)
         restorationTester.setContent {
-            HabitEditorRoute(habitId = null, onDone = {}, viewModel = viewModel)
+            HabitEditorRoute(habitId = null, onDone = {}, onBack = {}, viewModel = viewModel)
         }
         composeTestRule.onNodeWithText(text(R.string.habit_editor_name_label)).performTextInput("Read before bed")
 
@@ -88,7 +88,7 @@ class HabitEditorRotationComposeTest {
         val viewModel = HabitEditorViewModel(fixture.habitRepository, fixture.timeProvider)
         val restorationTester = StateRestorationTester(composeTestRule)
         restorationTester.setContent {
-            HabitEditorRoute(habitId = null, onDone = {}, viewModel = viewModel)
+            HabitEditorRoute(habitId = null, onDone = {}, onBack = {}, viewModel = viewModel)
         }
         composeTestRule.onNodeWithText(text(R.string.habit_editor_notes_label))
             .performTextInput("after the news")
