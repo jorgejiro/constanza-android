@@ -30,6 +30,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.component.HabitColorDot
+import com.jjrapps.constanza.core.ui.theme.Spacing
 import com.jjrapps.constanza.domain.model.DayStatus
 import com.jjrapps.constanza.domain.model.EntryStatus
 import java.time.Instant
@@ -159,7 +160,10 @@ private fun HabitRollupRow(
         val slot = row.slots.firstOrNull()
         Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
             Row(
-                modifier = Modifier.padding(start = 16.dp, top = 8.dp),
+                // `end` padding added with the SlotRow width fix below: a long habit name — the
+                // reported case was a full sentence — otherwise runs to the very edge of the
+                // screen with nothing between it and the bezel.
+                modifier = Modifier.padding(start = 16.dp, end = Spacing.lg, top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 HabitColorDot(row.colorArgb)
@@ -198,8 +202,18 @@ private fun SlotRow(
             .fillMaxWidth()
             .padding(start = if (indented) 32.dp else 16.dp, end = 16.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(slotStatusText(slot, zone))
+        // `weight(1f)` is load bearing, not styling, and is the same fix ExactAlarmBanner and
+        // NotificationPermissionBanner already carry in TodayBanners.kt. Without it the status text
+        // takes whatever width it wants and `SpaceBetween` squeezes the button group into the
+        // remainder, so "Skip" wrapped mid-word as "Ski / p" — reported from a real Galaxy S25.
+        // The buttons keep their intrinsic width and the text wraps instead, which is the right way
+        // round: a wrapped sentence is readable, a wrapped control label is not.
+        Text(
+            slotStatusText(slot, zone),
+            modifier = Modifier.weight(1f).padding(end = Spacing.sm),
+        )
         AnswerButtons(onAnswer = { status -> onAnswer(habitId, slot, status) })
     }
 }
@@ -227,15 +241,31 @@ private fun slotStatusText(slot: TodaySlot, zone: ZoneId): String {
     val time = slot.minuteOfDay?.let { minute ->
         "%02d:%02d".format(minute / MINUTES_PER_HOUR, minute % MINUTES_PER_HOUR)
     }
-    val statusText = when {
-        slot.snoozedUntilEpochMs != null -> stringResource(
+    val statusText = if (slot.snoozedUntilEpochMs != null) {
+        // Still ahead of the status itself: a snoozed slot is pending WITH a time attached, and
+        // that time is the more useful half of the sentence.
+        stringResource(
             R.string.today_slot_pending_snoozed_until,
             TIME_FORMATTER.format(Instant.ofEpochMilli(slot.snoozedUntilEpochMs).atZone(zone)),
         )
-        slot.status == EntryStatus.UNKNOWN -> stringResource(R.string.today_slot_pending)
-        else -> slot.status.name
+    } else {
+        stringResource(slotStatusLabel(slot.status))
     }
     return if (time != null) "$time — $statusText" else statusText
+}
+
+/** today-row-answering-is-cramped-and-always-on, defect 2. The fallback here used to be
+ *  `slot.status.name`, which put the Kotlin constant `COMPLETED` on screen; this mirrors
+ *  [dayStatusLabel]'s existing shape instead, which is what it should have done from the start.
+ *
+ *  Exhaustive over [EntryStatus] with no `else`, deliberately: adding a member to that enum must
+ *  break this compile rather than silently reach a default. [EntryStatus.UNKNOWN] is the pending
+ *  case and keeps the string it already had. */
+private fun slotStatusLabel(status: EntryStatus) = when (status) {
+    EntryStatus.COMPLETED -> R.string.today_slot_completed
+    EntryStatus.MISSED -> R.string.today_slot_missed
+    EntryStatus.SKIPPED -> R.string.today_slot_skipped
+    EntryStatus.UNKNOWN -> R.string.today_slot_pending
 }
 
 private fun dayStatusLabel(status: DayStatus) = when (status) {
