@@ -63,8 +63,17 @@ private const val MINUTES_PER_HOUR = 60
 private const val MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR
 private const val LAST_MINUTE_OF_DAY = MINUTES_PER_DAY - 1
 
-/** A visible amber, so the seeded habit is also distinguishable from the teal `Meditate` seed. */
-private const val SEED_COLOR_ARGB = 0xFFF57C00.toInt()
+/**
+ * `HabitColor.PINK` — distinguishable at a glance from the teal `Meditate` seed, which is all this
+ * value is for.
+ *
+ * On-palette for the same reason as `ImminentReminderSeed`'s: this fixture writes to the app's REAL
+ * database file. The previous value here (`0xFFF57C00`, a Material 2 amber) was worse than a stale
+ * legacy colour — it is not a key in `HabitColorRemap.LEGACY_TO_CURRENT` either, so no version of
+ * this app ever offered it and `MIGRATION_1_2` would pass it through untouched forever. Pink is the
+ * palette's counterpart for the orange family (the migration's one family change).
+ */
+private const val SEED_COLOR_ARGB = 0xFFFFA8DC.toInt()
 
 /** Grep this in logcat to read back everything the seed wrote. Deliberately distinct from
  *  `ConstanzaSeed` and `ConstanzaState`, so this fixture's output can be filtered on its own. */
