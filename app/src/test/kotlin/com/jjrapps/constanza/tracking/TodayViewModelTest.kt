@@ -12,6 +12,9 @@ import com.jjrapps.constanza.domain.model.Habit
 import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
 import com.jjrapps.constanza.habit.HabitRepository
+import com.jjrapps.constanza.reminding.NotificationPermission
+import com.jjrapps.constanza.reminding.NotificationPermissionDecision
+import com.jjrapps.constanza.reminding.ReminderSettingsStore
 import com.jjrapps.constanza.scheduling.AlarmScheduler
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -244,12 +247,97 @@ class TodayViewModelTest {
         assertTrue(viewModel.uiState.first().canScheduleExactAlarms)
     }
 
+    /** The Today banner is the only production consumer [NotificationPermission] has, so this is
+     *  the guard that the decision actually reaches the screen. `GRANTED` is asserted alongside
+     *  `SHOULD_REQUEST` on purpose: [TodayUiState] defaults the field to `GRANTED`, so an assertion
+     *  on that value alone would pass even if the flow were never folded into the state at all. */
+    @Test
+    fun `the notification permission decision surfaces into the ui state`() = runTest {
+        val requesting = buildViewModel(
+            notificationPermission = mockk {
+                every { decide(any(), any()) } returns NotificationPermissionDecision.SHOULD_REQUEST
+            },
+        )
+        assertEquals(NotificationPermissionDecision.SHOULD_REQUEST, requesting.uiState.first().notificationPermission)
+
+        val granted = buildViewModel(
+            notificationPermission = mockk {
+                every { decide(any(), any()) } returns NotificationPermissionDecision.GRANTED
+            },
+        )
+        assertEquals(NotificationPermissionDecision.GRANTED, granted.uiState.first().notificationPermission)
+    }
+
+    /** The `onResume` counterpart of the exact-alarm re-check: `BLOCKED` can only be undone from
+     *  system settings, so the screen has to re-read on return rather than cache construction. */
+    @Test
+    fun `refreshNotificationPermission picks up a permission granted while the screen was paused`() = runTest {
+        // Driven by a variable rather than `andThen`: construction seeds the flow with one
+        // `decide` call of its own before `init` refreshes it, so a fixed call sequence would
+        // encode that internal call count into the test.
+        var grantedInSystemSettings = false
+        val notificationPermission = mockk<NotificationPermission> {
+            every { decide(any(), any()) } answers {
+                if (grantedInSystemSettings) {
+                    NotificationPermissionDecision.GRANTED
+                } else {
+                    NotificationPermissionDecision.BLOCKED
+                }
+            }
+        }
+        val viewModel = buildViewModel(notificationPermission = notificationPermission)
+        assertEquals(NotificationPermissionDecision.BLOCKED, viewModel.uiState.first().notificationPermission)
+
+        grantedInSystemSettings = true
+        viewModel.refreshNotificationPermission()
+
+        assertEquals(NotificationPermissionDecision.GRANTED, viewModel.uiState.first().notificationPermission)
+    }
+
+    /** The flag means "we have asked", not "the user agreed", which is exactly what turns the next
+     *  decision from `SHOULD_REQUEST` into `BLOCKED`. Both halves are asserted: that the store is
+     *  actually written, and that the state moves — writing without re-reading would leave the
+     *  banner offering a prompt the system will never show again. */
+    @Test
+    fun `recordNotificationPermissionRequested writes the flag and moves SHOULD_REQUEST to BLOCKED`() = runTest {
+        var alreadyAsked = false
+        val reminderSettingsStore = mockk<ReminderSettingsStore> {
+            coEvery { hasRequestedNotificationPermission() } answers { alreadyAsked }
+            coEvery { recordRequestedNotificationPermission() } answers { alreadyAsked = true }
+        }
+        val notificationPermission = mockk<NotificationPermission> {
+            every { decide(any(), any()) } answers {
+                if (firstArg<Boolean>()) {
+                    NotificationPermissionDecision.BLOCKED
+                } else {
+                    NotificationPermissionDecision.SHOULD_REQUEST
+                }
+            }
+        }
+        val viewModel = buildViewModel(
+            notificationPermission = notificationPermission,
+            reminderSettingsStore = reminderSettingsStore,
+        )
+        assertEquals(NotificationPermissionDecision.SHOULD_REQUEST, viewModel.uiState.first().notificationPermission)
+
+        viewModel.recordNotificationPermissionRequested()
+
+        coVerify(exactly = 1) { reminderSettingsStore.recordRequestedNotificationPermission() }
+        assertEquals(NotificationPermissionDecision.BLOCKED, viewModel.uiState.first().notificationPermission)
+    }
+
     private fun twoSlots() = listOf(slot(MORNING_SLOT_ID, MORNING_MINUTE), slot(EVENING_SLOT_ID, EVENING_MINUTE))
 
     private fun buildViewModel(
         entryWriter: EntryWriter = mockk(relaxUnitFun = true),
         alarmScheduler: AlarmScheduler = mockk {
             every { canScheduleExactAlarms() } returns true
+        },
+        notificationPermission: NotificationPermission = mockk {
+            every { decide(any(), any()) } returns NotificationPermissionDecision.GRANTED
+        },
+        reminderSettingsStore: ReminderSettingsStore = mockk(relaxUnitFun = true) {
+            coEvery { hasRequestedNotificationPermission() } returns false
         },
     ): TodayViewModel {
         val habitRepository = mockk<HabitRepository> {
@@ -268,6 +356,9 @@ class TodayViewModelTest {
             every { today() } returns TODAY
             every { zone() } returns ZONE
         }
-        return TodayViewModel(habitRepository, entryDao, occurrenceDao, entryWriter, alarmScheduler, timeProvider)
+        return TodayViewModel(
+            habitRepository, entryDao, occurrenceDao, entryWriter, alarmScheduler,
+            notificationPermission, reminderSettingsStore, timeProvider,
+        )
     }
 }

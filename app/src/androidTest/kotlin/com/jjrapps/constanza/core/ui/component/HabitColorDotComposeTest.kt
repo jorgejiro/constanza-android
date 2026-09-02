@@ -17,6 +17,8 @@ import com.jjrapps.constanza.scheduling.AlarmScheduler
 import com.jjrapps.constanza.tracking.EntryWriter
 import com.jjrapps.constanza.tracking.TodayRoute
 import com.jjrapps.constanza.tracking.TodayViewModel
+import com.jjrapps.constanza.tracking.grantedNotificationPermission
+import com.jjrapps.constanza.tracking.neverAskedReminderSettingsStore
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.cancel
@@ -79,7 +81,8 @@ class HabitColorDotComposeTest {
         every { alarmScheduler.canScheduleExactAlarms() } returns true
         val viewModel = TodayViewModel(
             fixture.habitRepository, fixture.database.entryDao(), fixture.database.reminderOccurrenceDao(),
-            entryWriter, alarmScheduler, fixture.timeProvider,
+            entryWriter, alarmScheduler, grantedNotificationPermission(),
+            neverAskedReminderSettingsStore(), fixture.timeProvider,
         )
         todayViewModel = viewModel
 

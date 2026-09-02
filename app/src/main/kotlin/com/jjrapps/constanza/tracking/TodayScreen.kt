@@ -2,9 +2,6 @@
 
 package com.jjrapps.constanza.tracking
 
-import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +13,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -26,7 +22,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -35,8 +30,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.component.HabitColorDot
-import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
-import com.jjrapps.constanza.core.ui.theme.ConstanzaShapes
 import com.jjrapps.constanza.domain.model.DayStatus
 import com.jjrapps.constanza.domain.model.EntryStatus
 import java.time.Instant
@@ -49,7 +42,9 @@ private val TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm")
 /** Task 6b.1 — container, matching [com.jjrapps.constanza.habit.HabitListRoute]'s hoisted-route
  *  navigation shape (design.md §14, no navigation library). Task 6b.9: re-checks
  *  [TodayViewModel.refreshExactAlarmPermission] on `ON_RESUME`, since the user can grant the
- *  permission from system Settings and come back without any Room write to react to. */
+ *  permission from system Settings and come back without any Room write to react to. The same
+ *  hook re-checks [TodayViewModel.refreshNotificationPermission] for the identical reason — a
+ *  `BLOCKED` notification permission can only be undone from system settings. */
 @Composable
 fun TodayRoute(
     onManageHabits: () -> Unit,
@@ -60,7 +55,10 @@ fun TodayRoute(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshExactAlarmPermission()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshExactAlarmPermission()
+                viewModel.refreshNotificationPermission()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -71,17 +69,27 @@ fun TodayRoute(
         onAnswer = viewModel::answer,
         onManageHabits = onManageHabits,
         onOpenSettings = onOpenSettings,
+        onNotificationPermissionRequested = viewModel::recordNotificationPermissionRequested,
     )
 }
 
-/** Presentational: state in, callbacks out, no dependencies of its own. */
+/** Presentational: state in, callbacks out, no dependencies of its own.
+ *
+ *  `LongParameterList` is suppressed on this one function for the same class of reason
+ *  `config/detekt/detekt.yml` already relaxes `FunctionNaming`: the rule has no notion of Compose,
+ *  where one state object plus a hoisted lambda per event IS the parameter list, and collapsing
+ *  five callbacks into a holder object to satisfy a count would make the screen harder to read and
+ *  harder to preview, not easier. Suppressed on the declaration only — the threshold still applies
+ *  to every other function in this file. */
 @Composable
+@Suppress("LongParameterList")
 fun TodayScreen(
     state: TodayUiState,
     onToggleExpanded: (Long) -> Unit,
     onAnswer: (Long, TodaySlot, InAppEntryStatus) -> Unit,
     onManageHabits: () -> Unit,
     onOpenSettings: () -> Unit = {},
+    onNotificationPermissionRequested: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -99,7 +107,7 @@ fun TodayScreen(
         },
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
-            TodayContent(state, onToggleExpanded, onAnswer)
+            TodayContent(state, onToggleExpanded, onAnswer, onNotificationPermissionRequested)
         }
     }
 }
@@ -109,8 +117,19 @@ private fun TodayContent(
     state: TodayUiState,
     onToggleExpanded: (Long) -> Unit,
     onAnswer: (Long, TodaySlot, InAppEntryStatus) -> Unit,
+    onNotificationPermissionRequested: () -> Unit,
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
+        // Above the exact-alarm banner deliberately: a late reminder is a degraded reminder, a
+        // missing permission is no reminder at all.
+        if (state.notificationPermission.needsBanner()) {
+            item {
+                NotificationPermissionBanner(
+                    decision = state.notificationPermission,
+                    onPermissionRequested = onNotificationPermissionRequested,
+                )
+            }
+        }
         if (!state.canScheduleExactAlarms) {
             item { ExactAlarmBanner() }
         }
@@ -119,43 +138,6 @@ private fun TodayContent(
         }
         items(state.rows, key = { it.habitId }) { row ->
             HabitRollupRow(row, row.habitId in state.expandedHabitIds, state.zone, onToggleExpanded, onAnswer)
-        }
-    }
-}
-
-/** Task 6b.9 (design §12/§13.1): non-blocking — reminders still fire, degraded to a 10-minute
- *  inexact window (design §13.4's measurement), so this is informational, not a gate. One tap
- *  deep-links to [Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM]; the default on a fresh install
- *  targeting API 33+ is denied, so this is the common path, not an edge case.
- *
- *  Wrapped in a tonal [Surface] (design.md decision 7 — the one deliberate structural surface this
- *  change adds): a banner with no container does not read as a banner, and unlike a per-row `Card`
- *  this is a single `LazyColumn` `item`, not a repeated row, so it costs no measured-height budget
- *  anywhere `TodayAdaptiveComposeTest` looks. */
-@Composable
-private fun ExactAlarmBanner() {
-    val context = LocalContext.current
-    Surface(color = ConstanzaColors.SurfaceRaised, shape = ConstanzaShapes.medium) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            // `weight(1f)` is load bearing, not styling: without it the text takes whatever width
-            // it wants and `SpaceBetween` pushes the action button clean off the right edge, so the
-            // one tap §13.1 promises becomes unreachable while the banner still looks fine. Found
-            // by task G.7's manual matrix on a 1080dp-wide Pixel 10 — the automated `sw = 600dp`
-            // test (6b.8) asserts the habit rows, not this banner. Preserved verbatim through the
-            // `Surface` wrap above (work unit 4) — this `Row` is not replaced.
-            Text(
-                stringResource(R.string.today_exact_alarm_banner),
-                modifier = Modifier.weight(1f).padding(end = 8.dp),
-            )
-            TextButton(onClick = {
-                val uri = Uri.parse("package:${context.packageName}")
-                context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, uri))
-            }) {
-                Text(stringResource(R.string.today_exact_alarm_banner_action))
-            }
         }
     }
 }

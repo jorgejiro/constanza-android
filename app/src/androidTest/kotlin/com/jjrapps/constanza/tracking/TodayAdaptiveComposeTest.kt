@@ -75,7 +75,8 @@ class TodayAdaptiveComposeTest {
         every { alarmScheduler.canScheduleExactAlarms() } returns true
         viewModel = TodayViewModel(
             fixture.habitRepository, fixture.database.entryDao(), fixture.database.reminderOccurrenceDao(),
-            entryWriter, alarmScheduler, fixture.timeProvider,
+            entryWriter, alarmScheduler, grantedNotificationPermission(),
+            neverAskedReminderSettingsStore(), fixture.timeProvider,
         )
     }
 
