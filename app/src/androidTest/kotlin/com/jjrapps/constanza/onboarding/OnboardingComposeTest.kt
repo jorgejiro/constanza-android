@@ -93,21 +93,35 @@ class OnboardingComposeTest {
         composeTestRule.onNodeWithText(text(R.string.onboarding_exact_alarm_denied_action)).assertDoesNotExist()
     }
 
-    /** onboarding: Non-Blocking Permission Ask — the bottom-slot primary action is a sibling of the
-     *  row content and stays present and enabled across all four live-state combinations the two
-     *  rows can independently land in; the flow's forward path never routes through either row. */
+    // onboarding: Non-Blocking Permission Ask — the bottom-slot primary action is a sibling of the
+    // row content and stays present and enabled across all four live-state combinations the two
+    // rows can independently land in; the flow's forward path never routes through either row.
+    // Four separate tests, deliberately, rather than one test looping over `setContent`: a compose
+    // rule's `setContent` may only be called once per test, so a second call in the same test
+    // throws `IllegalStateException("has already set content")` instead of recomposing.
+
     @Test
-    fun thePrimaryActionStaysPresentAndEnabledInEveryRowCombination() {
-        val combinations = listOf(
-            NotificationPermissionDecision.SHOULD_REQUEST to false,
-            NotificationPermissionDecision.SHOULD_REQUEST to true,
-            NotificationPermissionDecision.BLOCKED to false,
-            NotificationPermissionDecision.GRANTED to true,
-        )
-        for ((permission, canScheduleExactAlarms) in combinations) {
-            setPermissionsPage(twoRowState(permission, canScheduleExactAlarms))
-            composeTestRule.onNodeWithText(text(R.string.onboarding_action_finish)).assertIsEnabled()
-        }
+    fun thePrimaryActionStaysEnabledWhenNotificationsShouldBeRequestedAndExactAlarmsAreDenied() {
+        setPermissionsPage(twoRowState(NotificationPermissionDecision.SHOULD_REQUEST, canScheduleExactAlarms = false))
+        composeTestRule.onNodeWithText(text(R.string.onboarding_action_finish)).assertIsEnabled()
+    }
+
+    @Test
+    fun thePrimaryActionStaysEnabledWhenNotificationsShouldBeRequestedAndExactAlarmsAreGranted() {
+        setPermissionsPage(twoRowState(NotificationPermissionDecision.SHOULD_REQUEST, canScheduleExactAlarms = true))
+        composeTestRule.onNodeWithText(text(R.string.onboarding_action_finish)).assertIsEnabled()
+    }
+
+    @Test
+    fun thePrimaryActionStaysEnabledWhenNotificationsAreBlockedAndExactAlarmsAreDenied() {
+        setPermissionsPage(twoRowState(NotificationPermissionDecision.BLOCKED, canScheduleExactAlarms = false))
+        composeTestRule.onNodeWithText(text(R.string.onboarding_action_finish)).assertIsEnabled()
+    }
+
+    @Test
+    fun thePrimaryActionStaysEnabledWhenNotificationsAndExactAlarmsAreBothGranted() {
+        setPermissionsPage(twoRowState(NotificationPermissionDecision.GRANTED, canScheduleExactAlarms = true))
+        composeTestRule.onNodeWithText(text(R.string.onboarding_action_finish)).assertIsEnabled()
     }
 
     /** onboarding: Exact-Alarm Onboarding Row — "the screen MUST NOT auto-launch that intent on
