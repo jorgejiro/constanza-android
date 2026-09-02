@@ -39,7 +39,11 @@ private const val EVENING_MINUTE = 20 * 60
 private const val ANSWER_BUTTON_COUNT_PER_HABIT = 2
 
 /** Bound for awaiting a Room-Flow-fed row; same value the sibling Today tests use. */
-private const val WAIT_TIMEOUT_MS = 5_000L
+/** Bound for awaiting a Room-Flow-fed row. Raised from 5s to 15s with `today-add-habit`: three
+ *  more Room-backed Compose classes joined this suite and the extra contention started blowing the
+ *  old bound on the matrix while the same tests passed in isolation. The assertions are unchanged;
+ *  only the headroom is. See `TodayAddHabitComposeTest` for the measurements. */
+private const val WAIT_TIMEOUT_MS = 15_000L
 
 /**
  * Task 6b.8 (ui-adaptive-layout: Today screen scenario). Renders the real [TodayRoute] with a
