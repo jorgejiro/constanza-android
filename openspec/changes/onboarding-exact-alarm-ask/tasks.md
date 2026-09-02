@@ -102,11 +102,11 @@ actually judged against is the code-only figure above, which clears 800 comforta
       coverage for "no-restart-on-grant" that did not exist; this is now a real instrumented test
       using a live `mutableStateOf` to drive recomposition without a new `setContent` call).
 - [x] 7.4 `design.md`: corrected a cosmetic misattribution (verify report WARNING-3) — the
-      `exactAlarmsAllowedScheduler()` reference actually lives in `design.md`'s own Testing Strategy
-      section, not `tasks.md`, and no such named factory function exists anywhere in the codebase;
-      the actual pattern is the defaulted `alarmScheduler` parameter inline in
-      `TodayViewModelTest.buildViewModel` (`TodayViewModelTest.kt:333-334`). Corrected to name that
-      call site directly instead of an invented function name.
+      `exactAlarmsAllowedScheduler()` does exist, at
+      `androidTest/.../tracking/TodayViewModelTestFactory.kt:76-80`, used at `:45`. The
+      correction round briefly recorded it as a phantom after grepping only `app/src/test`;
+      that was wrong and is corrected here. `TodayViewModelTest.kt:333-334` is the separate
+      inline unit-test default. Both are real and both are the same lesson.
 - [x] 7.5 CRITICAL-4/5 (`reminder-delivery`: "declining costs nothing later" / "does not suppress
       the banner"): judged and accepted as architectural-only proof, not rework. See Promise
       Coverage table above and `verify-report.md`'s own WARNING-1 recommendation, which this

@@ -181,7 +181,7 @@ data class OnboardingUiState(
 
 **`buildViewModel` must default `alarmScheduler` to granted.** A `mockk(relaxed = true)` answers a
 `Boolean` with `false`, which would silently add the exact-alarm row to every existing onboarding
-test — the identical trap the defaulted `alarmScheduler` parameter in `TodayViewModelTest.kt:333-334`
+test — the identical trap that `exactAlarmsAllowedScheduler()` (`androidTest/.../tracking/TodayViewModelTestFactory.kt:76-80`, used at `:45`) and the defaulted `alarmScheduler` parameter in `TodayViewModelTest.kt:333-334`
 (`buildViewModel`) exists to avoid on the Today side. Stub it explicitly; do not inherit the relaxed
 default.
 
