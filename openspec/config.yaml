@@ -155,6 +155,34 @@ carried_forward_open_items:
         case is better served by a FAB than by a trailing list item, and
         whether Today's empty state should instead route straight into the
         habit editor.
+    - id: "compose-test-db-teardown-race"
+      title: "TodayComposeTest's async DB teardown can crash the whole instrumentation process"
+      status: open
+      severity: "does not fail the build honestly — it misattributes failures to unrelated tests"
+      origin: >
+        Fired on 2026-09-02 during first-run-onboarding Unit B's second matrix
+        run: the entire api31 instrumentation process died inside
+        TodayComposeTest/TodayAdaptiveComposeTest while CoreFlowE2ETest had
+        already passed 5/5. A third run with no code changes was clean. The
+        failure mode is not new — TodayComposeTest.kt:70-77's own KDoc already
+        describes it.
+      reason: >
+        The test builds a real Room database and constructs TodayViewModel by
+        bare constructor. Its @After must cancel viewModelScope BEFORE closing
+        the database, or an eager `stateIn` collector throws asynchronously
+        after teardown. When it does, the throw lands in the shared
+        instrumentation process rather than in the test that caused it.
+      why_it_matters: >
+        The device-free matrix is now the binding verification gate for this
+        project. A gate that intermittently reports a failure against a test
+        that did not cause it is worse than a gate that fails: it sends the
+        next reader to debug the wrong file. This did not affect the change
+        that found it, but it will eventually cost somebody an afternoon.
+      owner_condition: >
+        Its own small change. The fix is structural rather than a longer
+        timeout: make teardown deterministic so the collector cannot outlive
+        the database. Worth auditing every instrumented test that constructs a
+        ViewModel by bare constructor, not just these two.
     - id: "no-launcher-icon"
       title: "The app ships with the stock Android launcher icon"
       status: open
