@@ -19,7 +19,8 @@ internal object ConstanzaColors {
     private const val SURFACE_ARGB = 0xFF17120D.toInt()
     private const val SURFACE_RAISED_ARGB = 0xFF201811.toInt()
     private const val SURFACE_SELECTED_ARGB = 0xFF261C13.toInt()
-    private const val OUTLINE_ARGB = 0xFF28231E.toInt()
+    private const val DIVIDER_ARGB = 0xFF28231E.toInt()
+    private const val CONTROL_STROKE_ARGB = 0xFF7A6B5D.toInt()
     private const val ACCENT_ARGB = 0xFFE8A860.toInt()
     private const val ON_ACCENT_ARGB = 0xFF20140A.toInt()
     private const val ON_BACKGROUND_ARGB = 0xFFEFEAE6.toInt()
@@ -38,8 +39,38 @@ internal object ConstanzaColors {
     /** oklch(0.235 0.022 62) — the selected/active control state. */
     val SurfaceSelected = Color(SURFACE_SELECTED_ARGB)
 
-    /** oklch(0.26 0.012 62) — borders and dividers. */
-    val Outline = Color(OUTLINE_ARGB)
+    /**
+     * oklch(0.26 0.012 62) — the decorative hairline: dividers and rules between rows, and nothing
+     * else. Measures 1.26:1 on [Background], which is intentional and permitted: WCAG 2.1 SC 1.4.11
+     * exempts purely decorative elements, and a quiet dark app wants its rules felt, not read.
+     *
+     * **This tone must never be bound to a control stroke.** It was, until this token was split out
+     * of the old single `Outline`: `Theme.kt` pointed both M3 `outline` and M3 `outlineVariant` here,
+     * which put every self-stroking control in the app at ~1.1-1.3:1 — most visibly the "Remind me"
+     * `Switch`, whose thumb sat at 1.07:1 against its own track. Use [ControlStroke] for anything a
+     * user can operate. [ColorContrastTest] fails if these two are ever collapsed again.
+     */
+    val Divider = Color(DIVIDER_ARGB)
+
+    /**
+     * oklch(0.52 0.020 62) — the stroke that draws an operable control: switch thumbs and unchecked
+     * track borders, unfocused outlined-field borders, unselected chip and checkbox outlines.
+     *
+     * Warm-ramp equivalent of M3's own `outline` role, which its dark baseline puts at `#938F99`
+     * (L=0.2815) — roughly 16x lighter than the divider tone above, because M3 separates the two
+     * jobs on purpose. This value clears WCAG 2.1 SC 1.4.11's 3:1 floor against **all four** surface
+     * tones, not just the page: 3.81:1 on [Background], 3.62:1 on [Surface], 3.41:1 on
+     * [SurfaceRaised] and 3.25:1 on [SurfaceSelected].
+     *
+     * That last figure is the binding constraint and the reason this is not a darker tone. A switch
+     * thumb is drawn *inside* its own track, which fills with [SurfaceSelected]; being visible
+     * against the page while invisible against the track is the exact defect being fixed here. The
+     * next candidate down, `#6A5C50`, cleared [Background] at 3.03:1 but only reached 2.59:1 against
+     * that track, so it was rejected. [OnBackgroundMuted] clears both, but it is a *text* role, and
+     * spending a text tone on a control stroke would repeat this same mistake in the other
+     * direction.
+     */
+    val ControlStroke = Color(CONTROL_STROKE_ARGB)
 
     /**
      * The single saturated colour in the app's chrome: app bars, selection indicators, primary

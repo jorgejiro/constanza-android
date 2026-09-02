@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.theme.ConstanzaControlDefaults
 import com.jjrapps.constanza.core.ui.theme.Spacing
 import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
@@ -39,6 +40,7 @@ import java.time.format.TextStyle
 
 private const val MIN_STEPPER_VALUE = 1
 private const val MAX_DAY_OF_MONTH = 31
+
 
 /** Task 6a.1, slice ii-a (habit-scheduling: Six Frequency Kinds). Always shows the kind picker,
  *  then the one parameter editor [state]'s current [Schedule] needs — `DAILY` needs none. Every
@@ -192,11 +194,19 @@ private fun NumberStepper(
 ) {
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, modifier = Modifier.weight(1f))
-        OutlinedButton(onClick = { onValueChange(value - 1) }, enabled = value > range.first) {
+        OutlinedButton(
+            onClick = { onValueChange(value - 1) },
+            enabled = value > range.first,
+            border = ConstanzaControlDefaults.outlinedButtonBorder(enabled = value > range.first),
+        ) {
             Text(stringResource(R.string.habit_editor_decrement))
         }
         Text(value.toString(), modifier = Modifier.padding(horizontal = 12.dp))
-        OutlinedButton(onClick = { onValueChange(value + 1) }, enabled = value < range.last) {
+        OutlinedButton(
+            onClick = { onValueChange(value + 1) },
+            enabled = value < range.last,
+            border = ConstanzaControlDefaults.outlinedButtonBorder(enabled = value < range.last),
+        ) {
             Text(stringResource(R.string.habit_editor_increment))
         }
     }
@@ -218,10 +228,12 @@ private fun DayOfWeekPicker(
     val locale = LocalLocale.current.platformLocale
     FlowRow(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         DayOfWeek.entries.forEach { day ->
+            val isSelected = day == selected
             FilterChip(
-                selected = day == selected,
+                selected = isSelected,
                 onClick = { onDayOfWeekChange(day) },
                 label = { Text(day.getDisplayName(TextStyle.SHORT, locale)) },
+                border = ConstanzaControlDefaults.filterChipBorder(selected = isSelected),
             )
         }
     }
