@@ -1,6 +1,9 @@
 package com.jjrapps.constanza.onboarding
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -93,6 +96,23 @@ class OnboardingComposeTest {
         composeTestRule.onNodeWithText(text(R.string.onboarding_exact_alarm_denied_action)).assertDoesNotExist()
     }
 
+    /** onboarding: Two-Screen Flow, Applicability-Derived — "API 37 with exact alarms already
+     *  granted shows a confirmation, not an ask". This is the exact combination that was previously
+     *  uncovered: notifications still asking for action, exact alarms already granted. Screen 2
+     *  renders both rows, but only the notification row is still an ask — the exact-alarm row is a
+     *  confirmation line with no button, exactly as [theGrantedExactAlarmRowIsAConfirmationLineWithNoButton]
+     *  proves in isolation. */
+    @Test
+    fun theExactAlarmRowShowsAConfirmationWhileTheNotificationRowIsStillAsking() {
+        setPermissionsPage(twoRowState(NotificationPermissionDecision.SHOULD_REQUEST, canScheduleExactAlarms = true))
+
+        composeTestRule.onNodeWithText(text(R.string.onboarding_permission_should_request_body)).assertExists()
+        composeTestRule.onNodeWithText(text(R.string.onboarding_permission_should_request_action)).assertExists()
+        composeTestRule.onNodeWithText(text(R.string.onboarding_exact_alarm_granted_body)).assertExists()
+        composeTestRule.onNodeWithText(text(R.string.onboarding_exact_alarm_denied_body)).assertDoesNotExist()
+        composeTestRule.onNodeWithText(text(R.string.onboarding_exact_alarm_denied_action)).assertDoesNotExist()
+    }
+
     // onboarding: Non-Blocking Permission Ask — the bottom-slot primary action is a sibling of the
     // row content and stays present and enabled across all four live-state combinations the two
     // rows can independently land in; the flow's forward path never routes through either row.
@@ -124,6 +144,29 @@ class OnboardingComposeTest {
         composeTestRule.onNodeWithText(text(R.string.onboarding_action_finish)).assertIsEnabled()
     }
 
+    /** onboarding: Two-Screen Flow, Applicability-Derived — "API 31 with exact alarms revoked shows
+     *  one row". `OnboardingViewModelTest` already proves the *page list* is `[Intro, Permissions]`
+     *  on this leg; this proves the *rendering*: `NOT_APPLICABLE` produces no notification content at
+     *  all (`OnboardingPermissionAction`'s `NOT_APPLICABLE -> Unit` branch), so the page that renders
+     *  is genuinely a single row, not a notification row that merely became invisible. */
+    @Test
+    fun aNotApplicableNotificationStateRendersNoNotificationContentLeavingOnlyTheExactAlarmRow() {
+        setPermissionsPage(
+            OnboardingUiState(
+                pages = listOf(OnboardingPage.Intro, OnboardingPage.Permissions),
+                index = 1,
+                permission = NotificationPermissionDecision.NOT_APPLICABLE,
+                canScheduleExactAlarms = false,
+            ),
+        )
+
+        composeTestRule.onNodeWithText(text(R.string.onboarding_exact_alarm_denied_body)).assertExists()
+        composeTestRule.onNodeWithText(text(R.string.onboarding_exact_alarm_denied_action)).assertExists()
+        composeTestRule.onNodeWithText(text(R.string.onboarding_permission_should_request_body)).assertDoesNotExist()
+        composeTestRule.onNodeWithText(text(R.string.onboarding_permission_blocked_body)).assertDoesNotExist()
+        composeTestRule.onNodeWithText(text(R.string.onboarding_permission_granted_body)).assertDoesNotExist()
+    }
+
     /** onboarding: Exact-Alarm Onboarding Row — "the screen MUST NOT auto-launch that intent on
      *  its own". Composing the denied row and letting the composition settle must never leave the
      *  system settings app in the foreground; only a deliberate tap does. */
@@ -135,5 +178,33 @@ class OnboardingComposeTest {
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         val context = ApplicationProvider.getApplicationContext<Context>()
         assertEquals(context.packageName, device.currentPackageName)
+    }
+
+    /** onboarding: Exact-Alarm Onboarding Row — "Granting via the deep link updates the screen
+     *  without restart". `OnboardingViewModelTest.refresh re-reads both...` proves the *data*
+     *  side (one `refresh()` call updates the live `StateFlow`); this proves the *rendering* side:
+     *  the same composition, with no new `setContent` call, drops the ask and shows the confirmation
+     *  the moment the backing state changes — exactly what a live `collectAsState()` value driven by
+     *  `OnboardingRoute`'s `ON_RESUME` -> `refresh()` call site does in production. */
+    @Test
+    fun theExactAlarmRowDropsItsAskAndShowsTheConfirmationOnTheSameCompositionWhenGrantedLive() {
+        var canSchedule by mutableStateOf(false)
+        composeTestRule.setContent {
+            OnboardingPermissionsPage(
+                permission = NotificationPermissionDecision.GRANTED,
+                canScheduleExactAlarms = canSchedule,
+                onPermissionRequested = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText(text(R.string.onboarding_exact_alarm_denied_body)).assertExists()
+        composeTestRule.onNodeWithText(text(R.string.onboarding_exact_alarm_granted_body)).assertDoesNotExist()
+
+        canSchedule = true
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText(text(R.string.onboarding_exact_alarm_denied_body)).assertDoesNotExist()
+        composeTestRule.onNodeWithText(text(R.string.onboarding_exact_alarm_denied_action)).assertDoesNotExist()
+        composeTestRule.onNodeWithText(text(R.string.onboarding_exact_alarm_granted_body)).assertExists()
     }
 }
