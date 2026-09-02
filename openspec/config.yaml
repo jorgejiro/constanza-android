@@ -170,6 +170,50 @@ carried_forward_open_items:
         has a defined accent and palette, and the launcher icon is the one place
         a habit app is seen every day without being opened.
       owner_condition: "Its own small PR. Needs an adaptive icon (foreground/background layers) plus a monochrome layer for themed icons."
+      progress: >
+        Branch feat/launcher-icon (2026-09-02, NOT merged and no PR opened)
+        builds the whole resource path and leaves only the artwork outstanding.
+        Shipped on that branch: res/drawable/ic_launcher_foreground.xml and
+        res/drawable/ic_launcher_monochrome.xml (108x108 viewport, stroked
+        Direction A "Espiral" path, round caps, accent #E8A860 matching
+        ConstanzaColors.ACCENT_ARGB); res/values/ic_launcher_background.xml as a
+        flat colour (#110B06, matching BACKGROUND_ARGB) rather than a drawable;
+        res/mipmap-anydpi-v26/ic_launcher.xml and ic_launcher_round.xml as
+        <adaptive-icon> with background/foreground/monochrome; and
+        AndroidManifest.xml pointing android:icon at @mipmap/ic_launcher with
+        android:roundIcon added. NO legacy raster mipmap was produced and none is
+        needed: minSdk = 31 is above the API 26 adaptive-icon floor, so every
+        device that can install the app renders the vector layers and the
+        density PNG buckets would be dead weight. Verified on emulator-5554
+        (API 37, 1080x2400, 420dpi): aapt2 confirms the manifest resolves to the
+        adaptive icon and that the compiled <monochrome> layer is present; the
+        icon renders on the launcher home screen unclipped by the circular mask;
+        and the Android 13+ themed path was exercised for real by switching
+        Wallpaper & style > Icons > Style to "Minimal", where the monochrome
+        layer rendered correctly and was system-tinted. Gates green on that
+        branch: assembleDebug, testDebugUnitTest, detekt, detektMain, lintDebug,
+        and emulatorMatrixGroupDebugAndroidTest (79 tests, 1 skipped, 0 failed).
+      blocked_on: >
+        The artwork itself, which does not survive at launcher size. The supplied
+        path steps its radius by 3 per half-turn (27, 24, 21, 18, 15), so the
+        coil's pitch — the radial distance between two adjacent turns — is 6,
+        while the stroke is 9 wide and therefore spans 4.5 either side of its
+        centreline. Adjacent turns overlap by 3 instead of leaving a gap, so the
+        turns fuse into a solid disc. On screen the icon reads as a coffee bean
+        or an eye: a filled amber circle with a dark notch where the innermost
+        unstroked area (radius 10.5) survives, with the round cap of the final
+        free end cutting the comma. This is arithmetic, not an anti-aliasing
+        artifact, so it fails at every size, not only at 48dp. The safe-zone half
+        of the design DID hold: the outermost stroked edge lands at radius 31.5
+        against the 33 safe radius, and nothing is clipped by any mask.
+      owner_condition_addendum: >
+        Needs a drawing decision from the maintainer before this can merge, and
+        the decision is only about numbers, not direction. Either thin the stroke
+        below the pitch of 6 (a stroke of 3 leaves an equal 3-wide gap, but at
+        48dp that is about 1.3dp of ink and probably too faint), or keep a
+        heavier stroke and widen the pitch by using fewer turns, which is what
+        makes a spiral legible at icon size. Everything else on the branch is
+        finished and can be reused as-is once the path data is settled.
     - id: "release-build-never-produced"
       title: "No release build has ever been assembled, and the R8 path is unexercised"
       status: open
