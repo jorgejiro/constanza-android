@@ -138,56 +138,56 @@ surface in this change. No RED-test threat-matrix tasks are required.
 
 ## Phase 5: Test Seeding Infrastructure — depends on Phase 1
 
-- [ ] 5.1 Modify `e2e/CoreFlowTestFixture.kt`: add the `@EntryPoint`
+- [x] 5.1 Modify `e2e/CoreFlowTestFixture.kt`: add the `@EntryPoint`
       `ReminderSettingsDataStoreEntryPoint` (`SingletonComponent`) and its
       `EntryPointAccessors.fromApplication` accessor (design §8.1, A5).
-- [ ] 5.2 Modify `e2e/CoreFlowTestFixture.kt`: add `seedOnboardingDone()` and
+- [x] 5.2 Modify `e2e/CoreFlowTestFixture.kt`: add `seedOnboardingDone()` and
       `seedNotificationPermissionUnasked()` suspend helpers writing through the shared `DataStore`
       using the now-`internal` keys (design §8.1, §8.3).
-- [ ] 5.3 Modify `e2e/CoreFlowTestFixture.kt`'s `reset()`: add
+- [x] 5.3 Modify `e2e/CoreFlowTestFixture.kt`'s `reset()`: add
       `settings.edit { it[ReminderSettingsStore.ONBOARDING_DONE_KEY] = false }`; do NOT touch
       `requested_notification_permission` (design §8.2).
-- [ ] 5.4 Modify `e2e/CoreFlowE2ETest.kt`: split `launchApp()` into `launchFirstRunApp()` (awaits
+- [x] 5.4 Modify `e2e/CoreFlowE2ETest.kt`: split `launchApp()` into `launchFirstRunApp()` (awaits
       onboarding's first page) and `launchOnboardedApp()` (seeds the flag, awaits `today_title`) —
       no default (design §8.4).
 
 ## Phase 6: Instrumented Rework & Measurement — depends on Phases 3, 5
 
-- [ ] 6.1 **Measure, do not reason further.** Run
+- [x] 6.1 **Measure, do not reason further.** Run
       `./gradlew :app:emulatorMatrixGroupDebugAndroidTest` with the a1(deny)/a2(allow) sequence as
       designed (§8.3). Observe whether the api37 image re-shows the `POST_NOTIFICATIONS` dialog for
       a2 after a1's single denial. If it does not, apply the documented fallback before finalizing
       6.2/6.3: keep a1 as the real-dialog scenario, and reduce a2 to seeding the latch unasked on a
       fresh method with no prior denial (design §8.3, §15).
-- [ ] 6.2 Rename/rewrite `a1DenyingTheOnboardingPromptLeavesTodayOfferingNotificationSettings`
+- [x] 6.2 Rename/rewrite `a1DenyingTheOnboardingPromptLeavesTodayOfferingNotificationSettings`
       (api37): walk onboarding, deny the real dialog on screen 2, assert Today renders
       `today_notification_permission_open_settings`, then relaunch and assert onboarding does not
       reappear. This is the corrected `BLOCKED`-reachability scenario, proven in a single
       instrumented step (design §2.2, §10; onboarding spec "Permission Screen Never Offers A
       Prompt...", "Completion Commits At Handoff...", "Finish Handoff Into Habit Creation With A
       Back Escape"; reminder-response delta "Onboarding's ask writes the latch...").
-- [ ] 6.3 Rename/rewrite `a2AllowingTheOnboardingPromptLeavesTodayWithNoNotificationBanner` (api37):
+- [x] 6.3 Rename/rewrite `a2AllowingTheOnboardingPromptLeavesTodayWithNoNotificationBanner` (api37):
       seed the latch unasked (5.2), walk onboarding, grant the real dialog, assert Today shows no
       banner (onboarding spec "Grant completes onboarding"; reminder-response delta "The banner is
       the fallback...").
-- [ ] 6.4 Add `a3ApiBelow33SkipsTheOnboardingPermissionScreenEntirely` (api31): walk onboarding,
+- [x] 6.4 Add `a3ApiBelow33SkipsTheOnboardingPermissionScreenEntirely` (api31): walk onboarding,
       assert screen 2 never renders, screen 1's primary action reads "Finish", Today shows no banner
       (design §7; onboarding spec "Two-Screen Flow, API-Conditional" scenario "API 31 shows only
       screen 1"; reminder-response delta "API 31 device gets notifications with no prompt").
-- [ ] 6.5 Update `creatingAHabitThroughTheUi...` and `removingAHabitThroughTheUi...` to call
+- [x] 6.5 Update `creatingAHabitThroughTheUi...` and `removingAHabitThroughTheUi...` to call
       `launchOnboardedApp()` with `onboarding_done = true` pre-seeded (design §8.4 — regression,
       unaffected by this change's own scope).
-- [ ] 6.6 Verify: `./gradlew :app:emulatorMatrixGroupDebugAndroidTest` green on both `api31`/`api37`
+- [x] 6.6 Verify: `./gradlew :app:emulatorMatrixGroupDebugAndroidTest` green on both `api31`/`api37`
       legs, nothing attached (`testing.instrumented.device_free_matrix`).
 
 ## Phase 7: Carried-Forward Items & Final Verification
 
-- [ ] 7.1 Add a new carried-forward item `notification-permission-blocked-after-one-ask` to
+- [x] 7.1 Add a new carried-forward item `notification-permission-blocked-after-one-ask` to
       `openspec/config.yaml`'s `carried_forward_open_items.items`, owner-conditioned on any future
       change already touching `NotificationPermission`'s Activity-free contract (design §2.3). Do
       NOT touch or close `habit-editor-has-no-cancel-affordance` — that item belongs to the editor
       change (design §2.1).
-- [ ] 7.2 Verify: `./gradlew check` green (unit tests, lint, detekt) and
+- [x] 7.2 Verify: `./gradlew check` green (unit tests, lint, detekt) and
       `./gradlew :app:emulatorMatrixGroupDebugAndroidTest` green — the change's two success gates
       (proposal Success Criteria).
 
