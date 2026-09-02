@@ -14,6 +14,8 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.expectedTimeOnDevice
+import com.jjrapps.constanza.core.ui.unexpectedTimeOnDevice
 import com.jjrapps.constanza.habit.HabitRepositoryTestFixture
 import com.jjrapps.constanza.scheduling.insertHabitWithSchedule
 import kotlinx.coroutines.runBlocking
@@ -107,6 +109,36 @@ class TodaySlotRowComposeTest {
             "the answer buttons ran past the right edge of a ${PHONE_WIDTH_DP}dp screen",
             skip.right <= composeTestRule.onRoot().fetchSemanticsNode().boundsInRoot.right,
         )
+    }
+
+    /**
+     * `fix/time-format-consistency`: the slot line is `<time> — <status>`, and the time half now
+     * follows the device's 12/24-hour setting instead of always being `HH:mm`.
+     *
+     * Asserted as the whole sentence rather than as a substring, because the sentence is the thing
+     * the row renders and the em dash is the only thing joining its two halves. Both notations are
+     * hand-written literals; the device picks which one applies, and the other is asserted absent —
+     * a positive check on its own would still pass on a screen that had gone back to hardcoding
+     * whichever cycle this device happens to use.
+     */
+    @Test
+    fun theSlotTimeReadsInTheDeviceHourCycle() = runBlocking {
+        val habitId = fixture.database.insertHabitWithSchedule(name = LONG_HABIT_NAME)
+        fixture.insertEnabledSlot(habitId, MORNING_MINUTE)
+
+        setPhoneSizedContent()
+        val shown = expectedTimeOnDevice(inTwentyFourHour = "08:00", inTwelveHour = "8:00 AM")
+        awaitNodeWithText(shown)
+
+        composeTestRule
+            .onNodeWithText("$shown — ${text(R.string.today_slot_pending)}")
+            .assertIsDisplayed()
+        composeTestRule
+            .onNodeWithText(
+                unexpectedTimeOnDevice(inTwentyFourHour = "08:00", inTwelveHour = "8:00 AM"),
+                substring = true,
+            )
+            .assertDoesNotExist()
     }
 
     /** Defect 2: an answered slot reads as copy. `EntryStatus.COMPLETED.name` must not be on

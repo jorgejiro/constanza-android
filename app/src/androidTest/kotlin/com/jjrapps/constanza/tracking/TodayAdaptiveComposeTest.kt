@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.expectedTimeOnDevice
 import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
 import com.jjrapps.constanza.habit.HabitRepositoryTestFixture
@@ -90,8 +91,18 @@ class TodayAdaptiveComposeTest {
         awaitNodeWithText(text(R.string.today_expand))
         composeTestRule.onNodeWithText(text(R.string.today_expand)).performClick()
 
-        val morningNode = composeTestRule.onNodeWithText("08:00", substring = true)
-        val eveningNode = composeTestRule.onNodeWithText("20:00", substring = true)
+        // Both notations are spelled out rather than derived, and the device's setting picks one:
+        // the emulators this matrix provisions run en-US, so this is the 12-hour branch in practice
+        // and the 24-hour branch only on a device set that way. The rows still have to be found by
+        // their real on-screen time, because what this test measures is where those rows sit.
+        val morningNode = composeTestRule.onNodeWithText(
+            expectedTimeOnDevice(inTwentyFourHour = "08:00", inTwelveHour = "8:00 AM"),
+            substring = true,
+        )
+        val eveningNode = composeTestRule.onNodeWithText(
+            expectedTimeOnDevice(inTwentyFourHour = "20:00", inTwelveHour = "8:00 PM"),
+            substring = true,
+        )
         morningNode.assertIsDisplayed()
         eveningNode.assertIsDisplayed()
 

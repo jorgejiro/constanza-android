@@ -90,9 +90,31 @@ import androidx.compose.runtime.Composable
  * component that must distinguish two states for a user who cannot separate those hues should add a
  * non-colour cue of its own rather than lean on this pair alone.
  *
+ * **`tertiaryContainer`/`onTertiaryContainer` are bound as of fix/time-format-consistency, and the
+ * audit below no longer lists them.** They used to be audited as unbound on the grounds that
+ * nothing rendered them, and `habit.ReminderTimeField` hardcoded its time picker to 24-hour partly
+ * to keep that true. Now that the picker follows the device's 12/24-hour setting, its AM/PM period
+ * selector renders — and in material3 1.4.0 that selector is the only consumer of the tertiary
+ * family in either `TimePickerTokens` or `TimeInputTokens`
+ * (`PeriodSelectorSelectedContainerColor` plus the four `PeriodSelectorSelected*LabelTextColor`
+ * entries, read from the resolved artifact's sources). Left unbound, a US phone set to 12-hour
+ * would have put M3's stock violet in the middle of the warm ramp.
+ *
+ * They take the same `SurfaceSelected`/`Accent` pair as `primaryContainer`/`onPrimaryContainer`, and
+ * for the same reason: both are "this half of a two-part selector is the one you picked", the AM/PM
+ * toggle sitting a few dp from the hour/minute selector inside the same dialog, and two different
+ * treatments for one idea in one dialog would be noise. The selection is carried by the *content*
+ * tone rather than the fill, which is the trade `onPrimaryContainer`'s paragraph above already
+ * spells out and which the period selector survives better than most: M3 strokes the whole toggle
+ * with `outline` ([ConstanzaColors.ControlStroke], 3.41:1 on the dialog's `surfaceContainerHigh`),
+ * so the component's own boundary is never in question — only which half is active, and that reads
+ * amber against off-white.
+ *
+ * `tertiary`/`onTertiary` follow `secondary`/`onSecondary` onto the accent pair. Nothing renders
+ * them today; they are bound anyway so that no member of this family can put a violet on screen
+ * later, which is exactly the failure this change had to go back and fix.
+ *
  * **Audited and deliberately left at M3's default — stated here so no future omission is silent:**
- * - `tertiary`/`onTertiary`/`tertiaryContainer`/`onTertiaryContainer` — zero call sites anywhere in
- *   `app/src/main/kotlin` (`rg -i tertiary` confirms). Nothing renders a tertiary role.
  * - `error`/`onError`/`errorContainer`/`onErrorContainer` — only `colorScheme.error` is read
  *   (`ScheduleEditors`'s slot-count error text), and M3's baseline error red is not violet/cool-hued
  *   regardless of the seed primary, so it needs no repointing. No component renders a filled
@@ -135,6 +157,10 @@ internal val DarkColors = darkColorScheme(
     onSecondary = ConstanzaColors.OnAccent,
     secondaryContainer = ConstanzaColors.SurfaceSelected,
     onSecondaryContainer = ConstanzaColors.OnBackground,
+    tertiary = ConstanzaColors.Accent,
+    onTertiary = ConstanzaColors.OnAccent,
+    tertiaryContainer = ConstanzaColors.SurfaceSelected,
+    onTertiaryContainer = ConstanzaColors.Accent,
 )
 
 /**

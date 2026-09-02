@@ -16,15 +16,19 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.expectedTimeOnDevice
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** The time a brand-new reminder slot is seeded at (`HabitEditorViewModel`'s
- *  `DEFAULT_MINUTE_OF_DAY`), and the hour typed over it to make the in-progress edit visible. */
-private const val DEFAULT_TIME = "08:00"
+/** The hour a brand-new reminder slot is seeded at (`HabitEditorViewModel`'s
+ *  `DEFAULT_MINUTE_OF_DAY`), and the hour typed over it to make the in-progress edit visible.
+ *
+ *  Both are the same string in either hour cycle, which is why they can stay constants while the
+ *  row's rendering of that same slot cannot: M3's keyboard-entry field pads to two digits in both
+ *  cycles, and 08:00 is a morning time, so `hourForDisplay` is 8 on a 12-hour clock too. */
 private const val DEFAULT_HOUR = "08"
 private const val EDITED_HOUR = "07"
 
@@ -134,7 +138,11 @@ class HabitEditorRotationComposeTest {
         // Addressed as "the one toggleable on the screen" because the Switch and its label are
         // separate nodes here and only the Switch carries the click; a DAILY editor has no other.
         composeTestRule.onNode(isToggleable()).performClick()
-        composeTestRule.onNodeWithText(DEFAULT_TIME).performClick()
+        // The row itself follows the device's 12/24-hour setting (fix/time-format-consistency), so
+        // the handle for tapping it does too. Both notations are written out; the device picks.
+        composeTestRule
+            .onNodeWithText(expectedTimeOnDevice(inTwentyFourHour = "08:00", inTwelveHour = "8:00 AM"))
+            .performClick()
         composeTestRule.onNodeWithTag(REMINDER_TIME_MODE_TOGGLE_TEST_TAG).performClick()
         // hasSetTextAction picks the editable field over Material 3's read-only display of the
         // same digits — both carry the text, only one takes input.

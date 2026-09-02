@@ -764,7 +764,7 @@ carried_forward_open_items:
 
     - id: "no-shared-time-of-day-formatter"
       title: "The app never honours the device's 12/24-hour setting; every screen hardcodes 24-hour"
-      status: open
+      status: resolved
       origin: >
         Recorded on 2026-09-02 by fix/control-contrast, which was auditing the habit editor for
         WCAG 1.4.11 non-text contrast and read the reminder-time code paths on the way through.
@@ -788,6 +788,99 @@ carried_forward_open_items:
         screen would put `9:15 PM` in the editor and `21:15` on Today for the same slot, which is
         worse than one consistent convention. Any change already touching how times are rendered
         on more than one screen should absorb it.
+      resolution: >
+        Shipped app-wide in one change on branch fix/time-format-consistency, as the
+        owner_condition required. `core/ui/TimeOfDayFormat.kt` holds the app's one renderer:
+        `class TimeOfDayFormat(val is24Hour: Boolean, locale: Locale)` with
+        `format(minuteOfDay: Int)` and `format(time: LocalTime)`, plus a
+        `@Composable rememberTimeOfDayFormat()` that reads `DateFormat.is24HourFormat(context)`
+        and `LocalConfiguration.current.locales[0]`. All three previous copies are gone:
+        `TodayScreen`'s `TIME_FORMATTER` constant, its separate `"%02d:%02d"` literal in
+        `slotStatusText`, and `ReminderTimeField`'s private `formatTimeOfDay`. `ReminderTimeField`
+        reads the format ONCE and hands the same object to the row and to
+        `rememberTimePickerState(is24Hour = ...)`, so the row and the picker it opens cannot
+        disagree.
+
+        FORMATTED BY HOUR CYCLE, NOT BY LOCALE — stated because the item asked. The digit layout is
+        the app's (`HH:mm` / `h:mm a`) and only the day-period marker comes from the locale (`PM` in
+        en-US, lower-case `pm` in en-GB, `p. m.` in es-ES; the en-GB case is pinned as its own unit
+        test because an earlier draft asserted `PM` there and failed). `DateTimeFormatter`'s
+        `ofLocalizedTime(SHORT)` was rejected outright: it derives the hour cycle from the LOCALE, so
+        a US-English phone switched to 24-hour would still be handed `9:15 PM` — the exact defect
+        this item is about. The setting has to beat the locale, and only an explicit pattern lets it.
+        Zero padding survives where it means something: both halves in 24-hour (`21:05`, `08:00`), the
+        minute only in 12-hour (`9:05 PM`, not `09:05 PM`, which is not a convention anywhere).
+
+        Reading the 12/24 setting is not a clock read, so detekt's `ForbiddenMethodCall` ban is
+        untouched and uncircumvented — every actual instant still arrives through `TimeProvider`.
+        Known limit, recorded in the KDoc rather than hidden: Android keeps that preference in
+        `Settings.System`, not in `Configuration`, so flipping it while the app is foregrounded shows
+        up on the next Activity creation rather than immediately.
+
+        THE TERTIARY-ROLE PROBLEM, WHICH IS THE ACTUAL RISK IN THIS CHANGE. `ReminderTimeField`'s old
+        KDoc gave two reasons for hardcoding 24-hour. The first (internal consistency with Today)
+        dissolves here. The second did not, and was re-verified against the resolved
+        material3-android-1.4.0 sources rather than taken on trust: in BOTH `TimePickerTokens` and
+        `TimeInputTokens` the only tertiary entries are `PeriodSelectorSelectedContainerColor`
+        (`TertiaryContainer`) and the four `PeriodSelectorSelected*LabelTextColor` (`OnTertiaryContainer`)
+        — nothing else in either table is tertiary — and `Theme.kt` audited that whole family as
+        deliberately unbound on the grounds that nothing rendered it. Following the device setting
+        renders the AM/PM selector, which would have put M3's stock violet in the warm ramp.
+
+        Fixed in the theme rather than by overriding colours at the one call site, so the next
+        component to reach for a tertiary role inherits a warm tone instead of repeating the
+        override. `Theme.kt` now binds `tertiaryContainer`/`onTertiaryContainer` to the same
+        `SurfaceSelected`/`Accent` pair `primaryContainer`/`onPrimaryContainer` already uses — both
+        are "this half of a two-part selector is the one you picked", and the AM/PM toggle sits a few
+        dp from the hour/minute selector inside the same dialog — and `tertiary`/`onTertiary` onto the
+        accent pair, following the existing `secondary` decision. No new hex values. That file's role
+        audit no longer lists the tertiary family as unbound; it explains the binding instead.
+
+        `ColorContrastTest` gained four assertions for it: that none of the four roles is still M3's
+        stock dark default (compared against `darkColorScheme()` itself, so it keeps meaning "not
+        Material's default" across an upgrade rather than pinning today's hex); that
+        `onTertiaryContainer` clears 4.5:1 on `tertiaryContainer`; that `onSurfaceVariant` — the
+        unselected label, drawn over the dialog's own `surfaceContainerHigh` because M3 makes the
+        unselected period container transparent — clears 7:1 there; and that the selected and
+        unselected label tones cannot collapse into one. SC 1.4.11 for the component itself is
+        already covered: M3 strokes the whole toggle with `outline`, which the existing sweep
+        measures on every surface.
+      verified: >
+        `:app:testDebugUnitTest` 181 tests, 0 failures — 20 of them the new `TimeOfDayFormatTest`
+        (both cycles across midnight, noon, 00:05, 23:59, 11:59, the LocalTime overload, and the
+        locale cases) and 25 `ColorContrastTest`, four of those new. `:app:detekt`, `:app:detektMain`
+        and `:app:lintDebug` green. `:app:emulatorMatrixGroupDebugAndroidTest` green on both legs,
+        93 tests each (api31 0 failures 2 skipped, api37 0 failures 1 skipped), up from 91: one new
+        Today test asserting the whole `<time> — <status>` sentence in the device's notation and the
+        other notation's absence, and one asserting the picker offers an AM/PM selector exactly when
+        the device says 12-hour. Four existing instrumented tests were UPDATED rather than loosened
+        — `HabitEditorTimePickerComposeTest`, `HabitEditorRotationComposeTest`,
+        `TodayAdaptiveComposeTest`, `TodaySlotRowComposeTest`. Each still compares against a
+        hand-written literal; the device's setting only chooses WHICH of two literals applies, via
+        `androidTest`'s `expectedTimeOnDevice`. That helper deliberately does not call
+        `TimeOfDayFormat`: asking production what it would print and asserting it printed that would
+        prove only that the screen called it. Both matrix emulators leave `time_12_24` unset with an
+        `en-US` locale, so both legs actually ran the 12-hour branch.
+
+        LOOKED AT, NOT ONLY MEASURED. Screenshotted on a booted `Constanza_API31` emulator (the
+        physical device was never touched) with the seeded `Meditate` habit, first at
+        `settings put system time_12_24 12` and then at `24`, force-stopping between the two because
+        Android carries that preference in `Settings.System` rather than in `Configuration`.
+        12-hour: Today reads `9:50 PM — Pending`; the reminder row reads `8:00 AM`; the dial dialog
+        renders the AM/PM toggle with the selected `AM` in the accent amber, the unselected `PM` in
+        off-white, and a warm-grey `ControlStroke` border around the pair; the keyboard-entry dialog
+        renders the same toggle. 24-hour: `21:50 — Pending`, `21:50`, no period selector at all, and
+        the dialog is pixel-wise what it was before this change. NO VIOLET ANYWHERE in either state —
+        the tertiary binding holds on a real screen, not only in the contrast test.
+
+        One honest observation from those screenshots rather than a claim of perfection: the selected
+        period's container is `SurfaceSelected` and its unselected sibling is transparent over
+        `surfaceContainerHigh`, and at these two ramp tiers those two fills are all but
+        indistinguishable — the selection is carried entirely by the amber label. That is the trade
+        `Theme.kt` already documents for every selected fill in this palette and it is conformant
+        (SC 1.4.11 is satisfied by the toggle's own `outline` border, which identifies the
+        component), but it is the same hue-carried distinction the theme's own KDoc flags as the
+        thing to revisit if the surface ramp is ever re-toned.
 
     - id: "fab-and-selected-chip-fills-below-the-non-text-floor"
       title: "Two filled controls identify themselves by a 1.17:1 fill; only their content carries them"

@@ -30,15 +30,12 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.component.HabitColorDot
+import com.jjrapps.constanza.core.ui.rememberTimeOfDayFormat
 import com.jjrapps.constanza.core.ui.theme.Spacing
 import com.jjrapps.constanza.domain.model.DayStatus
 import com.jjrapps.constanza.domain.model.EntryStatus
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-
-private const val MINUTES_PER_HOUR = 60
-private val TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm")
 
 /** Task 6b.1 — container, matching [com.jjrapps.constanza.habit.HabitListRoute]'s hoisted-route
  *  navigation shape (design.md §14, no navigation library). Task 6b.9: re-checks
@@ -235,18 +232,27 @@ private fun AnswerButtons(onAnswer: (InAppEntryStatus) -> Unit) {
 
 /** [zone] comes from [TodayUiState.zone] ([com.jjrapps.constanza.core.time.TimeProvider.zone]),
  *  never `ZoneId.systemDefault()` directly — the same clock-access ban design.md §4 enforces
- *  everywhere else (config/detekt/detekt.yml `ForbiddenMethodCall`). */
+ *  everywhere else (config/detekt/detekt.yml `ForbiddenMethodCall`).
+ *
+ *  Both times here — the slot's own time and the snoozed-until time — go through the one
+ *  [com.jjrapps.constanza.core.ui.TimeOfDayFormat]. They used to be formatted two different ways in
+ *  this one function: a `DateTimeFormatter.ofPattern("HH:mm")` file constant for the snooze and a
+ *  bare `"%02d:%02d"` literal for the slot, which is two copies of a decision that has to agree.
+ *
+ *  The format is remembered per row rather than hoisted into [TodayContent] and threaded down. That
+ *  is deliberate: threading it would add a sixth parameter to both [HabitRollupRow] and [SlotRow]
+ *  to save one small immutable object per visible row, and the rows are already carrying every
+ *  argument they can justify. */
 @Composable
 private fun slotStatusText(slot: TodaySlot, zone: ZoneId): String {
-    val time = slot.minuteOfDay?.let { minute ->
-        "%02d:%02d".format(minute / MINUTES_PER_HOUR, minute % MINUTES_PER_HOUR)
-    }
+    val timeFormat = rememberTimeOfDayFormat()
+    val time = slot.minuteOfDay?.let(timeFormat::format)
     val statusText = if (slot.snoozedUntilEpochMs != null) {
         // Still ahead of the status itself: a snoozed slot is pending WITH a time attached, and
         // that time is the more useful half of the sentence.
         stringResource(
             R.string.today_slot_pending_snoozed_until,
-            TIME_FORMATTER.format(Instant.ofEpochMilli(slot.snoozedUntilEpochMs).atZone(zone)),
+            timeFormat.format(Instant.ofEpochMilli(slot.snoozedUntilEpochMs).atZone(zone).toLocalTime()),
         )
     } else {
         stringResource(slotStatusLabel(slot.status))

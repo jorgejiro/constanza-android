@@ -35,13 +35,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.TimeOfDayFormat
+import com.jjrapps.constanza.core.ui.rememberTimeOfDayFormat
 import com.jjrapps.constanza.core.ui.theme.Dimens
 import com.jjrapps.constanza.core.ui.theme.Spacing
 
 private const val MINUTES_PER_HOUR = 60
-
-/** Zero-padded, 24-hour, both halves always two digits — see [formatTimeOfDay]. */
-private const val TIME_OF_DAY_FORMAT = "%02d:%02d"
 
 /** The display-mode toggle inside the reminder-time dialog. Tagged because its only other handle
  *  is a `contentDescription` that comes from Material 3's own **internal** string resources
@@ -85,6 +84,9 @@ internal fun ReminderTimeField(
     label: String? = null,
 ) {
     var showPicker by rememberSaveable { mutableStateOf(false) }
+    // One read of the device's 12/24-hour setting, shared by the row and by the dialog's
+    // TimePickerState. Reading it twice would let the row and the picker it opens disagree.
+    val timeFormat = rememberTimeOfDayFormat()
     Surface(
         modifier = modifier,
         shape = MaterialTheme.shapes.extraSmall,
@@ -106,7 +108,7 @@ internal fun ReminderTimeField(
                 .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val time = formatTimeOfDay(minuteOfDay)
+            val time = timeFormat.format(minuteOfDay)
             if (label == null) {
                 Text(time, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             } else {
@@ -125,6 +127,7 @@ internal fun ReminderTimeField(
     if (showPicker) {
         ReminderTimePickerDialog(
             initialMinuteOfDay = minuteOfDay,
+            timeFormat = timeFormat,
             onConfirm = {
                 showPicker = false
                 onMinuteOfDayChange(it)
@@ -137,24 +140,25 @@ internal fun ReminderTimeField(
 /**
  * Material 3's clock dial, with keyboard entry one tap away.
  *
- * **`is24Hour = true`, hardcoded, and NOT [rememberTimePickerState]'s system-setting default.**
- * Two independent reasons, both of which would have to change together before this should:
+ * **`is24Hour` follows the device**, through the same [TimeOfDayFormat] the row above it reads, so
+ * the picker and the value it edits can never disagree. It used to be hardcoded `true`, for two
+ * stated reasons; both have been dealt with rather than dropped:
  *
- * 1. *Consistency.* Everywhere else this app renders a time it renders `HH:mm` —
- *    `tracking.TodayScreen`'s `TIME_FORMATTER` and its `slotStatusText`. Following the system
- *    setting here alone would put `9:15 PM` in the editor and `21:15` on Today for the same slot.
- *    Following it *everywhere* is the genuinely right answer and is worth doing, but it is an
- *    app-wide change to how times are read, not a fix to this control, and it does not belong in
- *    the same diff. Until then, one convention beats two.
+ * 1. *Consistency.* The old argument was that `tracking.TodayScreen` rendered `HH:mm`
+ *    unconditionally, so following the setting here alone would put `9:15 PM` in the editor and
+ *    `21:15` on Today for the same slot. That is no longer true — Today reads the same
+ *    [TimeOfDayFormat], and the app-wide change the old KDoc said "is worth doing" is this one.
  * 2. *Palette.* The AM/PM period selector — the only part of [TimePicker]/[TimeInput] that renders
  *    at all when `is24Hour` is false — is the only part of them that reads `tertiaryContainer` and
- *    `onTertiaryContainer`, verified against `TimePickerTokens`/`TimeInputTokens` in the resolved
- *    `material3` artifact. Those two roles are the ones `core/ui/theme/Theme.kt` explicitly audits
- *    as *unbound*, on the grounds that nothing renders them; a 12-hour dial would drop M3's stock
- *    violet into the middle of the warm ramp and silently falsify that audit. Every other role
- *    these two composables touch — `surfaceContainerHigh`/`Highest`, `primary`/`onPrimary`,
- *    `primaryContainer`/`onPrimaryContainer`, `secondary`, `onSurface`, `onSurfaceVariant`,
- *    `outline` — is already bound there.
+ *    `onTertiaryContainer`, re-verified against `TimePickerTokens`/`TimeInputTokens` in the
+ *    resolved `material3` 1.4.0 artifact (`PeriodSelectorSelectedContainerColor` and the four
+ *    `PeriodSelectorSelected*LabelTextColor` entries; nothing else in either token table is
+ *    tertiary). Those two roles WERE the ones `core/ui/theme/Theme.kt` audited as unbound, and
+ *    surfacing them would have dropped M3's stock violet into the warm ramp. So they are now bound
+ *    there, to the same `SurfaceSelected`/`Accent` pair the hour/minute selector already uses, and
+ *    that file's audit says so. No colour is overridden here for the period selector: the fix
+ *    belongs in the theme, because the next component to render a tertiary role should inherit it
+ *    rather than repeat it.
  *
  * The confirm button is unconditionally enabled because there is nothing here that can be invalid:
  * `material3` 1.4.0 (the version Compose BOM 2026.08.00 resolves) rejects an out-of-range entry
@@ -167,6 +171,7 @@ internal fun ReminderTimeField(
 @Composable
 private fun ReminderTimePickerDialog(
     initialMinuteOfDay: Int,
+    timeFormat: TimeOfDayFormat,
     onConfirm: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -176,7 +181,7 @@ private fun ReminderTimePickerDialog(
     val state = rememberTimePickerState(
         initialHour = initialMinuteOfDay / MINUTES_PER_HOUR,
         initialMinute = initialMinuteOfDay % MINUTES_PER_HOUR,
-        is24Hour = true,
+        is24Hour = timeFormat.is24Hour,
     )
     var dialRequested by rememberSaveable { mutableStateOf(true) }
     val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
@@ -222,8 +227,3 @@ private fun ReminderTimePickerDialog(
         if (showDial) TimePicker(state = state, colors = colors) else TimeInput(state = state, colors = colors)
     }
 }
-
-/** `21:05`, never `21:5` and never `9:0`. Matches `tracking.TodayScreen`'s `slotStatusText`
- *  character for character, which is the point — see [ReminderTimePickerDialog]'s KDoc. */
-private fun formatTimeOfDay(minuteOfDay: Int): String =
-    TIME_OF_DAY_FORMAT.format(minuteOfDay / MINUTES_PER_HOUR, minuteOfDay % MINUTES_PER_HOUR)
