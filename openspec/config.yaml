@@ -358,22 +358,64 @@ testing:
   instrumented:
     available: true
     command: "./gradlew :app:connectedDebugAndroidTest"
-    framework: "AndroidX Test + androidx.work:work-testing + compose-ui-test-junit4"
+    framework: "AndroidX Test + androidx.work:work-testing + compose-ui-test-junit4 + androidx.test.uiautomator"
     harness: >
       An emulator is the DEFAULT runtime harness for this suite; physical hardware is
-      the exception, not the norm. Available AVDs, all on the `android-37.0` system
-      image (`google_apis_playstore_ps16k`, arm64-v8a): `Medium_Phone` (411dp wide),
-      `Tablet7` (600dp — the natural `sw >= 600dp` route, cleaner than a `wm density`
-      override), `Tablet10` (800dp). Pass `ANDROID_SERIAL` when more than one device
-      is attached. Physical hardware is required only for what an emulator cannot
-      reproduce: the One UI background-throttling row (carried-forward item
-      `G.7-throttling-row`) and a real fold/unfold configuration change — the phone
-      AVD reports only the `DEFAULT` device state
-      (`adb shell cmd device_state print-states`). A foldable AVD IS creatable from
-      the installed SDK (`pixel_fold`, `pixel_9_pro_fold`, `pixel_10_pro_fold` skins
-      are present and `sdklib.jar` carries the `pixel_fold` definition with a
-      `foldable-region`), but only via Android Studio's Device Manager: the
-      `cmdline-tools` package is not installed, so there is no `avdmanager` binary.
+      the exception, not the norm. The sanctioned way to run it is the device-free
+      matrix below, which provisions its own emulators and needs no AVD to exist on the
+      machine and nothing attached. `./gradlew :app:connectedDebugAndroidTest` remains
+      available for iterating against an already-running emulator; pass `ANDROID_SERIAL`
+      when more than one device is attached. Hand-made AVDs on this machine
+      (`Medium_Phone` 411dp, `Tablet7` 600dp — the natural `sw >= 600dp` route, cleaner
+      than a `wm density` override, `Tablet10` 800dp, `Constanza_API31`) are for that
+      manual route only; Gradle Managed Devices never touches them. Physical hardware is
+      required only for what an emulator cannot reproduce: the One UI
+      background-throttling row (carried-forward item `G.7-throttling-row`) and a real
+      fold/unfold configuration change — a phone AVD reports only the `DEFAULT` device
+      state (`adb shell cmd device_state print-states`). `cmdline-tools` IS now installed
+      (`$ANDROID_HOME/cmdline-tools/latest/bin/{sdkmanager,avdmanager}`), which supersedes
+      the "no avdmanager binary" reason recorded against the `colour-dot-fold-unfold`
+      carried-forward item; a foldable AVD is now creatable from the command line.
+    device_free_matrix:
+      status: ratified
+      date: 2026-09-02
+      by: user
+      convention: >
+        The standard develop / test / release cycle MUST be fully verifiable on an
+        emulator with nothing plugged in. Granting the notification permission through
+        the real system dialog, adding a habit, a reminder notification actually
+        arriving, answering from that notification, and removing a habit are all driven
+        through the product's own UI and asserted autonomously — see
+        `app/src/androidTest/kotlin/com/jjrapps/constanza/e2e/CoreFlowE2ETest.kt`.
+        Physical-hardware testing happens only by explicit prior agreement. Do not ask
+        for a device as a matter of course, and do not record a check as unverifiable
+        merely because nothing is attached.
+      command: "./gradlew :app:emulatorMatrixGroupDebugAndroidTest"
+      devices: >
+        Two, declared in `app/build.gradle.kts` under `testOptions.managedDevices` and
+        grouped as `emulatorMatrix`, so the one command above runs the whole matrix.
+        `api31` (Pixel 6, SDK 31, `aosp-atd`) is the API 31-32 half of the
+        `POST_NOTIFICATIONS` boundary, where the runtime permission does not exist,
+        `NotificationPermission.decide` answers `NOT_APPLICABLE`, and the Today banner
+        must never render. `api37` (Pixel 6, SDK 37, `google_apis`, 4KB pages) is
+        targetSdk, where the permission exists and the real
+        `com.android.permissioncontroller` dialog is tapped through UiAutomator. The
+        API 37 leg is NOT on an ATD image because Google publishes none at that API
+        level; `google_apis` is the lightest image android-37.0 offers. Gradle Managed
+        Devices downloads its system images and creates its own AVDs on first run, which
+        is slow once and cached afterwards.
+      limits: >
+        Read this before treating a green matrix as a release gate. A green matrix is
+        NOT evidence about the maintainer's Galaxy S25, or about any One UI device. An
+        emulator does not reproduce One UI's aggressive background-process killing, its
+        "put unused apps to sleep" policy, or real Doze — and those three are exactly
+        the conditions under which this app's reminders are most likely to fail in the
+        field, because every one of them attacks the alarm-and-worker path the whole
+        feature rests on. What the matrix proves is that the product's own logic and
+        wiring are correct; it says nothing about whether the OEM will let that wiring
+        run. The maintainer has accepted that residual risk knowingly. The
+        carried-forward items `G.7-throttling-row` and `colour-dot-fold-unfold` stay
+        exactly as open as they were.
     java_home: >
       REQUIRED for every `./gradlew` invocation — this machine has no system JDK and
       Gradle dies with "Unable to locate a Java Runtime" without it. Applies to all
@@ -454,6 +496,12 @@ rules:
   verify:
     test_command: "./gradlew check"
     build_command: "./gradlew assembleDebug"
+    device_free_matrix_command: "./gradlew :app:emulatorMatrixGroupDebugAndroidTest"
+    device_free_matrix_note: >
+      `check` covers unit tests, lint and detekt only — it runs no instrumented test at
+      all, so a green `check` says nothing about the reminder path. Run the matrix
+      command above for that, and read `testing.instrumented.device_free_matrix.limits`
+      before quoting the result as release evidence.
     coverage_threshold: 0
   archive:
     - Warn before merging destructive deltas
