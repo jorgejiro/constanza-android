@@ -172,6 +172,27 @@ testing:
     available: true
     command: "./gradlew :app:connectedDebugAndroidTest"
     framework: "AndroidX Test + androidx.work:work-testing + compose-ui-test-junit4"
+    harness: >
+      An emulator is the DEFAULT runtime harness for this suite; physical hardware is
+      the exception, not the norm. Available AVDs, all on the `android-37.0` system
+      image (`google_apis_playstore_ps16k`, arm64-v8a): `Medium_Phone` (411dp wide),
+      `Tablet7` (600dp — the natural `sw >= 600dp` route, cleaner than a `wm density`
+      override), `Tablet10` (800dp). Pass `ANDROID_SERIAL` when more than one device
+      is attached. Physical hardware is required only for what an emulator cannot
+      reproduce: the One UI background-throttling row (carried-forward item
+      `G.7-throttling-row`) and a real fold/unfold configuration change — the phone
+      AVD reports only the `DEFAULT` device state
+      (`adb shell cmd device_state print-states`). A foldable AVD IS creatable from
+      the installed SDK (`pixel_fold`, `pixel_9_pro_fold`, `pixel_10_pro_fold` skins
+      are present and `sdklib.jar` carries the `pixel_fold` definition with a
+      `foldable-region`), but only via Android Studio's Device Manager: the
+      `cmdline-tools` package is not installed, so there is no `avdmanager` binary.
+    java_home: >
+      REQUIRED for every `./gradlew` invocation — this machine has no system JDK and
+      Gradle dies with "Unable to locate a Java Runtime" without it. Applies to all
+      commands in this section, not only the instrumented one:
+      `export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`
+      (OpenJDK 21, bundled with Android Studio).
   coverage:
     available: false
     command: ""
