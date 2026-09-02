@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The round-mask variant referenced by android:roundIcon. The coil is drawn inside the 66dp safe
+    circle, so a round mask clips nothing a square mask would keep and the two layer sets are
+    identical; this file exists so launchers that ask for roundIcon get an answer instead of
+    falling back.
+
+    As with ic_launcher.xml: no legacy raster mipmaps, because minSdk = 31.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
+</adaptive-icon>

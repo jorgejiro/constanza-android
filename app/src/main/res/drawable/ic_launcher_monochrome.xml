@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Launcher icon monochrome layer for Android 13+ themed icons: the same "Espiral" path as
+    ic_launcher_foreground.xml, on the same 108x108 viewport.
+
+    The system reads ONLY this layer's alpha coverage and tints it with the user's wallpaper-derived
+    theme colour, so the stroke colour written here is never shown on device. It is kept as an
+    opaque placeholder purely so the drawable renders visibly in tooling previews. What actually
+    matters is the alpha mask — that the stroke geometry, width and round caps match the foreground
+    exactly, because a themed icon is nothing but this coverage.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M27,54 A27,27 0 0 1 81,54 A24,24 0 0 1 33,54 A21,21 0 0 1 75,54 A18,18 0 0 1 39,54 A15,15 0 0 1 69,54"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="9"
+        android:strokeLineCap="round" />
+</vector>

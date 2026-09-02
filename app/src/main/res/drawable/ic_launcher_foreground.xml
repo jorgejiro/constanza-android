@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Launcher icon foreground: "Espiral" — one unbroken stroke coiling inward, constancy as the
+    same small turn taken again.
+
+    Authored on the 108x108 adaptive-icon viewport. Every arc is an exact semicircle, and the
+    stroked extents stay inside the 66dp safe circle (centre 54,54 / radius 33), so no launcher
+    mask — circle, squircle, rounded square — can clip the coil.
+
+    android:strokeLineCap="round" is load-bearing: a butt cap squares off the coil's two free ends
+    against the spiral's curvature and changes the drawing.
+
+    Colour is ConstanzaColors.ACCENT_ARGB (#E8A860) over ConstanzaColors.BACKGROUND_ARGB.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M27,54 A27,27 0 0 1 81,54 A24,24 0 0 1 33,54 A21,21 0 0 1 75,54 A18,18 0 0 1 39,54 A15,15 0 0 1 69,54"
+        android:strokeColor="#E8A860"
+        android:strokeWidth="9"
+        android:strokeLineCap="round" />
+</vector>
