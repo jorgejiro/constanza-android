@@ -72,6 +72,58 @@ android {
             // throws "Method ... not mocked." instead of returning a harmless default.
             isReturnDefaultValues = true
         }
+
+        // The device-free verification matrix. `./gradlew :app:emulatorMatrixGroupDebugAndroidTest`
+        // provisions, boots, tests on and tears down both emulators with nothing plugged in — see
+        // `openspec/config.yaml`'s "Device-free verification" convention for the standing
+        // requirement and for the limits of what a green matrix actually proves.
+        //
+        // Two devices, because API 31 and API 37 are a REAL behavioural boundary for this app and
+        // not merely two versions of the same thing: `POST_NOTIFICATIONS` does not exist below API
+        // 33, so `NotificationPermission.decide` returns `NOT_APPLICABLE` there and the Today
+        // banner must never render, while on API 37 all of `SHOULD_REQUEST`/`BLOCKED`/`GRANTED`
+        // are reachable and the banner drives the real system dialog. One device cannot cover both
+        // halves; `CoreFlowE2ETest` asserts each half on the device that can actually reach it.
+        managedDevices {
+            localDevices {
+                create("api31") {
+                    device = "Pixel 6"
+                    sdkVersion = 31
+                    // aosp-atd, the fast path: Automated Test Device images strip the pre-installed
+                    // apps and Play services this app never touches. Verified rather than assumed —
+                    // the whole 70-test suite passes on `aosp_atd/arm64-v8a`, including
+                    // NotificationPosterInstrumentedTest and NotificationActionWiringInstrumentedTest,
+                    // so real posted notifications and real PendingIntent dispatch both work on the
+                    // stripped image. It needs no permission dialog at all, which is why ATD is safe
+                    // on this leg specifically: below API 33 there is no runtime notification
+                    // permission to prompt for.
+                    systemImageSource = "aosp-atd"
+                }
+                create("api37") {
+                    device = "Pixel 6"
+                    sdkVersion = 37
+                    // NOT aosp-atd, and the reason is availability rather than preference: Google
+                    // publishes no ATD image at API 37 at all. `sdkmanager --list` offers exactly
+                    // `google_apis`, `google_apis_ps16k`, `google_apis_playstore`,
+                    // `google_apis_playstore_ps16k` and `android-wear-signed` for android-37.0 —
+                    // there is no `aosp_atd` or `google_atd` entry to select, and asking for one
+                    // fails setup before a single test runs. `google_apis` is the lightest image
+                    // that does exist, and it carries the `com.android.permissioncontroller`
+                    // package whose dialog this leg has to tap.
+                    systemImageSource = "google_apis"
+                    // Pinned rather than left to DEFAULT_FOR_SDK_VERSION: above API 35 the default
+                    // cannot determine the certified image offline and warns on every run. 4KB is
+                    // the alignment of the `google_apis` image selected above.
+                    pageAlignment = com.android.build.api.dsl.ManagedVirtualDevice.PageAlignment.FORCE_4KB_PAGES
+                }
+            }
+            groups {
+                create("emulatorMatrix") {
+                    targetDevices.add(localDevices["api31"])
+                    targetDevices.add(localDevices["api37"])
+                }
+            }
+        }
     }
 
     sourceSets {
@@ -155,6 +207,10 @@ dependencies {
     // added here since this slice needs them for its own create/validate/archive-filter tests).
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    // `CoreFlowE2ETest` taps the REAL `POST_NOTIFICATIONS` dialog. That dialog belongs to
+    // `com.android.permissioncontroller`, a different process, so neither Compose's test rule nor
+    // Espresso can see it — UiAutomator is the only API in this project's test stack that can.
+    androidTestImplementation(libs.androidx.test.uiautomator)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     // Registers the test-only ComponentActivity ui-test-junit4's createComposeRule launches into.

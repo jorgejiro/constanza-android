@@ -21,6 +21,11 @@ coroutinesTest = "1.11.0"
 detekt = "1.23.8"
 androidxTestRunner = "1.7.0"
 androidxTestExtJunit = "1.3.0"
+# Ships on its own release train, independent of androidx.test's runner/core/ext-junit versions
+# above, so it gets its own ref rather than reusing androidxTestRunner. Needed to drive the REAL
+# `POST_NOTIFICATIONS` system dialog, which lives in another process and is therefore invisible to
+# Compose's test rule and to Espresso.
+androidxTestUiautomator = "2.4.0"
 # Not managed by the Compose BOM (§2): androidx.lifecycle ships its own release train.
 lifecycleViewmodelCompose = "2.11.0"
 # Work unit 7: matches the version already forced in app/build.gradle.kts's
@@ -60,6 +65,7 @@ androidx-hilt-compiler = { group = "androidx.hilt", name = "hilt-compiler", vers
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidxTestRunner" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
+androidx-test-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "androidxTestUiautomator" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" }
