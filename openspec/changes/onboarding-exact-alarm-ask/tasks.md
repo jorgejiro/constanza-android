@@ -31,43 +31,43 @@ actually judged against is the code-only figure above, which clears 800 comforta
 | C | First `androidTest/.../onboarding/` package | N/A (compose-only tests) | `./gradlew :app:emulatorMatrixGroupDebugAndroidTest` (API 31 + API 37, nothing attached) | Delete the new package |
 
 ## Phase 1 — Enum Rename (own commit, mechanical)
-- [ ] 1.1 `app/src/main/kotlin/.../onboarding/OnboardingViewModel.kt`: rename `OnboardingPage.Notifications`→`Permissions`; update KDoc and the `buildList` call site.
-- [ ] 1.2 `app/src/main/kotlin/.../onboarding/OnboardingScreen.kt`: rename `OnboardingNotificationsPage`→`OnboardingPermissionsPage`.
-- [ ] 1.3 `app/src/main/kotlin/.../onboarding/OnboardingRoute.kt`: update the `when` branch to `Permissions`/`OnboardingPermissionsPage`.
-- [ ] 1.4 `app/src/test/kotlin/.../onboarding/OnboardingUiStateTest.kt` and `OnboardingViewModelTest.kt`: update enum references.
+- [x] 1.1 `app/src/main/kotlin/.../onboarding/OnboardingViewModel.kt`: rename `OnboardingPage.Notifications`→`Permissions`; update KDoc and the `buildList` call site.
+- [x] 1.2 `app/src/main/kotlin/.../onboarding/OnboardingScreen.kt`: rename `OnboardingNotificationsPage`→`OnboardingPermissionsPage`.
+- [x] 1.3 `app/src/main/kotlin/.../onboarding/OnboardingRoute.kt`: update the `when` branch to `Permissions`/`OnboardingPermissionsPage`.
+- [x] 1.4 `app/src/test/kotlin/.../onboarding/OnboardingUiStateTest.kt` and `OnboardingViewModelTest.kt`: update enum references.
 - Verify: `./gradlew :app:testDebugUnitTest --tests "com.jjrapps.constanza.onboarding.*"`.
 
 ## Phase 2 — ViewModel: AlarmScheduler + Applicability
 (Req: onboarding — Two-Screen Flow, Applicability-Derived)
-- [ ] 2.1 `OnboardingViewModel.kt`: inject `AlarmScheduler`; add `canScheduleExactAlarms: Boolean` to `OnboardingUiState`; widen `includesPermissionPage` to `notificationApplicable || !alarmScheduler.canScheduleExactAlarms()`.
-- [ ] 2.2 **Same commit as 2.1** — `OnboardingViewModelTest.kt`: add an `alarmScheduler` param to `buildViewModel`, defaulted to `mockk { every { canScheduleExactAlarms() } returns true }` (mirrors `TodayViewModelTest.kt:333-334`). Do this before any row UI lands: a relaxed `mockk`'s default `false` would silently arm the new row in every existing test.
-- [ ] 2.3 Rename `refreshPermission()`→`refresh()`, reading both sources in one `combine`; update `OnboardingRoute.kt`'s `ON_RESUME` call site.
-- [ ] 2.4 Add unit cases: API-31-fresh-install leg (`NOT_APPLICABLE` + granted → `[Intro]`); API-31-revoked leg (`NOT_APPLICABLE` + denied → `[Intro, Permissions]`); `refresh()` updates both facts from one call.
+- [x] 2.1 `OnboardingViewModel.kt`: inject `AlarmScheduler`; add `canScheduleExactAlarms: Boolean` to `OnboardingUiState`; widen `includesPermissionPage` to `notificationApplicable || !alarmScheduler.canScheduleExactAlarms()`.
+- [x] 2.2 **Same commit as 2.1** — `OnboardingViewModelTest.kt`: add an `alarmScheduler` param to `buildViewModel`, defaulted to `mockk { every { canScheduleExactAlarms() } returns true }` (mirrors `TodayViewModelTest.kt:333-334`). Do this before any row UI lands: a relaxed `mockk`'s default `false` would silently arm the new row in every existing test.
+- [x] 2.3 Rename `refreshPermission()`→`refresh()`, reading both sources in one `combine`; update `OnboardingRoute.kt`'s `ON_RESUME` call site.
+- [x] 2.4 Add unit cases: API-31-fresh-install leg (`NOT_APPLICABLE` + granted → `[Intro]`); API-31-revoked leg (`NOT_APPLICABLE` + denied → `[Intro, Permissions]`); `refresh()` updates both facts from one call.
 - Verify: `./gradlew :app:testDebugUnitTest --tests "com.jjrapps.constanza.onboarding.*"`.
 
 ## Phase 3 — Exact-Alarm Row
 (Req: onboarding — Exact-Alarm Onboarding Row [ADDED]; Non-Blocking Permission Ask)
-- [ ] 3.1 `OnboardingPermissionAction.kt`: add `OnboardingExactAlarmAction(canSchedule: Boolean)` — own `LocalContext`; granted → confirmation `Text`; denied → body `Text` + filled `Button` → `startActivity(ACTION_REQUEST_SCHEDULE_EXACT_ALARM, "package:$packageName")`. No launcher, no callback (Decision 6).
-- [ ] 3.2 `res/values/strings.xml`: add 3 keys for the row's granted body, denied body, and action label, stating reminders still arrive (degraded), never that they stop; change `today_exact_alarm_banner_action` value `Fix`→`Open settings` (key unchanged, `TodayBanners.kt` untouched).
-- [ ] 3.3 `OnboardingScreen.kt`: `OnboardingPermissionsPage` hosts both rows split by `Spacing.md`, notification row first (spec ordering).
-- [ ] 3.4 `OnboardingRoute.kt`: pass `state.canScheduleExactAlarms` into the page.
+- [x] 3.1 `OnboardingPermissionAction.kt`: add `OnboardingExactAlarmAction(canSchedule: Boolean)` — own `LocalContext`; granted → confirmation `Text`; denied → body `Text` + filled `Button` → `startActivity(ACTION_REQUEST_SCHEDULE_EXACT_ALARM, "package:$packageName")`. No launcher, no callback (Decision 6).
+- [x] 3.2 `res/values/strings.xml`: add 3 keys for the row's granted body, denied body, and action label, stating reminders still arrive (degraded), never that they stop; change `today_exact_alarm_banner_action` value `Fix`→`Open settings` (key unchanged, `TodayBanners.kt` untouched).
+- [x] 3.3 `OnboardingScreen.kt`: `OnboardingPermissionsPage` hosts both rows split by `Spacing.md`, notification row first (spec ordering).
+- [x] 3.4 `OnboardingRoute.kt`: pass `state.canScheduleExactAlarms` into the page.
 - Verify: `./gradlew :app:testDebugUnitTest --tests "com.jjrapps.constanza.onboarding.*"` (compose-only change; behavior proven in Phase 4).
 
 ## Phase 4 — Instrumented Coverage
 (new `androidTest/.../onboarding/` package — does not exist today)
-- [ ] 4.1 Create package `app/src/androidTest/kotlin/com/jjrapps/constanza/onboarding/`.
-- [ ] 4.2 `OnboardingComposeTest.kt` (new): render `OnboardingPermissionsPage`/`OnboardingScaffold` over hand-built `OnboardingUiState` — never bare-construct `OnboardingViewModel` (it is in `ViewModelTeardownCallSiteTest.GUARDED_VIEW_MODELS`, and the only exemption drags in an unrelated Room fixture). Assert both rows render, row order, degradation copy, primary action stays present+enabled across all 4 live-state combinations.
-- [ ] 4.3 Assert the granted state renders only a confirmation line, no button (Decision 2).
-- [ ] 4.4 Assert non-auto-launch: compose the denied state, idle, assert `UiDevice.currentPackageName` (per `e2e/SystemPermissionDialog.kt`) is still this app's package.
+- [x] 4.1 Create package `app/src/androidTest/kotlin/com/jjrapps/constanza/onboarding/`.
+- [x] 4.2 `OnboardingComposeTest.kt` (new): render `OnboardingPermissionsPage`/`OnboardingScaffold` over hand-built `OnboardingUiState` — never bare-construct `OnboardingViewModel` (it is in `ViewModelTeardownCallSiteTest.GUARDED_VIEW_MODELS`, and the only exemption drags in an unrelated Room fixture). Assert both rows render, row order, degradation copy, primary action stays present+enabled across all 4 live-state combinations.
+- [x] 4.3 Assert the granted state renders only a confirmation line, no button (Decision 2).
+- [x] 4.4 Assert non-auto-launch: compose the denied state, idle, assert `UiDevice.currentPackageName` (per `e2e/SystemPermissionDialog.kt`) is still this app's package.
 - Verify: `./gradlew :app:emulatorMatrixGroupDebugAndroidTest` (API 31 + API 37, nothing attached — the binding convention for both API-conditional legs).
 
 ## Phase 5 — reminder-delivery Delta: Confirm, Don't Re-Test
-- [ ] 5.1 Confirm `TodayViewModelTest.kt:222-247` already proves "Banner renders/disappears on live `canScheduleExactAlarms`" (Req: Exact-Alarm Banner, Standing Fallback [ADDED]) — no new test needed; `AlarmScheduler.kt`/`TodayBanners.kt` are unmodified.
-- [ ] 5.2 Confirm by inspection that the new `AlarmScheduler` collaborator on `OnboardingViewModel` has no `record*`/persisted method, unlike `recordRequestedNotificationPermission` — this absence of coupling is what proves "declining onboarding's offer costs nothing later" and "does not suppress the banner." **This is an architectural proof, not a unit test** — record it in the PR description, not as a test file.
+- [x] 5.1 Confirm `TodayViewModelTest.kt:222-247` already proves "Banner renders/disappears on live `canScheduleExactAlarms`" (Req: Exact-Alarm Banner, Standing Fallback [ADDED]) — no new test needed; `AlarmScheduler.kt`/`TodayBanners.kt` are unmodified.
+- [x] 5.2 Confirm by inspection that the new `AlarmScheduler` collaborator on `OnboardingViewModel` has no `record*`/persisted method, unlike `recordRequestedNotificationPermission` — this absence of coupling is what proves "declining onboarding's offer costs nothing later" and "does not suppress the banner." **This is an architectural proof, not a unit test** — record it in the PR description, not as a test file.
 
 ## Phase 6 — Full Regression
-- [ ] 6.1 `./gradlew check` (unit tests + lint + detekt) — runs no instrumented test.
-- [ ] 6.2 `./gradlew :app:emulatorMatrixGroupDebugAndroidTest` — the only command that proves either API-conditional leg; `check` alone proves nothing instrumented.
+- [x] 6.1 `./gradlew check` (unit tests + lint + detekt) — runs no instrumented test.
+- [x] 6.2 `./gradlew :app:emulatorMatrixGroupDebugAndroidTest` — the only command that proves either API-conditional leg; `check` alone proves nothing instrumented.
 
 ## Promise Coverage
 
