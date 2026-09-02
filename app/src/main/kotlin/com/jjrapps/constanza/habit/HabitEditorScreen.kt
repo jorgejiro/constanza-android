@@ -2,6 +2,7 @@
 
 package com.jjrapps.constanza.habit
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,11 +15,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -59,11 +66,26 @@ import com.jjrapps.constanza.core.ui.theme.HabitPalette
  * Keying `rememberSaveable` on [habitId] means navigating to a genuinely different habit still
  * re-initializes correctly, while a same-habit config change restores `hasInitialized = true` and
  * leaves the already-in-progress state alone. Found via task 6a.7's own rotation test.
+ *
+ * **[onBack] and the discard confirmation (carried-forward item
+ * `habit-editor-has-no-cancel-affordance`).** Before this, the only exit from the editor was a
+ * successful [onDone]; the top bar had no navigation icon and nothing in the app handled system
+ * back, so backing out of a half-filled form closed the whole app. [onBack] follows the same
+ * hoisted-callback convention [com.jjrapps.constanza.progress.ProgressRoute] and
+ * [com.jjrapps.constanza.reminding.SnoozeSettingsRoute] already use.
+ *
+ * Leaving is immediate when nothing was touched ([HabitEditorUiState.isDirty] is `false`) — a
+ * confirmation on an untouched form is pure nagging. Otherwise the discard dialog is shown first.
+ * Its visibility is [rememberSaveable] here rather than ViewModel state for the same reason
+ * [hasInitialized] is: it is the container's navigation concern, and it must survive the
+ * configuration change that disposes this composition, so a rotation with the dialog open does not
+ * silently drop the question the user was answering.
  */
 @Composable
 fun HabitEditorRoute(
     habitId: Long?,
     onDone: () -> Unit,
+    onBack: () -> Unit,
     viewModel: HabitEditorViewModel = hiltViewModel(),
 ) {
     var hasInitialized by rememberSaveable(habitId) { mutableStateOf(false) }
@@ -77,6 +99,22 @@ fun HabitEditorRoute(
         viewModel.events.collect { onDone() }
     }
     val state by viewModel.uiState.collectAsState()
+    var showDiscardDialog by rememberSaveable { mutableStateOf(false) }
+    val requestBack = { if (state.isDirty) showDiscardDialog = true else onBack() }
+
+    // The first BackHandler in this codebase, and the reason the rest of the app does not need one:
+    // every other screen is either the Activity's start destination (Today, where the platform
+    // default of finishing the Activity IS the right behaviour) or a leaf whose only unsaved state
+    // is nothing at all. This editor is the one screen holding work the user can lose, so it is the
+    // one screen that has to intercept the gesture instead of letting it reach the Activity. Kept
+    // here, in the container, so HabitEditorScreen stays presentational and the icon and the
+    // gesture provably share one code path: both call requestBack.
+    //
+    // Disabled while the dialog is up so the two do not stack. The dialog is its own window and
+    // handles back through onDismissRequest; leaving this enabled would be a second handler
+    // competing for the same gesture the moment that stops being true.
+    BackHandler(enabled = !showDiscardDialog) { requestBack() }
+
     HabitEditorScreen(
         state = state,
         actions = HabitEditorActions(
@@ -85,7 +123,14 @@ fun HabitEditorRoute(
             onColorChange = viewModel::onColorChange,
             onNotesChange = viewModel::onNotesChange,
             onSave = viewModel::save,
+            onBackRequest = requestBack,
+            onDiscardConfirm = {
+                showDiscardDialog = false
+                onBack()
+            },
+            onDiscardDismiss = { showDiscardDialog = false },
         ),
+        showDiscardDialog = showDiscardDialog,
         onScheduleParamChange = viewModel::onScheduleParamChange,
         onSlotAction = viewModel::onSlotAction,
     )
@@ -99,6 +144,11 @@ data class HabitEditorActions(
     val onColorChange: (Int) -> Unit,
     val onNotesChange: (String) -> Unit,
     val onSave: () -> Unit,
+    /** The back arrow. Whether it leaves straight away or opens the discard dialog is the
+     *  container's decision, not this screen's — see [HabitEditorRoute]. */
+    val onBackRequest: () -> Unit = {},
+    val onDiscardConfirm: () -> Unit = {},
+    val onDiscardDismiss: () -> Unit = {},
 )
 
 /** Presentational: state in, callbacks out, no dependencies of its own. No fixed orientation and
@@ -115,64 +165,91 @@ fun HabitEditorScreen(
     actions: HabitEditorActions,
     onScheduleParamChange: (ScheduleParamAction) -> Unit,
     onSlotAction: (SlotAction) -> Unit,
+    showDiscardDialog: Boolean = false,
 ) {
     val titleRes = if (state.habitId == null) {
         R.string.habit_editor_title_create
     } else {
         R.string.habit_editor_title_edit
     }
-    Scaffold(topBar = { HabitEditorTopBar(titleRes) }, containerColor = ConstanzaColors.Background) { padding ->
-        Column(
+    if (showDiscardDialog) {
+        DiscardChangesDialog(onConfirm = actions.onDiscardConfirm, onDismiss = actions.onDiscardDismiss)
+    }
+    Scaffold(
+        topBar = { HabitEditorTopBar(titleRes, actions.onBackRequest) },
+        containerColor = ConstanzaColors.Background,
+    ) { padding ->
+        HabitEditorForm(
+            state = state,
+            actions = actions,
+            onScheduleParamChange = onScheduleParamChange,
+            onSlotAction = onSlotAction,
+            modifier = Modifier.padding(padding),
+        )
+    }
+}
+
+/** The scrolling form itself, split out of [HabitEditorScreen] so that composable stays the
+ *  screen's frame — title, chrome, and the discard dialog — rather than growing past detekt's
+ *  `LongMethod` threshold every time a field is added. Same presentational contract: state in,
+ *  callbacks out. */
+@Composable
+private fun HabitEditorForm(
+    state: HabitEditorUiState,
+    actions: HabitEditorActions,
+    onScheduleParamChange: (ScheduleParamAction) -> Unit,
+    onSlotAction: (SlotAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
+    ) {
+        // Shared across all three text fields on purpose (task 6a.9): it holds WHICH field
+        // gained focus last, so a rotation restores the caret and keyboard where the user was
+        // rather than always to the name field.
+        val focusedFieldId = rememberSaveable { mutableStateOf<String?>(null) }
+        EditorNameField(
+            name = state.name,
+            onNameChange = actions.onNameChange,
+            nameError = state.nameError,
+            focusedFieldId = focusedFieldId,
+        )
+        OutlinedTextField(
+            value = state.question,
+            onValueChange = actions.onQuestionChange,
+            label = { Text(stringResource(R.string.habit_editor_question_label)) },
             modifier = Modifier
-                .padding(padding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            // Shared across all three text fields on purpose (task 6a.9): it holds WHICH field
-            // gained focus last, so a rotation restores the caret and keyboard where the user was
-            // rather than always to the name field.
-            val focusedFieldId = rememberSaveable { mutableStateOf<String?>(null) }
-            EditorNameField(
-                name = state.name,
-                onNameChange = actions.onNameChange,
-                nameError = state.nameError,
-                focusedFieldId = focusedFieldId,
-            )
-            OutlinedTextField(
-                value = state.question,
-                onValueChange = actions.onQuestionChange,
-                label = { Text(stringResource(R.string.habit_editor_question_label)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp)
-                    .then(focusRestoring(FIELD_QUESTION, focusedFieldId)),
-            )
-            OutlinedTextField(
-                value = state.notes,
-                onValueChange = actions.onNotesChange,
-                label = { Text(stringResource(R.string.habit_editor_notes_label)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp)
-                    .then(focusRestoring(FIELD_NOTES, focusedFieldId)),
-            )
-            Text(
-                stringResource(R.string.habit_editor_color_label),
-                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
-            )
-            ColorSwatchRow(selected = state.colorArgb, onColorChange = actions.onColorChange)
-            Text(
-                stringResource(R.string.habit_editor_schedule_label),
-                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
-            )
-            ScheduleSection(
-                state = state,
-                onScheduleParamChange = onScheduleParamChange,
-                onSlotAction = onSlotAction,
-            )
-            Button(onClick = actions.onSave, modifier = Modifier.padding(top = 24.dp)) {
-                Text(stringResource(R.string.habit_editor_save))
-            }
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+                .then(focusRestoring(FIELD_QUESTION, focusedFieldId)),
+        )
+        OutlinedTextField(
+            value = state.notes,
+            onValueChange = actions.onNotesChange,
+            label = { Text(stringResource(R.string.habit_editor_notes_label)) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+                .then(focusRestoring(FIELD_NOTES, focusedFieldId)),
+        )
+        Text(
+            stringResource(R.string.habit_editor_color_label),
+            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+        )
+        ColorSwatchRow(selected = state.colorArgb, onColorChange = actions.onColorChange)
+        Text(
+            stringResource(R.string.habit_editor_schedule_label),
+            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+        )
+        ScheduleSection(
+            state = state,
+            onScheduleParamChange = onScheduleParamChange,
+            onSlotAction = onSlotAction,
+        )
+        Button(onClick = actions.onSave, modifier = Modifier.padding(top = 24.dp)) {
+            Text(stringResource(R.string.habit_editor_save))
         }
     }
 }
@@ -186,10 +263,51 @@ fun HabitEditorScreen(
  *  every other top bar in the app (`ProgressScreen`, `SnoozeSettingsScreen`) the moment either of
  *  those needed a different tone, for no remaining reason. The composable extraction itself is kept
  *  — it still exists purely to hold [titleRes], the same reason `EditorNameField` is its own
- *  composable, not to hold a colour override. */
+ *  composable, not to hold a colour override.
+ *
+ *  The navigation icon is the editor's cancel affordance (carried-forward item
+ *  `habit-editor-has-no-cancel-affordance`). It is an icon here rather than the `actions`-slot
+ *  "Back" text button `ProgressScreen`/`SnoozeSettingsScreen` use: those two are read-only leaves
+ *  where back is a minor action, while this screen's whole purpose is a form the user may need to
+ *  abandon, and the leading navigation slot is where every Android user already looks for that.
+ *  [Icons.AutoMirrored.Filled.ArrowBack] ships in `material-icons-core`, the only icon artifact
+ *  this project depends on (`app/build.gradle.kts`), so no new dependency is pulled in; the
+ *  auto-mirrored variant flips itself in right-to-left locales. `contentDescription` reuses the
+ *  existing `action_back` string rather than adding a second resource with the same word in it. */
 @Composable
-private fun HabitEditorTopBar(titleRes: Int) {
-    TopAppBar(title = { Text(stringResource(titleRes)) })
+private fun HabitEditorTopBar(titleRes: Int, onBack: () -> Unit) {
+    TopAppBar(
+        title = { Text(stringResource(titleRes)) },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.action_back),
+                )
+            }
+        },
+    )
+}
+
+/** The discard confirmation (carried-forward item `habit-editor-has-no-cancel-affordance`). Shown
+ *  only when the form is actually dirty — [HabitEditorRoute] makes that call, this composable only
+ *  renders. A plain M3 [AlertDialog]: every colour role it reads (`surfaceContainerHigh`, `scrim`,
+ *  `onSurface`, `onSurfaceVariant`, `primary`) is already audited in `core/ui/theme/Theme.kt`, and
+ *  `DataPortabilityScreen`'s import confirmation is the same shape, so this introduces no new
+ *  theming surface. The dismiss button reuses `action_cancel` for the same reason that one does. */
+@Composable
+private fun DiscardChangesDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.habit_editor_discard_title)) },
+        text = { Text(stringResource(R.string.habit_editor_discard_body)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.habit_editor_discard_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
 }
 
 /**

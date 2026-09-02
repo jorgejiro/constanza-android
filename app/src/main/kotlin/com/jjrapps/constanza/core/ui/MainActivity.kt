@@ -93,9 +93,15 @@ private fun ConstanzaApp() {
             onShowProgress = { habitId -> route = ConstanzaRoute.Progress(habitId) },
         )
 
+        // onBack mirrors onDone deliberately: both land back on the habit list, the only place
+        // this route is ever entered from. They stay two callbacks rather than one because they
+        // are two different questions — "saved, move on" and "abandoned, go back" — and the editor
+        // has to be able to ask them separately to decide whether to confirm the discard first
+        // (carried-forward item habit-editor-has-no-cancel-affordance).
         is ConstanzaRoute.HabitEditor -> HabitEditorRoute(
             habitId = current.habitId,
             onDone = { route = ConstanzaRoute.HabitList },
+            onBack = { route = ConstanzaRoute.HabitList },
         )
 
         is ConstanzaRoute.Progress -> ProgressRoute(

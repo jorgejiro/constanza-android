@@ -28,6 +28,13 @@
     <string name="habit_editor_color_label">Colour</string>
     <string name="habit_editor_save">Save</string>
 
+    <!-- habit-management: leaving the editor without saving (carried-forward item
+         habit-editor-has-no-cancel-affordance). The back arrow's contentDescription reuses
+         action_back and the dialog's dismiss button reuses action_cancel. -->
+    <string name="habit_editor_discard_title">Discard changes?</string>
+    <string name="habit_editor_discard_body">This habit has unsaved changes. Leaving now discards them.</string>
+    <string name="habit_editor_discard_confirm">Discard</string>
+
     <!-- habit-scheduling: schedule-kind picker and per-kind parameter editors (task 6a.1, slice ii-a). -->
     <string name="habit_editor_schedule_label">Frequency</string>
     <string name="schedule_kind_daily">Daily</string>

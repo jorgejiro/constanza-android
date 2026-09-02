@@ -1,7 +1,9 @@
 package com.jjrapps.constanza.habit
 
 import com.jjrapps.constanza.core.time.TimeProvider
+import com.jjrapps.constanza.core.ui.theme.HabitPalette
 import com.jjrapps.constanza.domain.model.Habit
+import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -399,6 +401,225 @@ class HabitEditorViewModelTest {
             habitRepository.create(any(), any(), match { it.size == 1 && it.single().enabled })
         }
     }
+
+    // --- Carried-forward item habit-editor-has-no-cancel-affordance: derived dirty state ---
+    //
+    // The editor's back affordance asks the ViewModel one question — "has the user touched
+    // anything?" — and confirms the discard only when the answer is yes. These cover both halves
+    // of that answer per field, because the failure that matters is not "dirty never fires", it is
+    // "dirty fires for a field nobody edited" (nagging) or "stays false for one that was"
+    // (silent data loss). The last-value-restored cases are what a `dirty = true` latch could
+    // never satisfy, and are the reason the flag is derived from a whole-state comparison.
+
+    @Test
+    fun `a freshly opened create form is not dirty`() = runTest {
+        val viewModel = newViewModel()
+
+        viewModel.startCreate()
+
+        assertFalse(viewModel.uiState.value.isDirty)
+    }
+
+    @Test
+    fun `typing a name makes the form dirty and clearing it back to empty makes it clean again`() = runTest {
+        val viewModel = newViewModel()
+
+        viewModel.onNameChange("Drink water")
+        assertTrue(viewModel.uiState.value.isDirty)
+
+        viewModel.onNameChange("")
+        assertFalse(viewModel.uiState.value.isDirty)
+    }
+
+    @Test
+    fun `editing the guiding question makes the form dirty and undoing it makes it clean again`() = runTest {
+        val viewModel = newViewModel()
+
+        viewModel.onQuestionChange("Did you?")
+        assertTrue(viewModel.uiState.value.isDirty)
+
+        viewModel.onQuestionChange("")
+        assertFalse(viewModel.uiState.value.isDirty)
+    }
+
+    @Test
+    fun `editing the notes makes the form dirty and undoing it makes it clean again`() = runTest {
+        val viewModel = newViewModel()
+
+        viewModel.onNotesChange("Any book counts")
+        assertTrue(viewModel.uiState.value.isDirty)
+
+        viewModel.onNotesChange("")
+        assertFalse(viewModel.uiState.value.isDirty)
+    }
+
+    @Test
+    fun `picking a different colour makes the form dirty and picking the original back makes it clean`() = runTest {
+        val viewModel = newViewModel()
+        val original = viewModel.uiState.value.colorArgb
+        val other = HabitPalette.ARGB.first { it != original }
+
+        viewModel.onColorChange(other)
+        assertTrue(viewModel.uiState.value.isDirty)
+
+        viewModel.onColorChange(original)
+        assertFalse(viewModel.uiState.value.isDirty)
+    }
+
+    @Test
+    fun `switching the schedule kind makes the form dirty and switching back makes it clean again`() = runTest {
+        val viewModel = newViewModel() // starts as DAILY
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.WEEKLY))
+        assertTrue(viewModel.uiState.value.isDirty)
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.DAILY))
+        assertFalse(viewModel.uiState.value.isDirty)
+    }
+
+    @Test
+    fun `changing a schedule parameter without changing its kind still makes the form dirty`() = runTest {
+        val viewModel = newViewModel()
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.N_TIMES_PER_WEEK))
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.TimesPerWeek(5))
+
+        assertTrue(viewModel.uiState.value.isDirty)
+    }
+
+    @Test
+    fun `editing the EVERY_N_DAYS anchor text makes the form dirty even while it is unparsable`() = runTest {
+        val viewModel = newViewModel()
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.EVERY_N_DAYS))
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.AnchorDate("not-a-date"))
+
+        assertTrue(viewModel.uiState.value.isDirty)
+    }
+
+    @Test
+    fun `adding a reminder time makes the form dirty and removing it again makes it clean`() = runTest {
+        val viewModel = newViewModel()
+
+        viewModel.onSlotAction(SlotAction.Add)
+        assertTrue(viewModel.uiState.value.isDirty)
+
+        viewModel.onSlotAction(SlotAction.Remove(0))
+        assertFalse(viewModel.uiState.value.isDirty)
+    }
+
+    @Test
+    fun `rescheduling a loaded habit's reminder slot makes the form dirty and restoring its time cleans it`() =
+        runTest {
+            stubExistingHabit(
+                slots = listOf(
+                    ReminderSlot(
+                        id = 3L,
+                        habitId = EXISTING_HABIT_ID,
+                        minuteOfDay = MORNING_MINUTE_OF_DAY_TEST,
+                        enabled = true,
+                    ),
+                ),
+            )
+            val viewModel = newViewModel()
+            viewModel.startEdit(EXISTING_HABIT_ID)
+            assertFalse(viewModel.uiState.value.isDirty)
+
+            viewModel.onSlotAction(SlotAction.SetTime(0, MORNING_MINUTE_OF_DAY_TEST + 1))
+            assertTrue(viewModel.uiState.value.isDirty)
+
+            viewModel.onSlotAction(SlotAction.SetTime(0, MORNING_MINUTE_OF_DAY_TEST))
+            assertFalse(viewModel.uiState.value.isDirty)
+        }
+
+    @Test
+    fun `disabling a loaded habit's reminder slot makes the form dirty`() = runTest {
+        stubExistingHabit(
+            slots = listOf(
+                ReminderSlot(
+                    id = 3L,
+                    habitId = EXISTING_HABIT_ID,
+                    minuteOfDay = MORNING_MINUTE_OF_DAY_TEST,
+                    enabled = true,
+                ),
+            ),
+        )
+        val viewModel = newViewModel()
+        viewModel.startEdit(EXISTING_HABIT_ID)
+
+        viewModel.onSlotAction(SlotAction.SetEnabled(0, false))
+
+        assertTrue(viewModel.uiState.value.isDirty)
+    }
+
+    @Test
+    fun `a blocked save leaves an untouched form clean — a validation error is not an edit`() = runTest {
+        val viewModel = newViewModel()
+
+        viewModel.save() // blank name, rejected
+
+        assertTrue(viewModel.uiState.value.nameError)
+        assertFalse(viewModel.uiState.value.isDirty)
+    }
+
+    @Test
+    fun `a loaded existing habit starts clean and stays clean until a field actually changes`() = runTest {
+        stubExistingHabit()
+        val viewModel = newViewModel()
+
+        viewModel.startEdit(EXISTING_HABIT_ID)
+
+        assertFalse(viewModel.uiState.value.isDirty)
+    }
+
+    @Test
+    fun `renaming a loaded habit makes it dirty and restoring the loaded name makes it clean again`() = runTest {
+        stubExistingHabit()
+        val viewModel = newViewModel()
+        viewModel.startEdit(EXISTING_HABIT_ID)
+
+        viewModel.onNameChange("Read more")
+        assertTrue(viewModel.uiState.value.isDirty)
+
+        viewModel.onNameChange("Read")
+        assertFalse(viewModel.uiState.value.isDirty)
+    }
+
+    @Test
+    fun `a loaded habit's own schedule is the baseline, so re-picking its kind is not an edit`() = runTest {
+        stubExistingHabit()
+        val viewModel = newViewModel()
+        viewModel.startEdit(EXISTING_HABIT_ID) // loaded as WEEKLY(TUESDAY)
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.DAILY))
+        assertTrue(viewModel.uiState.value.isDirty)
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.WEEKLY))
+        viewModel.onScheduleParamChange(ScheduleParamAction.DayOfWeek(DayOfWeek.TUESDAY))
+        assertFalse(viewModel.uiState.value.isDirty)
+    }
+
+    private fun stubExistingHabit(slots: List<ReminderSlot> = emptyList()) {
+        val existing = Habit(
+            id = EXISTING_HABIT_ID,
+            name = "Read",
+            question = "Did you read?",
+            colorArgb = HabitPalette.DEFAULT,
+            notes = "Any book counts",
+            archived = false,
+            archivedAt = null,
+            createdAt = NOW,
+            sortOrder = 0,
+        )
+        coEvery { habitRepository.findById(EXISTING_HABIT_ID) } returns existing
+        coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns Schedule.Weekly(DayOfWeek.TUESDAY)
+        coEvery { habitRepository.findSlotsFor(EXISTING_HABIT_ID) } returns slots
+    }
 }
 
 private const val MINUTES_PER_DAY_TEST = 24 * 60
+
+/** The minute-of-day a newly added reminder slot defaults to (08:00), mirrored from the
+ *  ViewModel's own DEFAULT_MINUTE_OF_DAY so a slot-time edit can be expressed as a change away
+ *  from it. */
+private const val MORNING_MINUTE_OF_DAY_TEST = 480
