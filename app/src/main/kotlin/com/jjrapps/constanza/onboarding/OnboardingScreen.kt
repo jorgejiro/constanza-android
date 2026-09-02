@@ -67,11 +67,17 @@ internal fun OnboardingScaffold(
     }
 }
 
-/** design.md §12: active `primary`, inactive `outlineVariant` — a pager dot is a selection
- *  indicator, chrome per `ConstanzaColors.Accent`'s own KDoc, reached here through the M3 role,
- *  never the token directly. Renders only when [OnboardingUiState.showsProgress] is true (screen
- *  count > 1): a one-of-one indicator would tell the user there is somewhere else to go when
- *  there is not (design.md §7). */
+/** design.md §12: active `primary`, inactive `outline` — a pager dot is a selection indicator,
+ *  chrome per `ConstanzaColors.Accent`'s own KDoc, reached here through the M3 role, never the
+ *  token directly. Renders only when [OnboardingUiState.showsProgress] is true (screen count > 1):
+ *  a one-of-one indicator would tell the user there is somewhere else to go when there is not
+ *  (design.md §7).
+ *
+ *  The inactive dot reads `outline` (the control-stroke role) and NOT `outlineVariant`, which is
+ *  what it used to read. `outlineVariant` is the decorative-divider role and measures 1.26:1 on the
+ *  background, so the inactive dots were, quite literally, not on screen — "1 of 3" looked like
+ *  "1 of 1" with two smudges. A pager dot communicates state, so WCAG 2.1 SC 1.4.11's 3:1 floor
+ *  applies to it and the decorative exemption does not. `outline` clears that floor at 3.81:1. */
 @Composable
 private fun ProgressDots(pageCount: Int, currentIndex: Int) {
     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -79,7 +85,7 @@ private fun ProgressDots(pageCount: Int, currentIndex: Int) {
             val color = if (index == currentIndex) {
                 MaterialTheme.colorScheme.primary
             } else {
-                MaterialTheme.colorScheme.outlineVariant
+                MaterialTheme.colorScheme.outline
             }
             Box(modifier = Modifier.size(Dimens.PagerDot).background(color = color, shape = CircleShape))
         }
