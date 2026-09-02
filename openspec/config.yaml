@@ -22,6 +22,113 @@ carried_forward_open_items:
     decision. Item 7.5 was closed this way by warm-dark-design-system, which
     wrote the app's first Room migration and so met its owner condition.
   items:
+    - id: "post-notifications-never-requested"
+      title: "The app never requests POST_NOTIFICATIONS, so reminders are inert on a fresh API 33+ install"
+      status: open
+      severity: "highest of the open items — it silently disables the app's core feature"
+      origin: >
+        Found on 2026-09-02 by installing the debug build on the maintainer's own
+        Galaxy S25 (SM-S931B, API 36) to try the app. Measured on the device
+        immediately after a clean install: `POST_NOTIFICATIONS: granted=false`
+        and `AppSettings: com.jjrapps.constanza importance=NONE`. The maintainer
+        independently confirmed the behaviour from the other side: the only
+        permission prompt they ever saw was the exact-alarm deep link to a system
+        settings screen, never the native notification prompt.
+      reason: >
+        Nothing in the app asks. Verified across all of app/src/main: there is no
+        `rememberLauncherForActivityResult(RequestPermission())` anywhere, and no
+        Intent to ACTION_APP_NOTIFICATION_SETTINGS either. The only permission
+        launchers in the codebase are the SAF document pickers in
+        DataPortabilityScreen.kt. So canPost() returns false, NotificationPoster
+        correctly declines to post, and no reminder ever arrives — with no
+        in-app path out of the denied state.
+      not_a_spec_violation: >
+        Be precise about this. reminder-response's `Notification Permission
+        Scope` requires that delivery be GATED by the permission on API 33+,
+        that API 31-32 deliver with no prompt, and that a denial still leave the
+        today screen usable for in-app answering. All three are implemented and
+        its scenario passes. The spec never required the app to ASK. This is a
+        product gap whose promise lives in the code's own KDoc, the same shape as
+        the Theme.kt product-palette promise.
+      why_it_matters: >
+        Eleventh instance of this repository's defining failure mode. The logic
+        is already written and unit-tested: NotificationPermission.kt is a
+        four-state decision table whose SHOULD_REQUEST state is documented as
+        "the contextual moment to request", and
+        ReminderSettingsStore.recordRequestedNotificationPermission() exists for
+        the same caller. BOTH have zero production consumers — the only
+        reference to SHOULD_REQUEST outside its file is its own test. The class
+        KDoc names the owner: "the future onboarding/settings UI, work unit
+        6a/6b". Units 6a and 6b both shipped without it.
+      owner_condition: >
+        No blocker. A Today banner symmetric to the existing ExactAlarmBanner,
+        which is already the right pattern in this codebase: consult
+        NotificationPermission.decide(hasRequestedBefore); on SHOULD_REQUEST
+        launch the native POST_NOTIFICATIONS prompt and call
+        recordRequestedNotificationPermission() on return; on BLOCKED offer a
+        deep link to ACTION_APP_NOTIFICATION_SETTINGS, the same gesture the
+        exact-alarm banner uses; on GRANTED or NOT_APPLICABLE render nothing.
+    - id: "no-launcher-icon"
+      title: "The app ships with the stock Android launcher icon"
+      status: open
+      origin: >
+        Seen on the S25 on 2026-09-02: the app appears with the generic Android
+        robot in the launcher and in system settings.
+      reason: >
+        AndroidManifest.xml declares
+        `android:icon="@android:drawable/sym_def_app_icon"` and no mipmap
+        resources exist anywhere in app/src/main/res.
+      why_it_matters: >
+        Not cosmetic once there is a design system. The warm-dark identity now
+        has a defined accent and palette, and the launcher icon is the one place
+        a habit app is seen every day without being opened.
+      owner_condition: "Its own small PR. Needs an adaptive icon (foreground/background layers) plus a monochrome layer for themed icons."
+    - id: "release-build-never-produced"
+      title: "No release build has ever been assembled, and the R8 path is unexercised"
+      status: open
+      origin: "Found on 2026-09-02 while choosing a build type to install for hands-on testing."
+      reason: >
+        app/build.gradle.kts has no `signingConfigs` block, so a release APK
+        would be unsigned and uninstallable. Separately, the `release` build type
+        sets `isMinifyEnabled = true` and `isShrinkResources = true`, and that
+        configuration has never been built even once.
+      why_it_matters: >
+        R8 over Room, Hilt and kotlinx-serialization is exactly where
+        reflection-adjacent breakage hides, and none of it would be caught by
+        any current gate: `check` runs unit tests, lint and detekt on debug
+        sources only. Every test number this project has ever reported is from a
+        debug build. The first release build is therefore an unknown, and it sits
+        between here and any distribution.
+      owner_condition: >
+        Its own PR: add a signing config (a local keystore kept out of the repo),
+        assemble release, install it, and run the instrumented suite against the
+        minified build. Expect proguard rules to be needed.
+    - id: "exact-alarm-banner-false-positive-question"
+      title: "Unresolved: did the exact-alarm banner show on a device where the permission is allowed?"
+      status: open
+      severity: "unverified — an open question, not a confirmed defect"
+      origin: >
+        On 2026-09-02 the maintainer reported seeing a button in the app that led
+        to an OS settings screen, on a device where
+        `cmd appops get com.jjrapps.constanza SCHEDULE_EXACT_ALARM` reports
+        `allow`. TodayScreen renders the banner only under
+        `if (!state.canScheduleExactAlarms)`, and TodayUiState defaults that
+        field to `true`, so neither the granted state nor the pre-emission
+        default should have shown it.
+      reason: >
+        The evidence is ambiguous and the ambiguity is self-inflicted: a blind
+        `adb shell input tap` during exploration navigated the device into the
+        exact-alarm settings screen at around the same time, so it cannot now be
+        told apart from a banner tap. Do not record this as a bug on that basis.
+      why_it_matters: >
+        If the banner really does show while exact alarms are allowed, it tells
+        every user their reminders may be late when they will not be — and on One
+        UI, AlarmManager.canScheduleExactAlarms() diverging from the appop would
+        be worth knowing about in its own right.
+      owner_condition: >
+        Cheap to settle: install clean on a device with the appop allowed, launch,
+        screenshot before touching anything, and read whether the banner is
+        present. Do not blind-tap on someone's daily device.
     - id: "colour-dot-fold-unfold"
       title: "Habit colour dot across a real fold/unfold configuration change"
       status: blocked
