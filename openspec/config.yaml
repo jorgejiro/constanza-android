@@ -24,7 +24,7 @@ carried_forward_open_items:
   items:
     - id: "post-notifications-never-requested"
       title: "The app never requests POST_NOTIFICATIONS, so reminders are inert on a fresh API 33+ install"
-      status: open
+      status: resolved
       severity: "highest of the open items — it silently disables the app's core feature"
       origin: >
         Found on 2026-09-02 by installing the debug build on the maintainer's own
@@ -68,6 +68,37 @@ carried_forward_open_items:
         recordRequestedNotificationPermission() on return; on BLOCKED offer a
         deep link to ACTION_APP_NOTIFICATION_SETTINGS, the same gesture the
         exact-alarm banner uses; on GRANTED or NOT_APPLICABLE render nothing.
+      resolution: >
+        Shipped exactly as the owner condition describes, on branch
+        fix/request-post-notifications. TodayViewModel now injects
+        NotificationPermission and ReminderSettingsStore and folds
+        NotificationPermission.decide(hasRequestedNotificationPermission()) into
+        TodayUiState, re-reading it on ON_RESUME alongside the existing
+        exact-alarm re-check. TodayScreen renders a NotificationPermissionBanner
+        above the exact-alarm banner (a missing permission outranks a late one)
+        for SHOULD_REQUEST and BLOCKED only. SHOULD_REQUEST launches the native
+        prompt through rememberLauncherForActivityResult(RequestPermission())
+        and calls recordRequestedNotificationPermission() when the dialog
+        returns, whatever the user answered — the flag means "we have asked".
+        BLOCKED deep-links to ACTION_APP_NOTIFICATION_SETTINGS with
+        EXTRA_APP_PACKAGE. GRANTED and NOT_APPLICABLE render nothing.
+        NotificationPermission and recordRequestedNotificationPermission() now
+        have their first production consumers.
+      resolution_caveat: >
+        NOT confirmed on real hardware. No device is attached, so the verified
+        evidence is JVM-level only: :app:compileDebugKotlin,
+        :app:testDebugUnitTest (121 tests, 0 failures, including three new
+        TodayViewModelTest cases covering the decision reaching TodayUiState,
+        the ON_RESUME re-read, and the record-then-refresh transition from
+        SHOULD_REQUEST to BLOCKED), :app:detekt, :app:detektMain and
+        :app:lintDebug all pass. What is still unproven is the part that
+        originally failed on the device: that the native prompt actually appears
+        on a clean install on the Galaxy S25 (API 36) and that granting it
+        flips the channel out of importance=NONE. Re-run the original
+        measurement — clean install, launch, screenshot, then
+        `adb shell dumpsys package com.jjrapps.constanza | rg POST_NOTIFICATIONS`
+        and `adb shell dumpsys notification_manager | rg -A3 com.jjrapps.constanza`
+        — before treating this as closed on device.
     - id: "no-launcher-icon"
       title: "The app ships with the stock Android launcher icon"
       status: open
@@ -105,7 +136,7 @@ carried_forward_open_items:
         minified build. Expect proguard rules to be needed.
     - id: "exact-alarm-banner-false-positive-question"
       title: "Unresolved: did the exact-alarm banner show on a device where the permission is allowed?"
-      status: open
+      status: resolved
       severity: "unverified — an open question, not a confirmed defect"
       origin: >
         On 2026-09-02 the maintainer reported seeing a button in the app that led
@@ -129,6 +160,24 @@ carried_forward_open_items:
         Cheap to settle: install clean on a device with the appop allowed, launch,
         screenshot before touching anything, and read whether the banner is
         present. Do not blind-tap on someone's daily device.
+      resolution: >
+        Not a defect. Settled by the maintainer from their own side rather than
+        by a new measurement: the only prompt they ever saw was "a button in the
+        app leading to an OS settings screen", which is precisely ExactAlarmBanner
+        behaving as designed on a device where SCHEDULE_EXACT_ALARM was still
+        denied. The `cmd appops get com.jjrapps.constanza SCHEDULE_EXACT_ALARM`
+        reading of `allow` was taken AFTER they had granted the permission
+        through that very banner, so the reading and the banner describe two
+        different moments in time and never actually contradicted each other.
+        There is nothing left to reproduce: TodayScreen's
+        `if (!state.canScheduleExactAlarms)` gate and TodayUiState's `true`
+        default are correct as written.
+      process_note_preserved: >
+        The reason this stayed open as long as it did is worth keeping. A blind
+        `adb shell input tap` during exploration navigated the device into the
+        exact-alarm settings screen at about the same time, which made the
+        evidence unreadable and turned a non-event into an open question. Do not
+        blind-tap on someone's daily driver; take a screenshot and read it first.
     - id: "colour-dot-fold-unfold"
       title: "Habit colour dot across a real fold/unfold configuration change"
       status: blocked
