@@ -49,7 +49,7 @@ class OnboardingViewModelTest {
             },
         )
 
-        assertEquals(listOf(OnboardingPage.Intro, OnboardingPage.Notifications), viewModel.uiState.first().pages)
+        assertEquals(listOf(OnboardingPage.Intro, OnboardingPage.Permissions), viewModel.uiState.first().pages)
     }
 
     @Test

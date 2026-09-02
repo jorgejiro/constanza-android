@@ -48,7 +48,7 @@ fun OnboardingRoute(
     ) {
         when (state.page) {
             OnboardingPage.Intro -> OnboardingIntroPage()
-            OnboardingPage.Notifications -> OnboardingNotificationsPage(
+            OnboardingPage.Permissions -> OnboardingPermissionsPage(
                 permission = state.permission,
                 onPermissionRequested = viewModel::recordRequestedNotificationPermission,
             )

@@ -109,11 +109,12 @@ internal fun OnboardingIntroPage() {
     }
 }
 
-/** Screen 2 — API-conditional (design.md §7): present only when [OnboardingViewModel] includes
- *  [OnboardingPage.Notifications] in its page list. [permission] is the LIVE decision, re-read on
- *  `ON_RESUME` by the caller — this composable stays presentational, state in, callback out. */
+/** Screen 2 — applicability-derived (design.md §7): present only when [OnboardingViewModel]
+ *  includes [OnboardingPage.Permissions] in its page list. [permission] is the LIVE decision,
+ *  re-read on `ON_RESUME` by the caller — this composable stays presentational, state in, callback
+ *  out. */
 @Composable
-internal fun OnboardingNotificationsPage(
+internal fun OnboardingPermissionsPage(
     permission: NotificationPermissionDecision,
     onPermissionRequested: () -> Unit,
 ) {

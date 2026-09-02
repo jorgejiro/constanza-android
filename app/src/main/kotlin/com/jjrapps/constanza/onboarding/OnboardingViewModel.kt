@@ -14,10 +14,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** first-run-onboarding design.md §7: the two-screen, API-conditional flow.
- *  [OnboardingPage.Notifications] is the runtime-permission screen, present only on API 33+;
- *  [OnboardingPage.Intro] always exists. */
-enum class OnboardingPage { Intro, Notifications }
+/** first-run-onboarding design.md §7: the two-screen, applicability-derived flow.
+ *  [OnboardingPage.Permissions] is the permissions screen, present only when at least one of the
+ *  two asks it hosts currently applies and is not already satisfied; [OnboardingPage.Intro] always
+ *  exists. */
+enum class OnboardingPage { Intro, Permissions }
 
 /**
  * design.md §7 — everything the API 31-32 divergence can break is derived from [pages], never
@@ -61,7 +62,7 @@ class OnboardingViewModel @Inject constructor(
 
     private val pages: List<OnboardingPage> = buildList {
         add(OnboardingPage.Intro)
-        if (includesPermissionPage) add(OnboardingPage.Notifications)
+        if (includesPermissionPage) add(OnboardingPage.Permissions)
     }
 
     private val index = MutableStateFlow(0)

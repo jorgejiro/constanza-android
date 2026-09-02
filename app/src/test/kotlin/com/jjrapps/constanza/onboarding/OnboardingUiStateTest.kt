@@ -18,7 +18,7 @@ class OnboardingUiStateTest {
 
     @Test
     fun `with two pages, only the second index is the last page and progress shows`() {
-        val twoPages = listOf(OnboardingPage.Intro, OnboardingPage.Notifications)
+        val twoPages = listOf(OnboardingPage.Intro, OnboardingPage.Permissions)
 
         val onFirstPage = state(twoPages, index = 0)
         assertFalse(onFirstPage.isLastPage)
