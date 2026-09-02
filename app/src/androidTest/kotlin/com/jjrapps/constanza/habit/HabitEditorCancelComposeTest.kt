@@ -58,8 +58,9 @@ class HabitEditorCancelComposeTest {
 
     /** Built outside `setContent` for the reason `HabitEditorComposeTest` documents: a view model
      *  constructed in the content lambda is rebuilt on every recomposition and the editor would
-     *  silently lose the very state these scenarios are about. */
-    private fun newViewModel() = HabitEditorViewModel(fixture.habitRepository, fixture.timeProvider)
+     *  silently lose the very state these scenarios are about. Built through the fixture so its
+     *  scope is cancelled before the database closes — see [HabitRepositoryTestFixture.close]. */
+    private fun newViewModel() = fixture.habitEditorViewModel()
 
     private fun text(resId: Int) = ApplicationProvider.getApplicationContext<Context>().getString(resId)
 
