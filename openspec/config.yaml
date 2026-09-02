@@ -535,7 +535,7 @@ carried_forward_open_items:
 
     - id: "control-stroke-overrides-are-not-guarded-by-a-test"
       title: "Three call sites must opt into ConstanzaControlDefaults, and nothing fails if a fourth forgets"
-      status: open
+      status: resolved
       origin: >
         Recorded on 2026-09-02 by fix/control-contrast, as a known limit of the guard that change
         introduced rather than a discovery about existing code.
@@ -558,6 +558,83 @@ carried_forward_open_items:
         `FilterChipDefaults.filterChipBorder` would close it mechanically and is the cheapest real
         guard. Worth doing when a fourth such control appears, which is the point at which the
         convention stops being memorable from the three existing examples.
+      resolution: >
+        Closed on 2026-09-02 by test/guard-control-strokes with two guards, because the suggested
+        one turned out to close only half of it.
+
+        Guard 1, the detekt ban the owner_condition named, in `config/detekt/detekt.yml`:
+        `ForbiddenMethodCall` now forbids eight Material default border factories —
+        `ButtonDefaults.outlinedButtonBorder`, `FilterChipDefaults.filterChipBorder`,
+        `AssistChipDefaults.assistChipBorder`, `SuggestionChipDefaults.suggestionChipBorder`,
+        `InputChipDefaults.inputChipBorder`, `CardDefaults.outlinedCardBorder`,
+        `IconButtonDefaults.outlinedIconButtonBorder` and
+        `IconButtonDefaults.outlinedIconToggleButtonBorder`. Each carries a reason naming the token
+        it resolves to. The eight were chosen by reading the resolved tokens in
+        `material3-android-1.4.0-sources.jar` rather than by pattern-matching on names: every one
+        resolves to `ColorSchemeKeyTokens.OutlineVariant`. `OutlinedTextField` is deliberately not
+        banned, because `OutlinedTextFieldTokens.OutlineColor` resolves to `Outline`, the
+        control-stroke role, so its default is already correct here. `ControlDefaults.kt` is the
+        single exempted adapter, the same shape as `TimeProvider.kt` for the clock ban.
+
+        Guard 2, `ControlStrokeCallSiteTest`, which exists because guard 1 alone does not close the
+        item. The reported defect is a control added with NO border argument, and such a call site
+        calls nothing forbidden — the default is evaluated inside material3, so no banned name
+        appears in our source at all. Probed on exactly that: `OutlinedButton(onClick = {}) { Text(…) }`
+        planted in `core/ui/theme/` passes `:app:detektMain` cleanly. The test therefore asserts the
+        other direction, over `app/src/main/kotlin` as text: every call to any of eight guarded
+        composables must pass `border = ConstanzaControlDefaults.…`. It covers the three existing
+        call sites by construction, so an edit that strips the argument back off one of them fails
+        too, and it asserts its own reach (file count and a floor on call sites found) so a scan
+        that reads nothing cannot pass.
+      resolution_enabler: >
+        The detekt half needed a build fix first, and it retires a "KNOWN GAP" that
+        `app/build.gradle.kts` had recorded as an unfixable AGP 9 limitation. That comment said
+        `ForbiddenMethodCall` cannot fire in `:app` because the hand-rolled `detektMain` task
+        obtains no type resolution under AGP 9. The observation was right and the diagnosis was
+        wrong: the task's classpath was unreadable. `debugCompileClasspath` resolves to what the
+        dependency graph holds, which for an Android app is mostly `.aar` files — measured at 70 of
+        92 entries — and the Kotlin frontend cannot read an `.aar`. `android.jar` was missing
+        entirely. Requesting the `android-classes-jar` artifact view and adding
+        `androidComponents.sdkComponents.bootClasspath` fixes both, and semantic rules now resolve
+        Compose and AndroidX symbols. That is also why the old probe was so convincing:
+        `java.time.LocalDate.now()` needs no classpath entry, so the one symbol anybody thought to
+        plant was the one symbol that resolved either way.
+
+        Turning resolution on surfaced exactly one finding in existing code: `InjectDispatcher` on
+        `replanAsync`, the shared `goAsync()` helper behind five BroadcastReceivers. It is a
+        top-level private function with nowhere to inject, so it is excluded by file in the detekt
+        config with that reason stated, rather than the rule being switched off.
+
+        The side effect is that the clock ban is now genuinely enforced in `:app` instead of resting
+        on the TimeProvider convention and review, which is what the old comment said it rested on.
+      verified: >
+        Every claim above was probed in both directions rather than reasoned about.
+
+        Guard 1 fires: `border = ButtonDefaults.outlinedButtonBorder(enabled = true)` planted in
+        `core/ui/theme/GuardProbe.kt` fails `:app:detektMain` with
+        "The method `androidx.compose.material3.ButtonDefaults.outlinedButtonBorder` has been
+        forbidden". Removed, the task passes.
+
+        Guard 1's blind spot is real: `OutlinedButton(onClick = {}) { Text("probe") }`, with no
+        border argument, passes `:app:detektMain` — BUILD SUCCESSFUL. That is the planted defect
+        this item was filed about.
+
+        Guard 2 fires on that same snippet: `ControlStrokeCallSiteTest` fails with
+        "GuardProbe.kt:10 OutlinedButton(…)". It also fires on a border sourced from Material
+        (before that half was handed to detekt), on a correct border nested inside a content lambda
+        of an otherwise-unguarded control, and — the regression direction — on deleting
+        `border = ConstanzaControlDefaults.filterChipBorder(selected = isSelected)` from the
+        existing `ScheduleEditors.kt:232` chip, which failed with exactly that line.
+
+        The classpath fix was probed by subtraction: with the artifact view and the platform in
+        place, `ForbiddenMethodCall` fires on both `java.time.LocalDate.now()` and the real
+        `ButtonDefaults.outlinedButtonBorder` call in `ControlDefaults.kt:62`; with the artifact
+        view removed, the compose entry stops firing while `java.time` keeps firing; before either
+        change, neither fired.
+
+        Suite, all with no probe in the tree: `:app:detekt`, `:app:detektMain`, `:domain:detekt`,
+        `:domain:detektMain`, `:app:lintDebug` all BUILD SUCCESSFUL; `:app:testDebugUnitTest` 157
+        tests, 0 failures (155 before the 2 added here); `:domain:test` 52 tests, 0 failures.
 
 stack:
   status: ratified
