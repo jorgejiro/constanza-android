@@ -85,6 +85,12 @@
     <string name="today_exact_alarm_banner">Reminders may arrive a few minutes late on this device.</string>
     <string name="today_exact_alarm_banner_action">Fix</string>
 
+    <!-- reminder-response: Notification Permission Scope — the Today banner that asks for
+         POST_NOTIFICATIONS, or points at system settings once the system stops prompting. -->
+    <string name="today_notification_permission_banner">Reminders cannot reach you until notifications are allowed.</string>
+    <string name="today_notification_permission_allow">Allow</string>
+    <string name="today_notification_permission_open_settings">Open settings</string>
+
     <!-- habit-progress: Streak Calculation, Compliance Calculation (task 6b.4, OA-4 30-day window). -->
     <string name="progress_title">Progress</string>
     <string name="progress_no_schedule">No schedule found for this habit.</string>

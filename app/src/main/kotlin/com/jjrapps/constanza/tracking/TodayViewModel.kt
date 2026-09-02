@@ -6,6 +6,9 @@ import com.jjrapps.constanza.core.data.dao.EntryDao
 import com.jjrapps.constanza.core.data.dao.ReminderOccurrenceDao
 import com.jjrapps.constanza.core.time.TimeProvider
 import com.jjrapps.constanza.habit.HabitRepository
+import com.jjrapps.constanza.reminding.NotificationPermission
+import com.jjrapps.constanza.reminding.NotificationPermissionDecision
+import com.jjrapps.constanza.reminding.ReminderSettingsStore
 import com.jjrapps.constanza.scheduling.AlarmScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.ZoneId
@@ -18,20 +21,47 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/** Both permission-backed banners folded into one value before the screen-wide `combine`.
+ *  `combine`'s largest typed overload takes five flows and this screen already had five sources;
+ *  bundling the two banner flags keeps the outer `combine` typed rather than dropping to the
+ *  vararg overload, which erases every source to `Any?` and costs a cast per element. */
+private data class PermissionBanners(
+    val canScheduleExactAlarms: Boolean,
+    val notificationPermission: NotificationPermissionDecision,
+)
+
 /** Task 6b.1 (habit-entry-tracking: Day-Level Rollup and Per-Slot Display). [expandedHabitIds]
  *  is presented state only — which multi-slot rows the user opened — never persisted, since it is
  *  meaningless once the day rolls over. [answer] is the ONLY write path this screen uses; it
  *  always goes through [entryWriter] (task 6b.2), the same one the notification action route
  *  uses. [canScheduleExactAlarms] backs task 6b.9's non-blocking banner (design §12/§13.1); it is
  *  re-read via [refreshExactAlarmPermission], since the system permission can change while this
- *  screen is paused (the user granting it from Settings) with no Room write to react to. */
+ *  screen is paused (the user granting it from Settings) with no Room write to react to.
+ *
+ *  [notificationPermissionDecision] backs the second, more consequential banner: without
+ *  `POST_NOTIFICATIONS` no reminder arrives at all, so the Today screen is the one place that can
+ *  offer a way out of the denied state. It follows exactly the same re-read discipline as the
+ *  exact-alarm flag ([refreshNotificationPermission] on `ON_RESUME`), plus one extra write path —
+ *  [recordNotificationPermissionRequested] — because the "already asked once" flag is what lets
+ *  [NotificationPermission] tell `SHOULD_REQUEST` apart from `BLOCKED`. */
+// LongParameterList is suppressed here as a TRUE finding, not a false positive, and narrowly on
+// the constructor rather than anywhere wider: eight collaborators is genuinely at the edge, and
+// the honest reading is that [NotificationPermission] and [ReminderSettingsStore] are only ever
+// used as a pair (read the "already asked" flag, then decide) and would collapse into one injected
+// gate. That refactor is deliberately not folded into this fix, which is already the first
+// production consumer these two classes have ever had; it belongs in its own change, where the
+// exact-alarm side can be considered for the same treatment rather than leaving the screen with
+// one bundled permission collaborator and one raw one.
 @HiltViewModel
+@Suppress("LongParameterList")
 class TodayViewModel @Inject constructor(
     private val habitRepository: HabitRepository,
     private val entryDao: EntryDao,
     private val reminderOccurrenceDao: ReminderOccurrenceDao,
     private val entryWriter: EntryWriter,
     private val alarmScheduler: AlarmScheduler,
+    private val notificationPermission: NotificationPermission,
+    private val reminderSettingsStore: ReminderSettingsStore,
     private val timeProvider: TimeProvider,
 ) : ViewModel() {
 
@@ -39,13 +69,26 @@ class TodayViewModel @Inject constructor(
     private val expandedHabitIds = MutableStateFlow<Set<Long>>(emptySet())
     private val canScheduleExactAlarms = MutableStateFlow(alarmScheduler.canScheduleExactAlarms())
 
+    /** Seeded from the synchronous half of the decision only. `hasRequestedBefore` needs a suspend
+     *  DataStore read, so it is assumed `false` here and corrected by the `init` refresh below;
+     *  construction stays non-blocking. The seed is already correct whenever the permission is
+     *  granted or does not exist (both ignore the flag) — the flag only ever chooses between
+     *  `SHOULD_REQUEST` and `BLOCKED`, which is a difference of banner action, not of visibility. */
+    private val notificationPermissionDecision =
+        MutableStateFlow(notificationPermission.decide(hasRequestedBefore = false))
+
+    private val permissionBanners = combine(
+        canScheduleExactAlarms,
+        notificationPermissionDecision,
+    ) { exactAlarms, notifications -> PermissionBanners(exactAlarms, notifications) }
+
     val uiState: StateFlow<TodayUiState> = combine(
         habitRepository.observeAll(),
         entryDao.observeByDate(today.toString()),
         reminderOccurrenceDao.observeUnresolved(),
         expandedHabitIds,
-        canScheduleExactAlarms,
-    ) { habits, entriesToday, unresolved, expanded, exactAlarms ->
+        permissionBanners,
+    ) { habits, entriesToday, unresolved, expanded, banners ->
         val snapshot = TodaySnapshot(entriesToday, unresolved, today)
         val rows = habits.filterNot { it.archived }.mapNotNull { habit ->
             val schedule = habitRepository.findScheduleFor(habit.id) ?: return@mapNotNull null
@@ -56,9 +99,14 @@ class TodayViewModel @Inject constructor(
             rows = rows,
             expandedHabitIds = expanded,
             zone = timeProvider.zone(),
-            canScheduleExactAlarms = exactAlarms,
+            canScheduleExactAlarms = banners.canScheduleExactAlarms,
+            notificationPermission = banners.notificationPermission,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, TodayUiState(zone = timeProvider.zone()))
+
+    init {
+        refreshNotificationPermission()
+    }
 
     fun toggleExpanded(habitId: Long) = expandedHabitIds.update {
         if (habitId in it) it - habitId else it + habitId
@@ -75,6 +123,29 @@ class TodayViewModel @Inject constructor(
     fun refreshExactAlarmPermission() {
         canScheduleExactAlarms.value = alarmScheduler.canScheduleExactAlarms()
     }
+
+    /** The `POST_NOTIFICATIONS` counterpart of [refreshExactAlarmPermission], called from the same
+     *  `ON_RESUME` hook: the user can grant or revoke the permission from system settings — the
+     *  only route left once the decision is `BLOCKED` — and return with nothing to react to. */
+    fun refreshNotificationPermission() {
+        viewModelScope.launch { readNotificationPermission() }
+    }
+
+    /** Called once the native permission dialog has returned, whatever the user answered. The
+     *  persisted flag means "we have asked", not "the user agreed": that is precisely the state
+     *  [NotificationPermission] uses to approximate the system's no-more-prompting condition, so a
+     *  denial must record it too or the banner would keep offering a prompt that never appears. */
+    fun recordNotificationPermissionRequested() {
+        viewModelScope.launch {
+            reminderSettingsStore.recordRequestedNotificationPermission()
+            readNotificationPermission()
+        }
+    }
+
+    private suspend fun readNotificationPermission() {
+        notificationPermissionDecision.value =
+            notificationPermission.decide(reminderSettingsStore.hasRequestedNotificationPermission())
+    }
 }
 
 data class TodayUiState(
@@ -82,4 +153,7 @@ data class TodayUiState(
     val expandedHabitIds: Set<Long> = emptySet(),
     val zone: ZoneId = ZoneId.of("UTC"),
     val canScheduleExactAlarms: Boolean = true,
+    /** Defaults to [NotificationPermissionDecision.GRANTED] — the one value that renders nothing —
+     *  so no existing preview, test or pre-emission state shows a banner it never asked for. */
+    val notificationPermission: NotificationPermissionDecision = NotificationPermissionDecision.GRANTED,
 )
