@@ -413,7 +413,7 @@ carried_forward_open_items:
         an argued decision, not the silence it is today.
     - id: "today-row-answering-is-cramped-and-always-on"
       title: "Today's answer buttons never fit, and never go away once answered"
-      status: open
+      status: resolved
       severity: "this is the screen the app exists for, used every day"
       origin: >
         Reported by the maintainer on 2026-09-02 from a screenshot of their own
@@ -521,11 +521,44 @@ carried_forward_open_items:
         and after tapping Yes it reads "08:00 — Done", not "COMPLETED". The
         `uiautomator` dump backs the screenshot — all three labels 53px tall,
         right edge 998 of 1080.
-      still_open: >
-        Defect 3 only: all three actions still render on every slot, answered
-        or not. Unchanged, deliberately — it is the interaction redesign this
-        item's analysis_to_do describes and it touches published
-        `habit-entry-tracking` requirements.
+      resolution: >
+        Defect 3 closed by change `today-answered-slot-collapse` (PR #65, merged
+        2026-09-03), which is the interaction redesign this item's analysis_to_do
+        called for rather than a patch around it. An answered slot no longer
+        re-offers Yes / No / Skip: it names its own answer — "Done", "Missed" or
+        "Skipped", reusing the three strings defect 2 introduced — and offers
+        exactly one control to change it, which reopens that slot alone.
+
+        Three constraints were specified rather than left to the implementation,
+        because each is a way the obvious version would have been wrong. The
+        answered states are distinguished by text, never by colour or position
+        alone. The change control is reachable by a standard tap or an
+        accessibility-service action and never by a gesture, so a TalkBack user
+        can reopen a row at all. And each control's accessible label names its
+        own slot, so two answered slots on one habit do not both announce
+        "Change".
+
+        The published `habit-entry-tracking` requirements this touches were
+        widened rather than added: Slot Independence now covers presentation and
+        control set, not only the `Entry` row, and Day-Level Rollup now carries
+        the answered-state display rules. Four scenarios added, every existing
+        one preserved.
+      resolution_verified: >
+        `TodayAnsweredSlotComposeTest` covers the collapse, the three distinct
+        labels, sibling independence (reopening one answered slot leaves a
+        same-habit, same-date sibling collapsed), and the gesture-free
+        reachability of each control. Full matrix green on the merged content:
+        115 tests per leg on api31 and api37, 0 failures, 0 errors, with the
+        skips complementary by design — api31 skips the two runtime
+        `POST_NOTIFICATIONS` prompt tests that do not apply below API 33, api37
+        skips the one asserting that below 33 the permission screen is omitted.
+
+        One latent bug surfaced and was fixed with it: `slotStatusText` gained a
+        `bypassSnooze` parameter. Without it an answered slot carrying a live
+        snooze rendered "Pending, snoozed until 09:00" while holding a
+        `COMPLETED` entry — status text contradicting the row's own state. The
+        collapse made it visible; it was already wrong.
+
     - id: "no-launcher-icon"
       title: "The app ships with the stock Android launcher icon"
       status: resolved
@@ -1225,6 +1258,54 @@ carried_forward_open_items:
         `today-rows-are-built-from-tables-the-screen-does-not-observe` records
         the production-side fragility this investigation uncovered, which the
         test-side fix removes the trigger for but not the cause of.
+
+    - id: "today-never-rolls-over-at-midnight"
+      title: "TodayViewModel captures the date once at construction, so an open screen still shows yesterday after midnight"
+      status: open
+      severity: >
+        Reachable by an ordinary user with no unusual sequence: open the app
+        before midnight, leave it backgrounded, come back after. The screen is
+        the one the app exists for, and it silently shows the wrong day's
+        entries while looking completely normal.
+      origin: >
+        Found on 2026-09-03 while verifying the severity of
+        `today-rows-are-built-from-tables-the-screen-does-not-observe` rather
+        than taking it at face value. That item turned out to be a fragility no
+        production writer can reach; this one, found in the same file two lines
+        away, is a live defect and had never been recorded.
+      reason: >
+        `TodayViewModel.kt:79` reads `private val today = timeProvider.today()`
+        — a property initialiser, evaluated exactly once when Hilt constructs
+        the ViewModel. It then feeds `entryDao.observeByDate(today.toString())`,
+        so the Room flow is bound for the ViewModel's whole lifetime to the date
+        that was current at construction. A ViewModel survives configuration
+        changes and backgrounding; it dies only with its scope. Nothing
+        recomputes the date, and no source in the combine emits on a day change,
+        so no recomposition can correct it either.
+      why_it_matters: >
+        The failure is silent and durable, the same shape as this file's other
+        expensive lessons: not an error, but a screen that is quietly wrong. A
+        user who crosses midnight with the app open sees yesterday's slots,
+        answers them, and writes entries against yesterday's date. There is no
+        visible cue that the day on screen is not today.
+
+        Note the domain-side midnight rule is unaffected and already specified:
+        `habit-entry-tracking`'s Midnight Transition requirement governs
+        `UNKNOWN` becoming `MISSED`, and it is enforced elsewhere. This is
+        purely the screen failing to follow the clock.
+      owner_condition: >
+        Its own change. The date must become an observed source rather than a
+        captured value, which means the entry flow has to re-subscribe when the
+        day changes — `flatMapLatest` over a date flow, not another element in a
+        `combine` that is already at its largest typed overload. Two triggers are
+        worth weighing rather than assuming one: a timer scheduled to the next
+        local midnight, and the system's own `ACTION_DATE_CHANGED` /
+        `ACTION_TIMEZONE_CHANGED` broadcasts, which also cover a manual clock
+        change and travel across time zones that a pure timer misses. Whichever
+        is chosen it must go through `TimeProvider` — direct clock reads are
+        banned by detekt's `ForbiddenMethodCall` and the ban is enforced.
+        Do not close this with a poll or a refresh-on-resume alone: resume does
+        not fire for an app that is already foregrounded at midnight.
 
     - id: "today-rows-are-built-from-tables-the-screen-does-not-observe"
       title: "TodayViewModel reads each habit's schedule and slots imperatively inside a combine that observes neither table"
