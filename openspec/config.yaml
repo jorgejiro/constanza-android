@@ -375,6 +375,42 @@ carried_forward_open_items:
         quietly reintroduce the old shape. If this ever fires again, suspect the
         drain timing out silently first; that is the one path left where close()
         proceeds with work still in flight.
+    - id: "no-in-app-route-to-edit-a-past-day"
+      title: "Provisional-Missed Correction mandates an in-app past-day edit, and no screen can reach one"
+      status: open
+      origin: >
+        Found on 2026-09-03 while spec'ing today-answered-slot-collapse, when
+        the spec phase had to reason about whether that requirement needed a
+        delta. It does not — but checking why exposed this.
+      reason: >
+        habit-entry-tracking's `Provisional-Missed Correction` names three
+        paths that must be able to answer an already-resolved occurrence: from
+        a notification, from an import, and "a manual in-app edit of a past
+        day". The first two exist. The third has no surface.
+
+        `TodayViewModel` pins `private val today = timeProvider.today()` with
+        no date parameter, and the app's five routes — Today, HabitList,
+        HabitEditor(habitId), Progress(habitId), Settings — take no date
+        between them. `EntryWriter.writeEntry` accepts an arbitrary
+        `LocalDate`, and `EntryWriter.answerInApp` credits the originally
+        scheduled date correctly, so the write path is complete and correct.
+        Nothing can call it with a past date.
+      why_it_matters: >
+        The sixteenth instance of this repository's defining failure mode, and
+        the same shape as the eleventh: capability written, tested at the layer
+        below, and never given a caller. It is worse than a missing feature
+        because the spec asserts the route exists — a reader checking
+        compliance against the requirement would tick it.
+
+        Practically: a reminder missed while the phone was off resolves to
+        MISSED overnight, and the user has no way to correct it. The
+        notification is gone and Today only ever shows today.
+      owner_condition: >
+        Its own change, and it needs a product decision before a technical
+        one: whether Today gains date navigation, whether Progress becomes the
+        surface for it, or whether the requirement is narrowed to the two
+        routes that exist. Narrowing is a legitimate answer — but it has to be
+        an argued decision, not the silence it is today.
     - id: "today-row-answering-is-cramped-and-always-on"
       title: "Today's answer buttons never fit, and never go away once answered"
       status: open
