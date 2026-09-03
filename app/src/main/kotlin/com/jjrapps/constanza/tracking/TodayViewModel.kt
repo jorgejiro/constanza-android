@@ -30,6 +30,17 @@ private data class PermissionBanners(
     val notificationPermission: NotificationPermissionDecision,
 )
 
+/** today-answered-slot-collapse, design.md decision 5: [expandedHabitIds] and [reopenedSlots] are
+ *  bundled for the identical reason [PermissionBanners] is — the screen-wide `combine` below is
+ *  already at its five-typed-source ceiling, so a sixth source is folded into an existing shape
+ *  rather than dropping to the vararg overload, which erases every source to `Any?`. Both flags
+ *  are presented state only, never persisted, since neither means anything once the day rolls
+ *  over — the same reasoning [expandedHabitIds] already carried alone. */
+private data class ExpansionState(
+    val expandedHabitIds: Set<Long>,
+    val reopenedSlots: Set<TodaySlotKey>,
+)
+
 /** Task 6b.1 (habit-entry-tracking: Day-Level Rollup and Per-Slot Display). [expandedHabitIds]
  *  is presented state only — which multi-slot rows the user opened — never persisted, since it is
  *  meaningless once the day rolls over. [answer] is the ONLY write path this screen uses; it
@@ -67,6 +78,11 @@ class TodayViewModel @Inject constructor(
 
     private val today = timeProvider.today()
     private val expandedHabitIds = MutableStateFlow<Set<Long>>(emptySet())
+
+    /** today-answered-slot-collapse, design.md decision 1. Cleared per-slot by [answer], never
+     *  otherwise, and dies with this ViewModel — see [ExpansionState]'s KDoc and the design's note
+     *  on why `rememberSaveable` would restore a reopened slot against the wrong day. */
+    private val reopenedSlots = MutableStateFlow<Set<TodaySlotKey>>(emptySet())
     private val canScheduleExactAlarms = MutableStateFlow(alarmScheduler.canScheduleExactAlarms())
 
     /** Seeded from the synchronous half of the decision only. `hasRequestedBefore` needs a suspend
@@ -82,13 +98,18 @@ class TodayViewModel @Inject constructor(
         notificationPermissionDecision,
     ) { exactAlarms, notifications -> PermissionBanners(exactAlarms, notifications) }
 
+    private val expansionState = combine(
+        expandedHabitIds,
+        reopenedSlots,
+    ) { expanded, reopened -> ExpansionState(expanded, reopened) }
+
     val uiState: StateFlow<TodayUiState> = combine(
         habitRepository.observeAll(),
         entryDao.observeByDate(today.toString()),
         reminderOccurrenceDao.observeUnresolved(),
-        expandedHabitIds,
+        expansionState,
         permissionBanners,
-    ) { habits, entriesToday, unresolved, expanded, banners ->
+    ) { habits, entriesToday, unresolved, expansion, banners ->
         val snapshot = TodaySnapshot(entriesToday, unresolved, today)
         val rows = habits.filterNot { it.archived }.mapNotNull { habit ->
             val schedule = habitRepository.findScheduleFor(habit.id) ?: return@mapNotNull null
@@ -97,7 +118,8 @@ class TodayViewModel @Inject constructor(
         }
         TodayUiState(
             rows = rows,
-            expandedHabitIds = expanded,
+            expandedHabitIds = expansion.expandedHabitIds,
+            reopenedSlots = expansion.reopenedSlots,
             zone = timeProvider.zone(),
             canScheduleExactAlarms = banners.canScheduleExactAlarms,
             notificationPermission = banners.notificationPermission,
@@ -112,7 +134,17 @@ class TodayViewModel @Inject constructor(
         if (habitId in it) it - habitId else it + habitId
     }
 
+    /** today-answered-slot-collapse, design.md decision 1: reveals [slot]'s answer actions again.
+     *  Called only from the Change control on an answered slot. */
+    fun requestChange(key: TodaySlotKey) = reopenedSlots.update { it + key }
+
+    /** Removing [slot]'s key happens synchronously, BEFORE the write coroutine is launched
+     *  (design.md decision 4) — waiting for the Room round-trip would let the reopened buttons
+     *  linger for a frame after the tap that is meant to collapse them. If the write itself fails,
+     *  the slot still collapses back to its previous status with its own Change control intact, so
+     *  nothing here is unrecoverable. */
     fun answer(habitId: Long, slot: TodaySlot, status: InAppEntryStatus) {
+        reopenedSlots.update { it - slot.keyIn(habitId) }
         viewModelScope.launch {
             entryWriter.answerInApp(habitId, today, slot.slotId, status, slot.occurrenceId)
         }
@@ -151,6 +183,9 @@ class TodayViewModel @Inject constructor(
 data class TodayUiState(
     val rows: List<TodayHabitRow> = emptyList(),
     val expandedHabitIds: Set<Long> = emptySet(),
+    /** today-answered-slot-collapse, design.md decision 1: which answered slots currently show
+     *  their answer actions again instead of their status text and Change control. */
+    val reopenedSlots: Set<TodaySlotKey> = emptySet(),
     val zone: ZoneId = ZoneId.of("UTC"),
     val canScheduleExactAlarms: Boolean = true,
     /** Defaults to [NotificationPermissionDecision.GRANTED] — the one value that renders nothing —

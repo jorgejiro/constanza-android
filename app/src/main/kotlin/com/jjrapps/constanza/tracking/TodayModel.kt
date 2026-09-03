@@ -44,6 +44,18 @@ data class TodaySlot(
     val snoozedUntilEpochMs: Long?,
 )
 
+/** Identifies one slot across a reopen/re-answer round trip (today-answered-slot-collapse,
+ *  design.md decision 1). [slotId] mirrors [TodaySlot.slotId]'s own nullability rather than
+ *  coercing it to a sentinel: a habit with no enabled reminder slot has exactly one slot per day
+ *  (see [buildTodayHabitRow]), so `(habitId, null)` is already unambiguous, and a `Set<Long>` of
+ *  slot ids alone could not express that habit's key at all. An index key is rejected too —
+ *  disabling a slot reshuffles positions and would silently move a reopen flag onto a different
+ *  slot, while `slotId` is stable across that change. */
+data class TodaySlotKey(val habitId: Long, val slotId: Long?)
+
+/** This slot's key within [habitId], for the reopen set and the Change control's callback. */
+fun TodaySlot.keyIn(habitId: Long): TodaySlotKey = TodaySlotKey(habitId, slotId)
+
 /** Bundles the whole-database inputs [buildTodayHabitRow] needs, keeping its parameter count
  *  under detekt's `LongParameterList` threshold — same reasoning as `habit.HabitDaos`.
  *  [entriesToday]/[unresolvedOccurrences] are NOT pre-filtered to one habit; the caller passes

@@ -20,9 +20,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -66,6 +69,7 @@ fun TodayRoute(
         state = state,
         onToggleExpanded = viewModel::toggleExpanded,
         onAnswer = viewModel::answer,
+        onRequestChange = viewModel::requestChange,
         onManageHabits = onManageHabits,
         onAddHabit = onAddHabit,
         onOpenSettings = onOpenSettings,
@@ -87,11 +91,15 @@ fun TodayScreen(
     state: TodayUiState,
     onToggleExpanded: (Long) -> Unit,
     onAnswer: (Long, TodaySlot, InAppEntryStatus) -> Unit,
+    onRequestChange: (TodaySlotKey) -> Unit,
     onManageHabits: () -> Unit,
     onAddHabit: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onNotificationPermissionRequested: () -> Unit = {},
 ) {
+    val actions = remember(onRequestChange, onAnswer, state.reopenedSlots) {
+        SlotActions(state.reopenedSlots, onRequestChange, onAnswer)
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -108,16 +116,29 @@ fun TodayScreen(
         },
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
-            TodayContent(state, onToggleExpanded, onAnswer, onAddHabit, onNotificationPermissionRequested)
+            TodayContent(state, onToggleExpanded, actions, onAddHabit, onNotificationPermissionRequested)
         }
     }
 }
+
+/** today-answered-slot-collapse, design.md decision 5: one holder instead of two extra parameters
+ *  on both [HabitRollupRow] and [SlotRow], which would otherwise push each past detekt's
+ *  unconfigured `LongParameterList` default of 6 — and, one level up, past [TodayContent]'s own
+ *  threshold too, which is why this is built in [TodayScreen] and threaded down as one value rather
+ *  than passing `onAnswer`/`onRequestChange` separately. Built with `remember`, keyed on the
+ *  callbacks and the reopen set it carries — the callbacks are stable member references from the
+ *  ViewModel, and the set is what should actually invalidate a row's recomposition. */
+private data class SlotActions(
+    val reopenedKeys: Set<TodaySlotKey>,
+    val onRequestChange: (TodaySlotKey) -> Unit,
+    val onAnswer: (Long, TodaySlot, InAppEntryStatus) -> Unit,
+)
 
 @Composable
 private fun TodayContent(
     state: TodayUiState,
     onToggleExpanded: (Long) -> Unit,
-    onAnswer: (Long, TodaySlot, InAppEntryStatus) -> Unit,
+    actions: SlotActions,
     onAddHabit: () -> Unit,
     onNotificationPermissionRequested: () -> Unit,
 ) {
@@ -137,7 +158,7 @@ private fun TodayContent(
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item { TodayPermissionBanners(state, onNotificationPermissionRequested) }
         items(state.rows, key = { it.habitId }) { row ->
-            HabitRollupRow(row, row.habitId in state.expandedHabitIds, state.zone, onToggleExpanded, onAnswer)
+            HabitRollupRow(row, row.habitId in state.expandedHabitIds, state.zone, onToggleExpanded, actions)
         }
         item { TrailingAddHabitAction(onAddHabit) }
     }
@@ -151,7 +172,7 @@ private fun HabitRollupRow(
     expanded: Boolean,
     zone: ZoneId,
     onToggleExpanded: (Long) -> Unit,
-    onAnswer: (Long, TodaySlot, InAppEntryStatus) -> Unit,
+    actions: SlotActions,
 ) {
     if (row.slots.size <= 1) {
         val slot = row.slots.firstOrNull()
@@ -166,7 +187,7 @@ private fun HabitRollupRow(
                 HabitColorDot(row.colorArgb)
                 Text(row.habitName)
             }
-            if (slot != null) SlotRow(row.habitId, slot, zone, onAnswer)
+            if (slot != null) SlotRow(row, slot, zone, actions)
         }
         return
     }
@@ -181,19 +202,26 @@ private fun HabitRollupRow(
             },
         )
         if (expanded) {
-            row.slots.forEach { slot -> SlotRow(row.habitId, slot, zone, onAnswer, indented = true) }
+            row.slots.forEach { slot -> SlotRow(row, slot, zone, actions, indented = true) }
         }
     }
 }
 
+/** today-answered-slot-collapse, design.md decision 2: a pending slot ([EntryStatus.UNKNOWN]), or
+ *  one the user just asked to change via [SlotActions.reopenedKeys], keeps [AnswerButtons]
+ *  verbatim. Any other status instead shows the text naming its own answer plus one [ChangeButton]
+ *  — never both, and never Yes/No/Skip alongside a resolved status. [row] replaces the old bare
+ *  `habitId: Long` parameter because the Change control's accessible label needs the habit name
+ *  too (design.md decision 3), and this keeps the parameter count at 5 rather than adding a sixth. */
 @Composable
 private fun SlotRow(
-    habitId: Long,
+    row: TodayHabitRow,
     slot: TodaySlot,
     zone: ZoneId,
-    onAnswer: (Long, TodaySlot, InAppEntryStatus) -> Unit,
+    actions: SlotActions,
     indented: Boolean = false,
 ) {
+    val key = slot.keyIn(row.habitId)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -207,11 +235,17 @@ private fun SlotRow(
         // remainder, so "Skip" wrapped mid-word as "Ski / p" — reported from a real Galaxy S25.
         // The buttons keep their intrinsic width and the text wraps instead, which is the right way
         // round: a wrapped sentence is readable, a wrapped control label is not.
-        Text(
-            slotStatusText(slot, zone),
-            modifier = Modifier.weight(1f).padding(end = Spacing.sm),
-        )
-        AnswerButtons(onAnswer = { status -> onAnswer(habitId, slot, status) })
+        if (slot.status == EntryStatus.UNKNOWN || key in actions.reopenedKeys) {
+            Text(
+                slotStatusText(slot, zone),
+                modifier = Modifier.weight(1f).padding(end = Spacing.sm),
+            )
+            AnswerButtons(onAnswer = { status -> actions.onAnswer(row.habitId, slot, status) })
+        } else {
+            val statusText = slotStatusText(slot, zone, bypassSnooze = true)
+            Text(statusText, modifier = Modifier.weight(1f).padding(end = Spacing.sm))
+            ChangeButton(row.habitName, statusText, onClick = { actions.onRequestChange(key) })
+        }
     }
 }
 
@@ -230,6 +264,22 @@ private fun AnswerButtons(onAnswer: (InAppEntryStatus) -> Unit) {
     }
 }
 
+/** today-answered-slot-collapse, design.md decision 3. Reachable by an ordinary tap and by
+ *  TalkBack's default activate action — no gesture, satisfying the spec's "gesture-free" scenario
+ *  directly. The visible label is identical on every row; [contentDescription] carries the
+ *  discriminator instead, which is also why this cannot collide with the four existing
+ *  `onNodeWithText` assertions — Compose's text matcher never reads `contentDescription`. */
+@Composable
+private fun ChangeButton(habitName: String, answeredStatusText: String, onClick: () -> Unit) {
+    val description = stringResource(R.string.today_slot_change_a11y, habitName, answeredStatusText)
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier.semantics { contentDescription = description },
+    ) {
+        Text(stringResource(R.string.today_slot_change))
+    }
+}
+
 /** [zone] comes from [TodayUiState.zone] ([com.jjrapps.constanza.core.time.TimeProvider.zone]),
  *  never `ZoneId.systemDefault()` directly — the same clock-access ban design.md §4 enforces
  *  everywhere else (config/detekt/detekt.yml `ForbiddenMethodCall`).
@@ -242,12 +292,19 @@ private fun AnswerButtons(onAnswer: (InAppEntryStatus) -> Unit) {
  *  The format is remembered per row rather than hoisted into [TodayContent] and threaded down. That
  *  is deliberate: threading it would add a sixth parameter to both [HabitRollupRow] and [SlotRow]
  *  to save one small immutable object per visible row, and the rows are already carrying every
- *  argument they can justify. */
+ *  argument they can justify.
+ *
+ *  [bypassSnooze] is today-answered-slot-collapse, design.md decision 2: `SlotRow`'s answered
+ *  branch passes `true` so the snooze sentence below is never even reached for a slot already
+ *  carrying a resolved `Entry` — `&&` short-circuits before `snoozedUntilEpochMs` is read at all,
+ *  not merely before it renders. Without this an answered slot whose occurrence had not yet been
+ *  resolved would read "Pending, snoozed until 09:00" over a `COMPLETED` entry, a literal failure
+ *  of the spec's "text naming its specific answer". */
 @Composable
-private fun slotStatusText(slot: TodaySlot, zone: ZoneId): String {
+private fun slotStatusText(slot: TodaySlot, zone: ZoneId, bypassSnooze: Boolean = false): String {
     val timeFormat = rememberTimeOfDayFormat()
     val time = slot.minuteOfDay?.let(timeFormat::format)
-    val statusText = if (slot.snoozedUntilEpochMs != null) {
+    val statusText = if (!bypassSnooze && slot.snoozedUntilEpochMs != null) {
         // Still ahead of the status itself: a snoozed slot is pending WITH a time attached, and
         // that time is the more useful half of the sentence.
         stringResource(
