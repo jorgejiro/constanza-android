@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.jjrapps.constanza.reminding.NotificationPermission
 import com.jjrapps.constanza.reminding.NotificationPermissionDecision
 import com.jjrapps.constanza.reminding.ReminderSettingsStore
+import com.jjrapps.constanza.scheduling.AlarmScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,10 +15,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-/** first-run-onboarding design.md §7: the two-screen, API-conditional flow.
- *  [OnboardingPage.Notifications] is the runtime-permission screen, present only on API 33+;
- *  [OnboardingPage.Intro] always exists. */
-enum class OnboardingPage { Intro, Notifications }
+/** first-run-onboarding design.md §7: the two-screen, applicability-derived flow.
+ *  [OnboardingPage.Permissions] is the permissions screen, present only when at least one of the
+ *  two asks it hosts currently applies and is not already satisfied; [OnboardingPage.Intro] always
+ *  exists. */
+enum class OnboardingPage { Intro, Permissions }
 
 /**
  * design.md §7 — everything the API 31-32 divergence can break is derived from [pages], never
@@ -28,6 +30,7 @@ data class OnboardingUiState(
     val pages: List<OnboardingPage>,
     val index: Int,
     val permission: NotificationPermissionDecision,
+    val canScheduleExactAlarms: Boolean,
 ) {
     val page: OnboardingPage get() = pages[index]
     val isLastPage: Boolean get() = index == pages.lastIndex
@@ -49,6 +52,7 @@ data class OnboardingUiState(
 class OnboardingViewModel @Inject constructor(
     private val notificationPermission: NotificationPermission,
     private val settingsStore: ReminderSettingsStore,
+    private val alarmScheduler: AlarmScheduler,
 ) : ViewModel() {
 
     // decide()'s first branch is `sdkInt < 33 -> NOT_APPLICABLE`, which ignores the flag entirely,
@@ -56,12 +60,18 @@ class OnboardingViewModel @Inject constructor(
     // BLOCKED, and both of those are "applicable" — the same argument
     // com.jjrapps.constanza.tracking.TodayViewModel already makes for its own construction-time
     // seed (design.md §7).
+    //
+    // design.md decision 1: this is an OR of two independent applicability facts, notification and
+    // exact-alarm — neither one alone decides whether screen 2 exists. Evaluated once, here, at
+    // construction: a live re-derivation would be able to delete the page the user is standing on
+    // (design.md decision 1's rejected alternative).
     private val includesPermissionPage =
-        notificationPermission.decide(hasRequestedBefore = false) != NotificationPermissionDecision.NOT_APPLICABLE
+        notificationPermission.decide(hasRequestedBefore = false) != NotificationPermissionDecision.NOT_APPLICABLE ||
+            !alarmScheduler.canScheduleExactAlarms()
 
     private val pages: List<OnboardingPage> = buildList {
         add(OnboardingPage.Intro)
-        if (includesPermissionPage) add(OnboardingPage.Notifications)
+        if (includesPermissionPage) add(OnboardingPage.Permissions)
     }
 
     private val index = MutableStateFlow(0)
@@ -71,12 +81,25 @@ class OnboardingViewModel @Inject constructor(
      *  `com.jjrapps.constanza.tracking.TodayViewModel`'s identical seed/refresh split. */
     private val permission = MutableStateFlow(notificationPermission.decide(hasRequestedBefore = false))
 
-    val uiState: StateFlow<OnboardingUiState> = combine(index, permission) { currentIndex, decision ->
-        OnboardingUiState(pages, currentIndex, decision)
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, OnboardingUiState(pages, 0, permission.value))
+    /** design.md decision 3: a plain `Boolean`, seeded synchronously — `AlarmScheduler.canScheduleExactAlarms()`
+     *  is a direct `AlarmManager` call, not a suspend `DataStore` read, so unlike [permission] it needs
+     *  no separate construction-time/refresh split. */
+    private val canScheduleExactAlarms = MutableStateFlow(alarmScheduler.canScheduleExactAlarms())
+
+    val uiState: StateFlow<OnboardingUiState> = combine(
+        index,
+        permission,
+        canScheduleExactAlarms,
+    ) { currentIndex, decision, exactAlarms ->
+        OnboardingUiState(pages, currentIndex, decision, exactAlarms)
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        OnboardingUiState(pages, 0, permission.value, canScheduleExactAlarms.value),
+    )
 
     init {
-        refreshPermission()
+        refresh()
     }
 
     /** Only ever called from [OnboardingRoute] when `!state.isLastPage` (design.md §9's ordering
@@ -85,11 +108,17 @@ class OnboardingViewModel @Inject constructor(
         index.value += 1
     }
 
-    /** Called from [OnboardingRoute] on `ON_RESUME` (design.md §6) — the re-read is load-bearing,
-     *  not symmetry: the `BLOCKED` action leaves the app for system settings, and without it the
-     *  user grants the permission there, comes back, and screen 2 still says they are blocked. */
-    fun refreshPermission() {
-        viewModelScope.launch { readPermission() }
+    /** Called from [OnboardingRoute] on `ON_RESUME` (design.md §6, decision 4) — the re-read is
+     *  load-bearing, not symmetry: the `BLOCKED` action and the exact-alarm settings deep link both
+     *  leave the app for system settings, and without re-reading both facts here the user grants one
+     *  or the other there, comes back, and screen 2 still says they are denied. One method reading
+     *  both facts in one coroutine, deliberately: two separate refresh methods would let a future
+     *  lifecycle call site refresh one and forget the other. */
+    fun refresh() {
+        viewModelScope.launch {
+            readPermission()
+            canScheduleExactAlarms.value = alarmScheduler.canScheduleExactAlarms()
+        }
     }
 
     /** Called once the native permission dialog has returned, whatever the user answered. The

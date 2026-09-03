@@ -1013,6 +1013,49 @@ carried_forward_open_items:
         `:domain:detektMain`, `:app:lintDebug` all BUILD SUCCESSFUL; `:app:testDebugUnitTest` 157
         tests, 0 failures (155 before the 2 added here); `:domain:test` 52 tests, 0 failures.
 
+    - id: "today-slot-row-compose-test-timeout-flakiness"
+      title: "TodaySlotRowComposeTest's awaitNodeWithText helper is the sole source of every matrix flake seen across two verify sessions"
+      status: open
+      severity: "non-blocking for any change so far, but the matrix is not currently a trustworthy binary pass/fail gate at its default settings"
+      origin: >
+        Surfaced across two separate `sdd-verify` sessions for unrelated changes. This change
+        (`onboarding-exact-alarm-ask`)'s own launch brief already recorded two known flakes going
+        into its second correction round —
+        `theAnswerLabelsStayOnOneLineNextToALongHabitNameOnAPhone` and `TodayAddHabitComposeTest`'s
+        add-action test. The second correction round's re-verify then re-ran the matrix three times
+        (as instructed, to avoid attributing a failure without a re-run) and hit it twice more, each
+        time a different method and a different API leg: `theSlotTimeReadsInTheDeviceHourCycle[api37]`
+        and `anAnsweredSlotReadsAsCopyRatherThanTheEnumConstant[api31]`. That is four distinct flaky
+        methods now observed, all in this one file, all through the same helper.
+      reason: >
+        Every failure is `ComposeTimeoutException` from `TodaySlotRowComposeTest`'s private
+        `awaitNodeWithText` helper (`WAIT_TIMEOUT_MS = 15_000L`), after 15 seconds. `git diff --stat`
+        against this change's base commit confirms `TodaySlotRowComposeTest.kt` was never touched by
+        `onboarding-exact-alarm-ask` — this is pre-existing and environmental, not a regression the
+        change introduced. The file's own KDoc on `WAIT_TIMEOUT_MS` already documents the same failure
+        mode once: the timeout was raised from an original 5s to the current 15s after the identical
+        "identically-seeded siblings pass, this one blows the wait under load" pattern was measured
+        under the full suite. Raising it once did not close the gap; two of three fresh
+        `--rerun-tasks` matrix runs in one session still failed here, hitting a third and fourth
+        distinct method never previously flagged.
+      why_it_matters: >
+        A 2-of-3 failure rate in one session, landing on a third and fourth distinct method each
+        time, is materially worse than "timed out once and passed on retry" — the framing the first
+        flake report used. It has never once affected a scenario unrelated to `TodaySlotRowComposeTest`
+        itself: across both sessions, every other test in the matrix (including, in this change,
+        60/60 `OnboardingComposeTest` executions across three full runs) passed without exception.
+        But a matrix that intermittently fails on an untouched file costs a future verify session real
+        time re-running and re-attributing, which is exactly the failure mode
+        `compose-test-db-teardown-race` above was filed to prevent for a different mechanism.
+      owner_condition: >
+        Not fixed here — this item is unrelated to `onboarding-exact-alarm-ask`'s own scope and
+        belongs to its own change. `sdd-verify`'s own suggestion, recorded verbatim: either a
+        documented retry-once policy for the managed-device matrix task, or a targeted look at
+        `TodaySlotRowComposeTest`'s `awaitNodeWithText` helper specifically — raising the timeout
+        further, or an explicit `@FlakyTest`-equivalent quarantine — since it is now the sole source
+        of every observed matrix flake across two consecutive verify sessions and four distinct
+        methods.
+
 stack:
   status: ratified
   note: >

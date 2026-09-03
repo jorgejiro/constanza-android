@@ -3,6 +3,7 @@ package com.jjrapps.constanza.onboarding
 import com.jjrapps.constanza.reminding.NotificationPermission
 import com.jjrapps.constanza.reminding.NotificationPermissionDecision
 import com.jjrapps.constanza.reminding.ReminderSettingsStore
+import com.jjrapps.constanza.scheduling.AlarmScheduler
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -18,6 +19,8 @@ import org.junit.After
 import org.junit.Before
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * first-run-onboarding design.md §7, §9, A4. [NotificationPermission] is mocked, never real —
@@ -49,7 +52,7 @@ class OnboardingViewModelTest {
             },
         )
 
-        assertEquals(listOf(OnboardingPage.Intro, OnboardingPage.Notifications), viewModel.uiState.first().pages)
+        assertEquals(listOf(OnboardingPage.Intro, OnboardingPage.Permissions), viewModel.uiState.first().pages)
     }
 
     @Test
@@ -118,6 +121,71 @@ class OnboardingViewModelTest {
         coVerify(exactly = 1) { settingsStore.setOnboardingDone() }
     }
 
+    /** onboarding: Two-Screen Flow, Applicability-Derived — the API 31 fresh-install leg. Exact
+     *  alarms are granted by default pre-Android-14 and `POST_NOTIFICATIONS` does not exist below
+     *  API 33, so neither ask applies and screen 2 does not exist. */
+    @Test
+    fun `the page list is intro-only on API 31 fresh install, where nothing applies`() = runTest {
+        val viewModel = buildViewModel(
+            notificationPermission = mockk {
+                every { decide(any(), any()) } returns NotificationPermissionDecision.NOT_APPLICABLE
+            },
+            alarmScheduler = mockk { every { canScheduleExactAlarms() } returns true },
+        )
+
+        assertEquals(listOf(OnboardingPage.Intro), viewModel.uiState.first().pages)
+    }
+
+    /** onboarding: Two-Screen Flow, Applicability-Derived — the API 31 revoked-exact-alarms leg.
+     *  Notification stays inapplicable, but the exact-alarm OR term alone must still admit screen 2
+     *  with exactly one applicable row. */
+    @Test
+    fun `the page list includes the permissions page on API 31 with exact alarms revoked`() = runTest {
+        val viewModel = buildViewModel(
+            notificationPermission = mockk {
+                every { decide(any(), any()) } returns NotificationPermissionDecision.NOT_APPLICABLE
+            },
+            alarmScheduler = mockk { every { canScheduleExactAlarms() } returns false },
+        )
+
+        assertEquals(listOf(OnboardingPage.Intro, OnboardingPage.Permissions), viewModel.uiState.first().pages)
+    }
+
+    /** design.md decision 4 — one [OnboardingViewModel.refresh] call updates both the notification
+     *  permission and the exact-alarm eligibility, never only one of them. */
+    @Test
+    fun `refresh re-reads both the notification permission and exact-alarm eligibility from one call`() = runTest {
+        // Driven by variables rather than a fixed `andThen` sequence, for the same reason
+        // `refreshNotificationPermission picks up a permission granted while the screen was paused`
+        // (com.jjrapps.constanza.tracking.TodayViewModelTest) is: construction seeds both flows with
+        // one call each of its own before `init`'s `refresh()` reads them again, so a fixed call
+        // sequence would encode that internal call count into the test.
+        var grantedInSystemSettings = false
+        var exactAlarmsGrantedInSystemSettings = false
+        val notificationPermission = mockk<NotificationPermission> {
+            every { decide(any(), any()) } answers {
+                if (grantedInSystemSettings) {
+                    NotificationPermissionDecision.GRANTED
+                } else {
+                    NotificationPermissionDecision.BLOCKED
+                }
+            }
+        }
+        val alarmScheduler = mockk<AlarmScheduler> {
+            every { canScheduleExactAlarms() } answers { exactAlarmsGrantedInSystemSettings }
+        }
+        val viewModel = buildViewModel(notificationPermission = notificationPermission, alarmScheduler = alarmScheduler)
+        assertEquals(NotificationPermissionDecision.BLOCKED, viewModel.uiState.first().permission)
+        assertFalse(viewModel.uiState.first().canScheduleExactAlarms)
+
+        grantedInSystemSettings = true
+        exactAlarmsGrantedInSystemSettings = true
+        viewModel.refresh()
+
+        assertEquals(NotificationPermissionDecision.GRANTED, viewModel.uiState.first().permission)
+        assertTrue(viewModel.uiState.first().canScheduleExactAlarms)
+    }
+
     @Test
     fun `next advances the index by one`() = runTest {
         val viewModel = buildViewModel(
@@ -139,5 +207,12 @@ class OnboardingViewModelTest {
         settingsStore: ReminderSettingsStore = mockk(relaxUnitFun = true) {
             coEvery { hasRequestedNotificationPermission() } returns false
         },
-    ) = OnboardingViewModel(notificationPermission, settingsStore)
+        // Defaulted to granted, never `mockk(relaxed = true)`: a relaxed mock answers `Boolean`
+        // with `false`, which would silently add the exact-alarm page to every existing test above
+        // that never meant to exercise it — the same trap `TodayViewModelTest.buildViewModel`'s
+        // identical default exists for.
+        alarmScheduler: AlarmScheduler = mockk {
+            every { canScheduleExactAlarms() } returns true
+        },
+    ) = OnboardingViewModel(notificationPermission, settingsStore, alarmScheduler)
 }
