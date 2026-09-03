@@ -27,7 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.jjrapps.constanza.R
@@ -213,11 +213,21 @@ private fun NumberStepper(
 }
 
 /**
- * Reads the locale from [LocalLocale] rather than `Locale.getDefault()`: the latter is not
+ * Reads the locale from [LocalConfiguration] rather than `Locale.getDefault()`: the latter is not
  * observable Compose state, so the day labels would keep rendering in the old language after an
  * in-app or system locale change until something else happened to invalidate this composable.
- * [LocalLocale] makes the read a real recomposition dependency, and `.platformLocale` hands the
- * `java.util.Locale` that [DayOfWeek.getDisplayName] requires straight back.
+ *
+ * It deliberately does NOT read `LocalLocale`, which this code used until app-localization-es-en
+ * and which looks like the more direct choice. `LocalLocale` computes from `LocalLocaleList`, whose
+ * backing local is private to compose-ui and is provided at the composition root from
+ * `AndroidComposeView.localeList` — derived from the *Activity's* configuration, not from
+ * composition. A per-app language override installed below the root therefore cannot reach it, and
+ * because the backing local is private it cannot be provided either. Under a Spanish override these
+ * chips kept rendering English day names while every `stringResource` around them was already
+ * Spanish. See design.md's Finding B, read from the compose-ui sources.
+ *
+ * [LocalConfiguration] is the only Compose-root-overridable locale source here, and it is the same
+ * one `TimeOfDayFormat` reads, so the two formatters now agree.
  */
 @Composable
 private fun DayOfWeekPicker(
@@ -225,7 +235,7 @@ private fun DayOfWeekPicker(
     onDayOfWeekChange: (DayOfWeek) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val locale = LocalLocale.current.platformLocale
+    val locale = LocalConfiguration.current.locales[0]
     FlowRow(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         DayOfWeek.entries.forEach { day ->
             val isSelected = day == selected

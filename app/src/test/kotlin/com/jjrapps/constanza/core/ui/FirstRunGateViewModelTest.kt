@@ -1,6 +1,8 @@
 package com.jjrapps.constanza.core.ui
 
 import app.cash.turbine.test
+import com.jjrapps.constanza.localization.AppLanguage
+import com.jjrapps.constanza.localization.AppLocaleController
 import com.jjrapps.constanza.reminding.ReminderSettingsStore
 import io.mockk.every
 import io.mockk.mockk
@@ -19,10 +21,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * first-run-onboarding design.md §10 row 1 (onboarding spec "Once-Per-Install Onboarding Gate").
- * [ReminderSettingsStore] is faked with MockK rather than a real `DataStore`, since the tri-state
- * contract under test needs precise control over exactly when the upstream flow emits — a real
- * `DataStore` file cannot be held mid-read deterministically.
+ * first-run-onboarding design.md §10 row 1 (onboarding spec "Once-Per-Install Onboarding Gate"),
+ * extended by app-localization design.md D3, which folds the resolved language into this same gate
+ * rather than adding a second one.
+ *
+ * [ReminderSettingsStore] and [AppLocaleController] are faked with MockK rather than backed by a
+ * real `DataStore`, since the tri-state contract under test needs precise control over exactly when
+ * each upstream flow emits — a real `DataStore` file cannot be held mid-read deterministically.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class FirstRunGateViewModelTest {
@@ -42,43 +47,83 @@ class FirstRunGateViewModelTest {
      *  replay is used here specifically because it never emits until told to — a [MutableStateFlow]
      *  cannot represent "has not emitted yet" at all, since it always carries a value. */
     @Test
-    fun `onboardingDone is null before the store's flow emits, then reflects the store`() = runTest {
+    fun `startupState is null before the store's flow emits, then reflects the store`() = runTest {
         val upstream = MutableSharedFlow<Boolean>(replay = 0)
-        val settingsStore = mockk<ReminderSettingsStore> { every { onboardingDone } returns upstream }
-        val viewModel = FirstRunGateViewModel(settingsStore)
+        val viewModel = viewModel(onboardingDone = upstream)
 
-        viewModel.onboardingDone.test {
+        viewModel.startupState.test {
             assertNull(awaitItem())
 
             upstream.emit(false)
-            assertEquals(false, awaitItem())
+            assertEquals(StartupState(onboardingDone = false, language = AppLanguage.SystemDefault), awaitItem())
 
             upstream.emit(true)
-            assertEquals(true, awaitItem())
+            assertEquals(StartupState(onboardingDone = true, language = AppLanguage.SystemDefault), awaitItem())
+        }
+    }
+
+    /**
+     * app-localization D3: the gate must hold blank until BOTH facts are known, not just the
+     * onboarding flag. If it opened on the flag alone, the first frame would render in whatever
+     * language happened to be the default — which is exactly the flash this design exists to avoid.
+     */
+    @Test
+    fun `startupState stays null while only the onboarding flag has emitted`() = runTest {
+        val language = MutableSharedFlow<AppLanguage>(replay = 0)
+        val viewModel = viewModel(
+            onboardingDone = MutableStateFlow(true),
+            language = language,
+        )
+
+        viewModel.startupState.test {
+            assertNull(awaitItem())
+            expectNoEvents()
+
+            language.emit(AppLanguage.Spanish)
+            assertEquals(StartupState(onboardingDone = true, language = AppLanguage.Spanish), awaitItem())
         }
     }
 
     @Test
-    fun `onboardingDone surfaces false for a fresh install`() = runTest {
-        val settingsStore = mockk<ReminderSettingsStore> {
-            every { onboardingDone } returns MutableStateFlow(false)
-        }
-        val viewModel = FirstRunGateViewModel(settingsStore)
+    fun `startupState surfaces false for a fresh install`() = runTest {
+        val viewModel = viewModel(onboardingDone = MutableStateFlow(false))
 
-        viewModel.onboardingDone.test {
-            assertEquals(false, awaitItem())
+        viewModel.startupState.test {
+            assertEquals(StartupState(onboardingDone = false, language = AppLanguage.SystemDefault), awaitItem())
         }
     }
 
     @Test
-    fun `onboardingDone surfaces true for an install that already completed onboarding`() = runTest {
-        val settingsStore = mockk<ReminderSettingsStore> {
-            every { onboardingDone } returns MutableStateFlow(true)
-        }
-        val viewModel = FirstRunGateViewModel(settingsStore)
+    fun `startupState surfaces true for an install that already completed onboarding`() = runTest {
+        val viewModel = viewModel(onboardingDone = MutableStateFlow(true))
 
-        viewModel.onboardingDone.test {
-            assertEquals(true, awaitItem())
+        viewModel.startupState.test {
+            assertEquals(StartupState(onboardingDone = true, language = AppLanguage.SystemDefault), awaitItem())
         }
+    }
+
+    /** An explicit override reaches the gate, so the very first composed frame is already in the
+     *  chosen language rather than correcting itself a frame later. */
+    @Test
+    fun `startupState carries an explicit language override`() = runTest {
+        val viewModel = viewModel(
+            onboardingDone = MutableStateFlow(true),
+            language = MutableStateFlow(AppLanguage.Spanish),
+        )
+
+        viewModel.startupState.test {
+            assertEquals(StartupState(onboardingDone = true, language = AppLanguage.Spanish), awaitItem())
+        }
+    }
+
+    private fun viewModel(
+        onboardingDone: kotlinx.coroutines.flow.Flow<Boolean>,
+        language: kotlinx.coroutines.flow.Flow<AppLanguage> = MutableStateFlow(AppLanguage.SystemDefault),
+    ): FirstRunGateViewModel {
+        val settingsStore = mockk<ReminderSettingsStore> {
+            every { this@mockk.onboardingDone } returns onboardingDone
+        }
+        val appLocaleController = mockk<AppLocaleController> { every { observe() } returns language }
+        return FirstRunGateViewModel(settingsStore, appLocaleController)
     }
 }
