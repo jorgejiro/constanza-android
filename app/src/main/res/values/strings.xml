@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Constanza</string>
+    <!-- app-localization: the app name is a proper noun and is deliberately never translated
+         (D9, StringResourceParityTest honours this attribute). -->
+    <string name="app_name" translatable="false">Constanza</string>
 
     <!-- reminder-response: Notification Actions (task 5.1). -->
     <string name="notification_channel_reminders_name">Habit reminders</string>
@@ -135,10 +137,20 @@
     <string name="progress_best_streak">Best streak: %1$d</string>
     <string name="progress_compliance">Compliance (last 30 days): %1$d%%</string>
 
-    <!-- reminder-response: Snooze Configuration and Re-arm (task 6b.5, bound to task 5.6's DataStore entry). -->
-    <string name="settings_snooze_title">Default snooze duration</string>
+    <!-- reminder-response: Snooze Configuration and Re-arm (task 6b.5, bound to task 5.6's DataStore
+         entry). app-localization: the screen title was renamed from `settings_snooze_title` because
+         this screen now hosts more than snooze settings; `settings_snooze_section_title` is the new
+         section header above the snooze radio list. -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_snooze_section_title">Default snooze duration</string>
     <string name="settings_snooze_minutes">%1$d min</string>
     <string name="settings_snooze_hours">%1$d h</string>
+
+    <!-- app-localization: the in-app three-option language picker (Three-State Language Override). -->
+    <string name="settings_language_section_title">Language</string>
+    <string name="settings_language_system_default">System default</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_language_spanish">Español</string>
 
     <!-- habit-management: per-habit progress entry point (task 6b.4). -->
     <string name="habit_list_progress">Progress</string>
@@ -151,6 +163,13 @@
     <string name="portability_import_confirm_body">Importing this file replaces every habit, schedule, and entry currently on this device. This action cannot be undone.</string>
     <string name="portability_import_confirm_action">Replace</string>
     <string name="portability_import_success">Import complete.</string>
+
+    <!-- data-portability: Import (MODIFIED) — one message per ImportFailure variant
+         (design.md D6), replacing the raw exception message the screen used to show. -->
+    <string name="portability_import_error_unreadable_file">The backup file could not be read.</string>
+    <string name="portability_import_error_malformed_file">This file is not a valid Constanza backup.</string>
+    <string name="portability_import_error_unsupported_version">This backup was created with a newer version of Constanza (format %1$d) and can\'t be imported here.</string>
+    <string name="portability_import_error_unknown_slot_reference">This backup refers to a reminder time that no longer exists (habit %1$d, slot %2$d).</string>
 
     <string name="action_back">Back</string>
     <string name="action_ok">OK</string>

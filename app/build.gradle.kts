@@ -188,6 +188,17 @@ tasks.withType<Test>().configureEach {
         "constanza.androidTestSourceDir",
         layout.projectDirectory.dir("src/androidTest/kotlin").asFile.absolutePath,
     )
+    // StringResourceParityTest (app-localization, design.md D9) reads both string tables as plain
+    // XML files, same explicit-path convention as the two properties above: a wrong or missing path
+    // fails loudly instead of silently resolving from the test's working directory.
+    systemProperty(
+        "constanza.stringsValuesXml",
+        layout.projectDirectory.file("src/main/res/values/strings.xml").asFile.absolutePath,
+    )
+    systemProperty(
+        "constanza.stringsValuesEsXml",
+        layout.projectDirectory.file("src/main/res/values-es/strings.xml").asFile.absolutePath,
+    )
 }
 
 dependencies {
