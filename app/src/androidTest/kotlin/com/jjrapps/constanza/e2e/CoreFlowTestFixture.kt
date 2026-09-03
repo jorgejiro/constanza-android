@@ -22,6 +22,13 @@ private const val POLL_TIMEOUT_MS = 15_000L
 private const val POLL_INTERVAL_MS = 50L
 private const val STATE_ARMED = "ARMED"
 
+/** Bound for [CoreFlowTestFixture.assertNoNotificationPosted]'s negative wait (task 1.2). Shorter
+ *  than [POLL_TIMEOUT_MS]: that constant bounds how long to wait for something to APPEAR, which
+ *  legitimately needs headroom for slow process hops; this bounds how long to wait to be sure
+ *  something does NOT appear, so every test that asserts absence pays this cost once. Still
+ *  generous enough that a slow emulator does not turn into a false negative. */
+private const val NEGATIVE_POLL_TIMEOUT_MS = 3_000L
+
 /**
  * Shared wiring for [CoreFlowE2ETest], in the same spirit as `HabitRepositoryTestFixture` and
  * `PortabilityTestFixture` — except for one deliberate difference that changes how it must be
@@ -204,6 +211,30 @@ class CoreFlowTestFixture(private val context: Context) {
             value = read()
         }
         return value
+    }
+
+    /**
+     * The negative counterpart to [awaitPostedNotification] (task 1.2, habit-management: Habit
+     * Deletion). Polls for [NEGATIVE_POLL_TIMEOUT_MS] and asserts the notification never appears
+     * in that window, instead of returning immediately on a single check — a single check would
+     * pass trivially if the post merely hadn't landed yet, proving nothing about whether it was
+     * ever going to.
+     *
+     * This proves only that nothing was posted; it says nothing about WHY. See
+     * `CoreFlowE2ETest.deletingAHabitThroughTheUiRemovesItAndItsHistoryAndSilencesItsReminder` for
+     * the division of proof between this (the handler's null-guard) and repository-layer mock
+     * verification (that `AlarmScheduler.cancel` actually ran).
+     */
+    fun assertNoNotificationPosted(notificationId: Int) {
+        val deadline = System.currentTimeMillis() + NEGATIVE_POLL_TIMEOUT_MS
+        while (System.currentTimeMillis() < deadline) {
+            val found = activeNotification(notificationId)
+            require(found == null) {
+                "Notification $notificationId was posted, but this habit was deleted before it " +
+                    "could fire — deleting a habit must silence its reminder."
+            }
+            Thread.sleep(POLL_INTERVAL_MS)
+        }
     }
 
     fun close() = database.close()

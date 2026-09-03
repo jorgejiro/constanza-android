@@ -1,6 +1,7 @@
 package com.jjrapps.constanza.habit
 
 import app.cash.turbine.test
+import com.jjrapps.constanza.core.data.dao.EntryDao
 import com.jjrapps.constanza.domain.model.Habit
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -9,6 +10,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -39,6 +41,11 @@ class HabitListViewModelTest {
         sortOrder = 0,
     )
 
+    /** No test in this class asserts on [HabitListUiState.entryCounts]; that behaviour lives in
+     *  `HabitDeleteDialogComposeTest` (task 4.5). This just needs to emit once so `combine` does not
+     *  withhold [HabitListViewModel.uiState] waiting on a source these tests do not otherwise use. */
+    private fun entryDao(): EntryDao = mockk { every { observeCountsByHabit() } returns flowOf(emptyList()) }
+
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -55,7 +62,7 @@ class HabitListViewModelTest {
         val habitRepository = mockk<HabitRepository> {
             every { observeAll() } returns habits
         }
-        val viewModel = HabitListViewModel(habitRepository)
+        val viewModel = HabitListViewModel(habitRepository, entryDao())
 
         viewModel.uiState.test {
             val state = awaitItem()
@@ -70,7 +77,7 @@ class HabitListViewModelTest {
         val habitRepository = mockk<HabitRepository> {
             every { observeAll() } returns habits
         }
-        val viewModel = HabitListViewModel(habitRepository)
+        val viewModel = HabitListViewModel(habitRepository, entryDao())
 
         viewModel.uiState.test {
             assertEquals(listOf("Read"), awaitItem().habits.map { it.name }) // initial: active filter
@@ -92,7 +99,7 @@ class HabitListViewModelTest {
                 habits.value = habits.value.map { it.copy(archived = true) }
             }
         }
-        val viewModel = HabitListViewModel(habitRepository)
+        val viewModel = HabitListViewModel(habitRepository, entryDao())
 
         viewModel.uiState.test {
             assertEquals(listOf("Read"), awaitItem().habits.map { it.name }) // initial: active filter
@@ -114,7 +121,7 @@ class HabitListViewModelTest {
                 habits.value = habits.value.map { it.copy(archived = false) }
             }
         }
-        val viewModel = HabitListViewModel(habitRepository)
+        val viewModel = HabitListViewModel(habitRepository, entryDao())
 
         viewModel.uiState.test {
             assertTrue(awaitItem().habits.isEmpty()) // initial: active filter, seeded habit is archived

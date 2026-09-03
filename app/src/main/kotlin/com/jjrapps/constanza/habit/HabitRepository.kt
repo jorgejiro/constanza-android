@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import com.jjrapps.constanza.core.data.AppDatabase
 import com.jjrapps.constanza.core.data.dao.EntryDao
 import com.jjrapps.constanza.core.data.dao.HabitDao
+import com.jjrapps.constanza.core.data.dao.ReminderOccurrenceDao
 import com.jjrapps.constanza.core.data.dao.ReminderSlotDao
 import com.jjrapps.constanza.core.data.dao.ScheduleDao
 import com.jjrapps.constanza.core.data.entity.HabitEntity
@@ -13,19 +14,23 @@ import com.jjrapps.constanza.core.time.TimeProvider
 import com.jjrapps.constanza.domain.model.Habit
 import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
+import com.jjrapps.constanza.scheduling.AlarmScheduler
 import com.jjrapps.constanza.scheduling.OccurrencePlanner
 import com.jjrapps.constanza.scheduling.ScheduleEditor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
-/** Bundles the four DAOs [HabitRepository] needs, keeping its constructor under detekt's
- *  `LongParameterList` threshold — same reasoning as `scheduling.SchedulingDaos`. */
+/** Bundles the five DAOs [HabitRepository] needs, keeping its constructor under detekt's
+ *  `LongParameterList` threshold — same reasoning as `scheduling.SchedulingDaos`.
+ *  [reminderOccurrenceDao] (task 2.2, habit-management: Habit Deletion) is [delete]'s only
+ *  caller so far — snapshotting armed occurrence ids before the cascade removes them. */
 data class HabitDaos @Inject constructor(
     val habitDao: HabitDao,
     val scheduleDao: ScheduleDao,
     val reminderSlotDao: ReminderSlotDao,
     val entryDao: EntryDao,
+    val reminderOccurrenceDao: ReminderOccurrenceDao,
 )
 
 /**
@@ -56,6 +61,13 @@ data class HabitDaos @Inject constructor(
  * unrelated write happened to trigger a second replan. A habit switching away from `TIMES_PER_DAY`
  * naturally arrives here with an empty list, which correctly tears down its now-orphaned slots
  * either way, since teardown order does not depend on replan visibility.
+ *
+ * [delete] (task 2.3, habit-management: Habit Deletion, design.md D1) follows
+ * `BackupImporter.replaceAll`'s ordering, not [setArchived]'s: snapshot armed occurrence ids,
+ * cascade the habit row inside a transaction, cancel those alarms after commit. No
+ * [OccurrencePlanner.replanAll] — no other habit's plan is affected, and by the time a replan
+ * could run, the cascade has already removed the occurrence rows [OccurrencePlanner.cancelAllFor]
+ * would need to read.
  */
 class HabitRepository @Inject constructor(
     private val daos: HabitDaos,
@@ -63,6 +75,7 @@ class HabitRepository @Inject constructor(
     private val scheduleEditor: ScheduleEditor,
     private val occurrencePlanner: OccurrencePlanner,
     private val timeProvider: TimeProvider,
+    private val alarmScheduler: AlarmScheduler,
 ) {
     /** habit-management: the habit list, filterable by [Habit.archived] in the presentation layer. */
     fun observeAll(): Flow<List<Habit>> = daos.habitDao.observeAll().map(::toDomainHabits)
@@ -113,6 +126,18 @@ class HabitRepository @Inject constructor(
             daos.entryDao.deleteBySlot(habitId, slotId)
             daos.reminderSlotDao.deleteById(slotId)
         }
+    }
+
+    /** habit-management: Habit Deletion (design.md D1). Irreversible: the habit, its schedule, its
+     *  reminder slots, its entries, and its reminder occurrences are all gone once this returns —
+     *  the four `ForeignKey.CASCADE` declarations on [HabitEntity]'s children do the removal, this
+     *  method only orders the alarm cancellation around it correctly. See design.md D1 for why
+     *  cancellation runs after the transaction commits rather than inside it or through
+     *  [OccurrencePlanner.replanAll]. */
+    suspend fun delete(habitId: Long) {
+        val armedIds = daos.reminderOccurrenceDao.findByHabitId(habitId).map { it.id }
+        database.withTransaction { daos.habitDao.deleteById(habitId) }
+        armedIds.forEach { alarmScheduler.cancel(it) }
     }
 
     /** Reconciles [habitId]'s persisted slots against the editor's [slots]: a slot missing from
