@@ -1038,7 +1038,7 @@ carried_forward_open_items:
 
     - id: "today-slot-row-compose-test-timeout-flakiness"
       title: "TodaySlotRowComposeTest's awaitNodeWithText helper is the sole source of every matrix flake seen across two verify sessions"
-      status: open
+      status: resolved
       severity: "non-blocking for any change so far, but the matrix is not currently a trustworthy binary pass/fail gate at its default settings"
       origin: >
         Surfaced across two separate `sdd-verify` sessions for unrelated changes. This change
@@ -1100,6 +1100,149 @@ carried_forward_open_items:
         hypothetical: every change since the item was filed has carried the
         instruction "re-run before attributing a failure to yourself", which is
         exactly the habit that teaches people to ignore red.
+
+      resolution: >
+        Fixed on branch `fix/tracking-bounded-wait-flake` by measuring the one
+        thing every previous round of this item argued about instead of measured.
+
+        WHAT WAS MEASURED. Every bounded wait in `app/src/androidTest/.../tracking/`
+        was temporarily instrumented to record how long it actually took and what
+        `TodayViewModel.uiState` held the moment it ended, and one full api37
+        suite run was captured through UTP's per-test logcat. The eleven waits
+        that satisfied took 2, 5, 15, 18, 24, 24, 27, 28, 69, 87 and 88 ms — a
+        24 ms median and an 88 ms worst case against a 15,000 ms bound. The
+        twelfth, `TodayAddHabitComposeTest.aPopulatedTodayShowsTheTrailingAddActionAndNoCentredOne`,
+        timed out at 15,011 ms with the ViewModel still reporting `rows=0`.
+
+        That settles the question the item was stuck on. The failing wait is not
+        170x slower than its siblings; it is waiting for something that was never
+        coming. Nothing was in flight at fifteen seconds, so the move this item
+        had already made once — 5s to 15s — could not have helped then and would
+        not help now. It only made each occurrence cost ten more seconds.
+
+        THE MECHANISM, proven rather than inferred. The seed every flaking test
+        used wrote three rows in three separate transactions: `habitDao.insert`,
+        then `scheduleDao.upsert`, then `reminderSlotDao.insert`. Room's
+        `InvalidationTracker` fires per commit, so that publishes "a habit with
+        no schedule" as a state a live observer can receive.
+        `TodayViewModel.uiState` observes `habits`, `entries` and
+        `reminder_occurrences`, but reads each habit's schedule and slots
+        imperatively inside its `combine`, and a habit whose `findScheduleFor`
+        returns null is dropped by `mapNotNull`. The `schedules` and
+        `reminder_slots` writes that follow invalidate tables that `combine` does
+        not observe, so no second emission ever comes and `rows = 0` is
+        permanent.
+
+        A temporary `MechanismProbeTest` forced that interleaving and confirmed
+        it deterministically on the **api31** leg — the one that had never been
+        seen to flake. Habit first, 750 ms pause, then schedule and slot, then a
+        further 750 ms: the screen was still at `rows=0` four seconds later. The
+        same three writes inside one transaction reached it in 17 ms. api31 was
+        never immune to this; it was winning a race that the heavier api37
+        `google_apis` image loses far more often. That probe was deleted once it
+        had done its job, and its numbers are recorded here instead.
+
+        THE FIX is atomicity at the seed, plus a wait that can tell the two
+        failures apart.
+
+        `HabitRepositoryTestFixture.seedHabitWithEnabledSlot` writes the habit,
+        its schedule and its enabled slot in one transaction, so the tracker
+        fires once, after commit, and a half-built habit is not an observable
+        state at all. `AppDatabase.insertHabitWithSchedule` is transactional for
+        the same reason, which covers its worker-test callers too. This is the
+        cause, not the symptom: there is no intermediate state left to lose a
+        race to.
+
+        The four duplicated `WAIT_TIMEOUT_MS = 15_000L` constants and four
+        near-identical node-wait helpers are gone, replaced by one
+        `TodayScreenWaits.kt` — the "one correct fix, applied to every sibling"
+        this repository keeps getting wrong. The tests now wait on
+        `TodayViewModel.uiState` (Room's own emission) BEFORE `setContent`, which
+        is exactly what `TodayComposeTest`'s KDoc had been recommending for two
+        changes while every class went on waiting for a node anyway. The
+        composition then renders from a state that already holds the rows, on its
+        first frame, so the node wait it replaces has nothing left to wait for.
+        Its 5s bound is a diagnostic tripwire at ~57x the measured worst case,
+        not headroom, and it fails with the state it actually saw rather than
+        `Condition still not satisfied after 15000 ms` — the message that let the
+        last four occurrences be re-run instead of investigated.
+
+        VERIFIED. `:app:testDebugUnitTest`, `:app:detekt`, `:app:detektMain` and
+        `:app:lintDebug` all clean. `:app:emulatorMatrixGroupDebugAndroidTest
+        --rerun-tasks` was run FOUR times end to end, and every run passed both
+        legs: 113 tests on api31 and 112 on api37 each time, parsed out of the
+        result XML with `xml.etree.ElementTree` rather than by eye — 222
+        executed, 0 failures, 0 errors, 3 skipped, per run. Runs 2, 3 and 4 are
+        on byte-identical sources; run 1 differs only in an import tidy-up
+        applied after its APK was packaged, and is reported rather than quietly
+        recounted. For contrast, the instrumented api37 run taken BEFORE the fix,
+        on the same machine and the same emulator images, failed on its first
+        attempt.
+
+        WHAT THIS DOES NOT PROVE. A race can never be proven absent, and this one
+        is no exception: N green runs are evidence, not a proof, and the
+        pre-existing `compose-test-db-teardown-race` shows this suite has more
+        than one timing-shaped failure mode in it. What is proven is narrower and
+        stronger than a run count: the specific interleaving that produced every
+        observed occurrence is no longer expressible, because the three writes it
+        needed are now one write. The new item
+        `today-rows-are-built-from-tables-the-screen-does-not-observe` records
+        the production-side fragility this investigation uncovered, which the
+        test-side fix removes the trigger for but not the cause of.
+
+    - id: "today-rows-are-built-from-tables-the-screen-does-not-observe"
+      title: "TodayViewModel reads each habit's schedule and slots imperatively inside a combine that observes neither table"
+      status: open
+      severity: >
+        Not reachable through any of the app's own write paths today, so this is
+        a fragility rather than a live defect. It is recorded because it is the
+        exact mechanism behind `today-slot-row-compose-test-timeout-flakiness`
+        above, and the fix that closed that item removes the trigger without
+        removing this.
+      origin: >
+        Found on 2026-09-03 while measuring the flake above rather than
+        re-running it. Instrumenting the tracking package's bounded waits caught
+        one timing out with `TodayViewModel.uiState` still reporting `rows=0`
+        fifteen seconds after the habit had been committed — a stall, not
+        slowness. A temporary `MechanismProbeTest` then reproduced it
+        deterministically on the api31 leg by forcing the interleaving: still
+        `rows=0` four seconds after all three writes had committed, against 17 ms
+        when the same three writes shared one transaction.
+      reason: >
+        `TodayViewModel.uiState` combines five sources, three of them Room flows:
+        `habitRepository.observeAll()` (`habits`), `entryDao.observeByDate`
+        (`entries`) and `reminderOccurrenceDao.observeUnresolved()`
+        (`reminder_occurrences`). Inside the combine's transform it then calls
+        `habitRepository.findScheduleFor(habit.id)` and `findSlotsFor(habit.id)`
+        — one-shot suspend reads of `schedules` and `reminder_slots`. Neither
+        table is observed by anything in that combine, and a habit whose schedule
+        read returns null is dropped by `mapNotNull`. Room re-runs the transform
+        only when one of the three observed tables is invalidated, so a state
+        that is wrong with respect to the other two tables stays wrong.
+      why_it_matters: >
+        It costs nothing today, and the reason is worth writing down because
+        nothing enforces it: every production writer of `schedules` or
+        `reminder_slots` sits inside a `database.withTransaction` that also
+        writes `habits` or `entries` — `HabitRepository.create`, `update`,
+        `deleteSlot` (which deletes the slot's entries in the same transaction),
+        `delete`, and `BackupImporter.replaceAll`. That is an invariant nobody
+        declared and no test guards. The first writer that changes only a slot or
+        only a schedule leaves Today showing the previous row until some
+        unrelated write happens to refresh it, and it will present the way this
+        item's parent did: not as an error, but as a screen that is quietly and
+        durably wrong.
+      owner_condition: >
+        Its own change, and only if a writer that breaks that invariant is
+        actually wanted — this is not worth pre-emptively refactoring the screen
+        for. Two shapes are worth weighing rather than one being obviously right.
+        Observe the two tables as well: Room 2.7's
+        `InvalidationTracker.createFlow`, or DAO flows folded into the combine,
+        which is already at `combine`'s largest typed overload and would need its
+        sources re-bundled. Or replace the per-habit reads with one observed
+        relation query returning each habit with its schedule and slots, which
+        removes the staleness and the N+1 in the transform together. Whichever is
+        chosen, do not close this with a retry, a poll, or a longer wait
+        anywhere — that is what the parent item spent two changes learning.
 stack:
   status: ratified
   note: >

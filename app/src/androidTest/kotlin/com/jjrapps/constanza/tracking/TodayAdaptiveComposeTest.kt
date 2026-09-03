@@ -33,13 +33,6 @@ private const val MORNING_MINUTE = 8 * 60
 private const val EVENING_MINUTE = 20 * 60
 private const val ANSWER_BUTTON_COUNT_PER_HABIT = 2
 
-/** Bound for awaiting a Room-Flow-fed row; same value the sibling Today tests use. */
-/** Bound for awaiting a Room-Flow-fed row. Raised from 5s to 15s with `today-add-habit`: three
- *  more Room-backed Compose classes joined this suite and the extra contention started blowing the
- *  old bound on the matrix while the same tests passed in isolation. The assertions are unchanged;
- *  only the headroom is. See `TodayAddHabitComposeTest` for the measurements. */
-private const val WAIT_TIMEOUT_MS = 15_000L
-
 /**
  * Task 6b.8 (ui-adaptive-layout: Today screen scenario). Renders the real [TodayRoute] with a
  * multi-slot habit due today, constrained to an apparent window of `sw = 600dp` via
@@ -80,6 +73,7 @@ class TodayAdaptiveComposeTest {
             ReminderSlot(id = 0, habitId = 0, minuteOfDay = EVENING_MINUTE, enabled = true),
         )
         fixture.habitRepository.create(newHabit("Stretch"), Schedule.TimesPerDay(), slots)
+        viewModel.awaitOneRowWithSlots(2)
 
         composeTestRule.setContent {
             DeviceConfigurationOverride(
@@ -88,7 +82,6 @@ class TodayAdaptiveComposeTest {
                 TodayRoute(onManageHabits = {}, viewModel = viewModel)
             }
         }
-        awaitNodeWithText(text(R.string.today_expand))
         composeTestRule.onNodeWithText(text(R.string.today_expand)).performClick()
 
         // Both notations are spelled out rather than derived, and the device's setting picks one:
@@ -113,22 +106,4 @@ class TodayAdaptiveComposeTest {
         val answerButtons = composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).fetchSemanticsNodes()
         assertEquals(ANSWER_BUTTON_COUNT_PER_HABIT, answerButtons.size)
     }
-
-    /**
-     * `performClick()` waits for the composition to be idle, which is NOT the same as waiting for
-     * the row to exist: [TodayViewModel.uiState] is fed by Room Flows through `combine`, so an idle
-     * composition can simply be one that has not received the first emission yet. Clicking then
-     * either misses the node or hits a row whose occurrence handle is still null.
-     *
-     * That is not theoretical — it failed exactly once in a full-suite run while passing four times
-     * out of four in isolation, because the full suite loads the device enough to lose the race.
-     * Await the node, never assume it; the same discipline the notification-post visibility and the
-     * WorkManager enqueue assertions in this project already needed.
-     */
-    private fun awaitNodeWithText(label: String) {
-        composeTestRule.waitUntil(WAIT_TIMEOUT_MS) {
-            composeTestRule.onAllNodesWithText(label).fetchSemanticsNodes().isNotEmpty()
-        }
-    }
-
 }

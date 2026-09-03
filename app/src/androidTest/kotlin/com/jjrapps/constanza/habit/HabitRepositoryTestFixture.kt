@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.Room
+import androidx.room.withTransaction
 import com.jjrapps.constanza.core.data.AppDatabase
 import com.jjrapps.constanza.core.data.entity.ReminderSlotEntity
 import com.jjrapps.constanza.core.time.TimeProvider
@@ -13,6 +14,7 @@ import com.jjrapps.constanza.scheduling.FakeTimeProvider
 import com.jjrapps.constanza.scheduling.OccurrencePlanner
 import com.jjrapps.constanza.scheduling.ScheduleEditor
 import com.jjrapps.constanza.scheduling.SchedulingDaos
+import com.jjrapps.constanza.scheduling.insertHabitWithSchedule
 import io.mockk.mockk
 import java.time.Instant
 import kotlinx.coroutines.cancelAndJoin
@@ -92,6 +94,36 @@ class HabitRepositoryTestFixture(internal val context: Context) {
             ReminderSlotEntity(habitId = habitId, minuteOfDay = minuteOfDay, enabled = true),
         )
 
+    /**
+     * A habit, its daily schedule and one enabled slot — written in ONE transaction, and therefore
+     * published to live observers as one state rather than three.
+     *
+     * **Use this, not `insertHabitWithSchedule` followed by [insertEnabledSlot], for any test that
+     * puts a screen in front of the result.** The pair it replaces is what
+     * `openspec/config.yaml`'s `today-slot-row-compose-test-timeout-flakiness` turned out to be.
+     * Room's `InvalidationTracker` fires per commit, so writing the habit first publishes a habit
+     * with no schedule and no slot. `TodayViewModel.uiState` observes `habits`, `entries` and
+     * `reminder_occurrences`, but reads each habit's schedule and slots imperatively inside its
+     * `combine` — so an observer that receives that first state drops the habit
+     * (`findScheduleFor` is still null) and produces `rows = 0`. The `schedules` and
+     * `reminder_slots` writes that follow invalidate tables nothing in that `combine` observes, so
+     * there is no second emission and the screen stays empty **for good**.
+     *
+     * Measured rather than reasoned about. `MechanismProbeTest`, run on the api31 leg — the one
+     * that had never been seen to flake — forced that interleaving and the screen was still at
+     * `rows=0` four seconds later, while the same three writes inside one transaction reached it in
+     * 17 ms. On the matrix it presented as a `ComposeTimeoutException` at exactly the wait bound,
+     * with the ViewModel still holding zero rows: nothing was in flight, so no larger bound could
+     * ever have helped.
+     */
+    suspend fun seedHabitWithEnabledSlot(
+        name: String = "Meditate",
+        minuteOfDay: Int = MORNING_MINUTE_OF_DAY,
+    ): SeededHabit = database.withTransaction {
+        val habitId = database.insertHabitWithSchedule(name = name)
+        SeededHabit(habitId = habitId, slotId = insertEnabledSlot(habitId, minuteOfDay))
+    }
+
     /** The dates [OccurrencePlanner] currently holds armed for [habitId] — how a replan is observed
      *  from outside, since `reminder_occurrences` is the scheduling source of truth (design.md D4). */
     suspend fun armedOccurrenceDates(habitId: Long): List<String> =
@@ -168,6 +200,10 @@ class HabitRepositoryTestFixture(internal val context: Context) {
         database.close()
     }
 }
+
+/** What [HabitRepositoryTestFixture.seedHabitWithEnabledSlot] wrote, for the tests that go on to
+ *  assert against the slot as well as the habit. */
+data class SeededHabit(val habitId: Long, val slotId: Long)
 
 /** A brand-new, unarchived [Habit] carrying the `id = 0` sentinel [HabitRepository.create] expects. */
 fun newHabit(name: String = "Read"): Habit = Habit(

@@ -5,7 +5,6 @@ import androidx.compose.ui.test.DeviceConfigurationOverride
 import androidx.compose.ui.test.WindowSize
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -16,8 +15,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.expectedTimeOnDevice
 import com.jjrapps.constanza.core.ui.unexpectedTimeOnDevice
+import com.jjrapps.constanza.domain.model.EntryStatus
 import com.jjrapps.constanza.habit.HabitRepositoryTestFixture
-import com.jjrapps.constanza.scheduling.insertHabitWithSchedule
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -26,17 +25,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Bound for awaiting a Room-Flow-fed row. 15s rather than the 5s the older Today tests use, and
- * matched to `CoreFlowE2ETest`'s own bound, because 5s is not a statement about correctness — it is
- * headroom, and there was not enough of it. Measured: these five tests take ~7.5s in total in
- * isolation, so ~1.5s each; under the full 91-test suite on the api37 emulator two of them blew a
- * 5s wait while their identically-seeded siblings passed, and all five pass three runs out of three
- * alone. The same load-induced race `openspec/config.yaml`'s `compose-test-db-teardown-race` and
- * `TodayComposeTest`'s own KDoc already describe. Waiting longer costs nothing when the row arrives
- * on time.
- */
-private const val WAIT_TIMEOUT_MS = 15_000L
 private const val MORNING_MINUTE = 8 * 60
 
 /** A narrow phone, pinned rather than inherited: the defect this class guards is a width defect,
@@ -84,11 +72,10 @@ class TodaySlotRowComposeTest {
 
     @Test
     fun theAnswerLabelsStayOnOneLineNextToALongHabitNameOnAPhone() = runBlocking {
-        val habitId = fixture.database.insertHabitWithSchedule(name = LONG_HABIT_NAME)
-        fixture.insertEnabledSlot(habitId, MORNING_MINUTE)
+        fixture.seedHabitWithEnabledSlot(name = LONG_HABIT_NAME, minuteOfDay = MORNING_MINUTE)
+        viewModel.awaitRows(1)
 
         setPhoneSizedContent()
-        awaitNodeWithText(text(R.string.today_answer_skip))
 
         composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).assertIsDisplayed()
         composeTestRule.onNodeWithText(text(R.string.today_answer_no)).assertIsDisplayed()
@@ -123,12 +110,11 @@ class TodaySlotRowComposeTest {
      */
     @Test
     fun theSlotTimeReadsInTheDeviceHourCycle() = runBlocking {
-        val habitId = fixture.database.insertHabitWithSchedule(name = LONG_HABIT_NAME)
-        fixture.insertEnabledSlot(habitId, MORNING_MINUTE)
+        fixture.seedHabitWithEnabledSlot(name = LONG_HABIT_NAME, minuteOfDay = MORNING_MINUTE)
+        viewModel.awaitRows(1)
 
         setPhoneSizedContent()
         val shown = expectedTimeOnDevice(inTwentyFourHour = "08:00", inTwelveHour = "8:00 AM")
-        awaitNodeWithText(shown)
 
         composeTestRule
             .onNodeWithText("$shown — ${text(R.string.today_slot_pending)}")
@@ -145,15 +131,15 @@ class TodaySlotRowComposeTest {
      *  screen anywhere, which is exactly what the row used to render. */
     @Test
     fun anAnsweredSlotReadsAsCopyRatherThanTheEnumConstant() = runBlocking {
-        val habitId = fixture.database.insertHabitWithSchedule(name = LONG_HABIT_NAME)
-        fixture.insertEnabledSlot(habitId, MORNING_MINUTE)
+        fixture.seedHabitWithEnabledSlot(name = LONG_HABIT_NAME, minuteOfDay = MORNING_MINUTE)
+        viewModel.awaitRows(1)
 
         setPhoneSizedContent()
-        awaitNodeWithText(text(R.string.today_answer_yes))
         composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).performClick()
 
-        awaitNodeWithText(text(R.string.today_slot_completed))
-        composeTestRule.onNodeWithText("COMPLETED", substring = true).assertDoesNotExist()
+        viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.COMPLETED)
+        composeTestRule.onNodeWithText(text(R.string.today_slot_completed), substring = true).assertExists()
+        composeTestRule.onNodeWithText(EntryStatus.COMPLETED.name, substring = true).assertDoesNotExist()
     }
 
     private fun setPhoneSizedContent() {
@@ -163,14 +149,6 @@ class TodaySlotRowComposeTest {
             ) {
                 TodayRoute(onManageHabits = {}, viewModel = viewModel)
             }
-        }
-    }
-
-    /** An idle composition is not one that has received Room's first emission; the same race, and
-     *  the same fix, [TodayComposeTest] documents for its own finders. */
-    private fun awaitNodeWithText(label: String) {
-        composeTestRule.waitUntil(WAIT_TIMEOUT_MS) {
-            composeTestRule.onAllNodesWithText(label, substring = true).fetchSemanticsNodes().isNotEmpty()
         }
     }
 }

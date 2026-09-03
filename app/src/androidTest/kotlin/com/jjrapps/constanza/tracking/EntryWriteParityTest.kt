@@ -8,7 +8,6 @@ import com.jjrapps.constanza.core.data.mapper.toDomain
 import com.jjrapps.constanza.habit.HabitRepositoryTestFixture
 import com.jjrapps.constanza.reminding.AnswerResponder
 import com.jjrapps.constanza.reminding.AnswerWorker
-import com.jjrapps.constanza.scheduling.insertHabitWithSchedule
 import java.time.Instant
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -121,8 +120,7 @@ class EntryWriteParityTest {
     /** A daily habit with one enabled slot and one still-unresolved occurrence dated [ORIGIN_DATE] —
      *  the live-past-midnight shape both routes have to credit identically. */
     private suspend fun armHabit(name: String): Triple<Long, Long, Long> {
-        val habitId = fixture.database.insertHabitWithSchedule(name = name)
-        val slotId = fixture.insertEnabledSlot(habitId, EVENING_MINUTE)
+        val (habitId, slotId) = fixture.seedHabitWithEnabledSlot(name = name, minuteOfDay = EVENING_MINUTE)
         val scheduledAt = Instant.parse("${ORIGIN_DATE}T20:00:00Z").toEpochMilli()
         val occId = fixture.database.reminderOccurrenceDao().upsert(
             ReminderOccurrenceEntity(
