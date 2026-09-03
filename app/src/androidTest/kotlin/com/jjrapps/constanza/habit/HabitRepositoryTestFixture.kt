@@ -45,6 +45,12 @@ private val FIXED_INSTANT: Instant = Instant.parse("2026-09-01T08:00:00Z")
 class HabitRepositoryTestFixture(internal val context: Context) {
     val database: AppDatabase = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
     val timeProvider: TimeProvider = FakeTimeProvider(FIXED_INSTANT)
+
+    /** Shared by [occurrencePlanner] and [habitRepository] (tasks 1.1, 2.3), so a test can
+     *  `verify { alarmScheduler.cancel(id) }` against whichever of the two ran the cancellation —
+     *  a single mock instance is what makes that verification possible at all. Arming a real
+     *  system alarm is irrelevant to what these scenarios assert. */
+    val alarmScheduler: AlarmScheduler = mockk(relaxed = true)
     val occurrencePlanner: OccurrencePlanner
     val habitRepository: HabitRepository
 
@@ -60,7 +66,7 @@ class HabitRepositoryTestFixture(internal val context: Context) {
                 database.reminderSlotDao(),
                 database.reminderOccurrenceDao(),
             ),
-            mockk<AlarmScheduler>(relaxed = true),
+            alarmScheduler,
             timeProvider,
             RESOLVE_DEADLINE_HOURS,
         )
@@ -69,6 +75,7 @@ class HabitRepositoryTestFixture(internal val context: Context) {
             database.scheduleDao(),
             database.reminderSlotDao(),
             database.entryDao(),
+            database.reminderOccurrenceDao(),
         )
         habitRepository = HabitRepository(
             daos,
@@ -76,6 +83,7 @@ class HabitRepositoryTestFixture(internal val context: Context) {
             ScheduleEditor(database, database.scheduleDao(), occurrencePlanner),
             occurrencePlanner,
             timeProvider,
+            alarmScheduler,
         )
     }
 
@@ -109,7 +117,8 @@ class HabitRepositoryTestFixture(internal val context: Context) {
     }
 
     /** The habit list's ViewModel, registered for teardown. See [register]. */
-    fun habitListViewModel(): HabitListViewModel = register(HabitListViewModel(habitRepository))
+    fun habitListViewModel(): HabitListViewModel =
+        register(HabitListViewModel(habitRepository, database.entryDao()))
 
     /** The habit editor's ViewModel, registered for teardown. See [register]. */
     fun habitEditorViewModel(): HabitEditorViewModel =

@@ -30,6 +30,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -51,7 +52,8 @@ private const val GRANT_POLL_INTERVAL_MS = 50L
 private const val SEND_TIMEOUT_SECONDS = 10L
 
 private const val REMINDED_HABIT = "Meditate"
-private const val REMOVED_HABIT = "Stretch"
+private const val ARCHIVED_HABIT = "Stretch"
+private const val DELETED_HABIT = "Journal"
 
 /**
  * The device-free core-flow proof: on an emulator with nothing plugged in, the app walks a
@@ -301,25 +303,30 @@ class CoreFlowE2ETest {
     }
 
     /**
-     * Step 5: remove the habit through the UI, and see it gone from Today and from the database.
+     * Step 5: archive the habit through the UI, and see it gone from Today and out of the
+     * schedule while its row and history survive.
      *
      * `onboarding_done` is pre-seeded (design.md §8.4), for the same reason as the reminder test
      * above.
      *
-     * **Archive IS this app's removal gesture; there is no hard delete.** `HabitRepository` exposes
-     * `setArchived` and `deleteSlot`, and the habit list offers "Archive"/"Un-archive" — nothing
-     * anywhere deletes a habit row, by design, because a deleted habit would take its history with
-     * it. So "gone from the database" is asserted where the product actually deletes: archiving
-     * runs `OccurrencePlanner.replanAll`, whose `cancelAllFor` cancels every alarm for the habit
-     * and deletes its `reminder_occurrences` rows. The habit row itself is asserted to survive,
-     * archived and stamped — that is the specified behaviour, and a test that demanded its
-     * disappearance would be asserting a feature this app deliberately does not have.
+     * **Archiving is this app's REVERSIBLE removal gesture, not its only one.** Before this
+     * change, this KDoc claimed "nothing anywhere deletes a habit row, by design" — that became
+     * false once `HabitRepository.delete` shipped (habit-management: Habit Deletion, design.md
+     * D1). The row survives archiving for a different reason: archiving preserves every record it
+     * touches so the gesture can be undone, and un-archiving resumes reminders from exactly where
+     * un-archival happens. So "gone from the database" is asserted where archiving actually
+     * deletes: `OccurrencePlanner.replanAll`'s `cancelAllFor` cancels every alarm for the habit
+     * and deletes its `reminder_occurrences` rows. The habit row, its schedule and its entries are
+     * asserted to survive, archived and stamped — that is archiving's specified behaviour. The
+     * counterpart below,
+     * [deletingAHabitThroughTheUiRemovesItAndItsHistoryAndSilencesItsReminder], drives the
+     * irreversible gesture and asserts the opposite: the row is gone.
      */
     @Test
     fun removingAHabitThroughTheUiTakesItOffTodayAndOutOfTheSchedule() {
         launchOnboardedApp()
-        addHabitThroughTheUi(REMOVED_HABIT)
-        val habit = runBlocking { fixture.requireHabitNamed(REMOVED_HABIT) }
+        addHabitThroughTheUi(ARCHIVED_HABIT)
+        val habit = runBlocking { fixture.requireHabitNamed(ARCHIVED_HABIT) }
         assertTrue(
             "the habit must be armed before removal, or its disappearance proves nothing",
             runBlocking { fixture.occurrencesFor(habit.id) }.isNotEmpty(),
@@ -327,19 +334,71 @@ class CoreFlowE2ETest {
 
         // Only one active habit exists — setUp() cleared the rest — so this label is unambiguous.
         compose.onNodeWithText(string(R.string.habit_list_archive)).performClick()
-        awaitTextGone(REMOVED_HABIT)
+        awaitTextGone(ARCHIVED_HABIT)
 
         relaunchOnboardedApp()
-        compose.onNodeWithText(REMOVED_HABIT).assertDoesNotExist()
+        compose.onNodeWithText(ARCHIVED_HABIT).assertDoesNotExist()
         awaitText(string(R.string.today_empty))
 
-        val archived = runBlocking { fixture.requireHabitNamed(REMOVED_HABIT) }
-        assertTrue("archiving is this app's removal gesture", archived.archived)
+        val archived = runBlocking { fixture.requireHabitNamed(ARCHIVED_HABIT) }
+        assertTrue("archiving is this app's reversible removal gesture", archived.archived)
         assertNotNull("archiving stamps the date it happened", archived.archivedAt)
         assertTrue(
             "archiving must clear the habit's scheduling rows, not merely hide the habit",
             runBlocking { fixture.occurrencesFor(habit.id) }.isEmpty(),
         )
+    }
+
+    /**
+     * Step 5b: delete the habit through the UI, and see it and its history gone from the
+     * database, with no reminder ever arriving for it again.
+     *
+     * `onboarding_done` is pre-seeded (design.md §8.4), same reason as the reminder test above.
+     * [fixture.latestArmedOccurrenceFor] is read BEFORE deleting — after deletion there is no row
+     * left to read.
+     *
+     * **Division of proof (design.md's Testing Strategy).** This test proves only the SECOND line
+     * of defence: driving the exact broadcast `AlarmManager` would have sent finds no occurrence
+     * and no habit, so `ReminderFireHandler` returns without posting anything
+     * ([fixture.assertNoNotificationPosted]). It does NOT prove `AlarmScheduler.cancel` was called
+     * — that the FIRST line of defence actually ran is proven separately, by mock verification at
+     * the repository layer, in
+     * `HabitRepositoryDeleteTest.deletingAHabitCancelsEveryArmedOccurrenceItHad` (task 4.2). A
+     * single test claiming both would be false coverage.
+     */
+    @Test
+    fun deletingAHabitThroughTheUiRemovesItAndItsHistoryAndSilencesItsReminder() {
+        launchOnboardedApp()
+        addHabitThroughTheUi(DELETED_HABIT)
+        val habit = runBlocking { fixture.requireHabitNamed(DELETED_HABIT) }
+        val occurrence = runBlocking { fixture.latestArmedOccurrenceFor(habit.id) }
+
+        // Only one active habit exists — setUp() cleared the rest — so these labels are unambiguous.
+        compose.onNodeWithContentDescription(string(R.string.habit_list_more_options)).performClick()
+        compose.onNodeWithText(string(R.string.habit_list_delete)).performClick()
+        awaitText(string(R.string.habit_delete_dialog_confirm))
+        compose.onNodeWithText(string(R.string.habit_delete_dialog_confirm)).performClick()
+        awaitTextGone(DELETED_HABIT)
+
+        relaunchOnboardedApp()
+        compose.onNodeWithText(DELETED_HABIT).assertDoesNotExist()
+        awaitText(string(R.string.today_empty))
+
+        assertNull(
+            "deleting a habit must remove its row, unlike archiving",
+            runBlocking { fixture.habitNamed(DELETED_HABIT) },
+        )
+        assertTrue(
+            "deleting a habit must remove every reminder occurrence it had",
+            runBlocking { fixture.occurrencesFor(habit.id) }.isEmpty(),
+        )
+        assertTrue(
+            "deleting a habit must remove every entry it had",
+            runBlocking { fixture.entriesFor(habit.id) }.isEmpty(),
+        )
+
+        fixture.fireArmedAlarmFor(occurrence)
+        fixture.assertNoNotificationPosted(occurrence.id.toInt())
     }
 
     /**

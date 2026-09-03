@@ -18,6 +18,19 @@
     <string name="habit_list_archive">Archive</string>
     <string name="habit_list_unarchive">Un-archive</string>
 
+    <!-- habit-management: Habit Deletion (design.md D2/D4, task 3.4). The dialog is irreversible,
+         so it names the habit and states the exact count of records it destroys; zero is worded
+         honestly by the "other" plural category (English has no CLDR "zero"), never a separate
+         copy branch. Dismiss reuses action_cancel. -->
+    <string name="habit_list_more_options">More options</string>
+    <string name="habit_list_delete">Delete</string>
+    <string name="habit_delete_dialog_title">Delete %1$s?</string>
+    <plurals name="habit_delete_dialog_body">
+        <item quantity="one">%1$d recorded answer will be permanently deleted along with this habit. This cannot be undone.</item>
+        <item quantity="other">%1$d recorded answers will be permanently deleted along with this habit. This cannot be undone.</item>
+    </plurals>
+    <string name="habit_delete_dialog_confirm">Delete</string>
+
     <!-- habit-management: Habit editor (tasks 6a.1, 6a.2, 6a.3). -->
     <string name="habit_editor_title_create">New habit</string>
     <string name="habit_editor_title_edit">Edit habit</string>

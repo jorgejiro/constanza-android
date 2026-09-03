@@ -106,7 +106,17 @@ interface EntryDao {
 
     @Query("DELETE FROM entries WHERE habitId = :habitId AND slotId = :slotId")
     suspend fun deleteBySlot(habitId: Long, slotId: Long)
+
+    /** habit-management: Habit Deletion (design.md D3) — the confirmation dialog's per-habit
+     *  answer count, resident in [com.jjrapps.constanza.habit.HabitListUiState] rather than
+     *  queried at dialog-open time. A habit absent from the result has zero entries. */
+    @Query("SELECT habitId, COUNT(*) AS count FROM entries GROUP BY habitId")
+    fun observeCountsByHabit(): Flow<List<HabitEntryCount>>
 }
+
+/** habit-management: Habit Deletion (design.md D3). One row per habit that has at least one
+ *  [EntryEntity]; a habit with none is simply absent, never present with `count = 0`. */
+data class HabitEntryCount(val habitId: Long, val count: Int)
 
 /**
  * design.md D4/§8.2: `id` doubles as the notification id, the `PendingIntent` request code, and
