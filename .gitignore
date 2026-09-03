@@ -4,6 +4,8 @@ local.properties
 .idea/
 .DS_Store
 build/
+# Kotlin build-session scratch, written by every ./gradlew run.
+.kotlin/
 captures/
 .externalNativeBuild/
 .cxx/
