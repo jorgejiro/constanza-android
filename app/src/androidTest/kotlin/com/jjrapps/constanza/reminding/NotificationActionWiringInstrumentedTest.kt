@@ -12,6 +12,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.di.ReminderSettingsDataStoreEntryPoint
+import com.jjrapps.constanza.localization.AppLocaleController
+import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -41,7 +45,11 @@ private const val POLL_INTERVAL_MS = 50L
 class NotificationActionWiringInstrumentedTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
-    private val poster = NotificationPoster(context)
+    private val settingsStore = ReminderSettingsStore(
+        EntryPointAccessors.fromApplication(context, ReminderSettingsDataStoreEntryPoint::class.java)
+            .reminderSettingsDataStore(),
+    )
+    private val poster = NotificationPoster(context, AppLocaleController(context, settingsStore))
     private val notificationManager = context.getSystemService(NotificationManager::class.java)
     private val workManager = WorkManager.getInstance(context)
 
@@ -98,7 +106,7 @@ class NotificationActionWiringInstrumentedTest {
     }
 
     private fun postAndFindAction(occurrenceId: Long, labelRes: Int): Notification.Action {
-        poster.postReminder(occurrenceId, "Meditate", "Did you meditate today?", HABIT_COLOR_ARGB)
+        runBlocking { poster.postReminder(occurrenceId, "Meditate", "Did you meditate today?", HABIT_COLOR_ARGB) }
         val posted = awaitPosted(occurrenceId)
         val label = context.getString(labelRes)
         return posted.notification.actions.first { it.title == label }

@@ -9,7 +9,11 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.jjrapps.constanza.core.di.ReminderSettingsDataStoreEntryPoint
 import com.jjrapps.constanza.core.ui.theme.HabitColor
+import com.jjrapps.constanza.localization.AppLocaleController
+import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -37,7 +41,11 @@ private const val GRANT_POLL_INTERVAL_MS = 50L
 class NotificationPosterInstrumentedTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
-    private val poster = NotificationPoster(context)
+    private val settingsStore = ReminderSettingsStore(
+        EntryPointAccessors.fromApplication(context, ReminderSettingsDataStoreEntryPoint::class.java)
+            .reminderSettingsDataStore(),
+    )
+    private val poster = NotificationPoster(context, AppLocaleController(context, settingsStore))
     private val manager = context.getSystemService(NotificationManager::class.java)
 
     /**
@@ -68,7 +76,7 @@ class NotificationPosterInstrumentedTest {
     }
 
     @Test
-    fun postsAVisibleNotificationWithAllThreeActionsWhenEnabled() {
+    fun postsAVisibleNotificationWithAllThreeActionsWhenEnabled() = runBlocking {
         assertTrue(
             "POST_NOTIFICATIONS was granted in @Before, so notifications must be enabled here",
             NotificationManagerCompat.from(context).areNotificationsEnabled(),
@@ -104,7 +112,7 @@ class NotificationPosterInstrumentedTest {
      * asserting against a colour the app can no longer produce.
      */
     @Test
-    fun postedNotificationCarriesTheHabitColourAsItsAccent() {
+    fun postedNotificationCarriesTheHabitColourAsItsAccent() = runBlocking {
         val expectedColor = HabitColor.TEAL.argb
         assertTrue(
             "postReminder must report a real post when notifications are enabled",

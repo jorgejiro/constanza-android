@@ -4,11 +4,14 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import androidx.core.app.NotificationManagerCompat
+import com.jjrapps.constanza.localization.AppLocaleController
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
 import kotlin.test.Test
@@ -28,13 +31,15 @@ class NotificationPosterTest {
 
     private val context = mockk<Context>(relaxed = true)
     private val manager = mockk<NotificationManagerCompat>(relaxUnitFun = true)
+    private val appLocaleController = mockk<AppLocaleController>()
     private lateinit var poster: NotificationPoster
 
     @Before
     fun setUp() {
         mockkStatic(NotificationManagerCompat::class)
         every { NotificationManagerCompat.from(context) } returns manager
-        poster = NotificationPoster(context)
+        coEvery { appLocaleController.localizedApplicationContext() } returns context
+        poster = NotificationPoster(context, appLocaleController)
     }
 
     @After
@@ -90,7 +95,7 @@ class NotificationPosterTest {
      *  rather than swallowed. The `true` return is proven on-device instead, where a real
      *  `Notification` can be built (`NotificationPosterInstrumentedTest`). */
     @Test
-    fun `postReminder skips notify entirely and reports no post when posting is blocked`() {
+    fun `postReminder skips notify entirely and reports no post when posting is blocked`() = runTest {
         every { manager.areNotificationsEnabled() } returns false
 
         assertFalse(poster.postReminder(OCCURRENCE_ID, "Meditate", "Did you meditate today?", 0))
