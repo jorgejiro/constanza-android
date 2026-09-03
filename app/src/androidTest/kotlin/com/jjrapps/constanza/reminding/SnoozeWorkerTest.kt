@@ -13,6 +13,7 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.jjrapps.constanza.core.data.AppDatabase
 import com.jjrapps.constanza.core.data.entity.ReminderOccurrenceEntity
+import com.jjrapps.constanza.localization.AppLocaleController
 import com.jjrapps.constanza.scheduling.AlarmScheduler
 import com.jjrapps.constanza.scheduling.FakeTimeProvider
 import com.jjrapps.constanza.scheduling.insertHabitWithSchedule
@@ -58,8 +59,11 @@ class SnoozeWorkerTest {
 
     private fun buildWorker(occId: Long, now: Instant): SnoozeWorker {
         val context = ApplicationProvider.getApplicationContext<Context>()
+        // localization: never touched by this path — SnoozeResponder only ever calls
+        // NotificationPoster.cancel(), which needs no locale, so a relaxed mock is enough.
+        val notificationPoster = NotificationPoster(context, mockk<AppLocaleController>(relaxed = true))
         val responder = SnoozeResponder(
-            database.reminderOccurrenceDao(), alarmScheduler, NotificationPoster(context), settingsStore, FakeTimeProvider(now),
+            database.reminderOccurrenceDao(), alarmScheduler, notificationPoster, settingsStore, FakeTimeProvider(now),
         )
         val inputData = Data.Builder().putLong(SnoozeWorker.KEY_OCCURRENCE_ID, occId).build()
         val factory = object : WorkerFactory() {

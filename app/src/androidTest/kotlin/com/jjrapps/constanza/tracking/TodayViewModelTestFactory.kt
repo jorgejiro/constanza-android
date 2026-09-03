@@ -2,6 +2,7 @@ package com.jjrapps.constanza.tracking
 
 import com.jjrapps.constanza.core.time.SelfReschedulingCurrentDateSource
 import com.jjrapps.constanza.habit.HabitRepositoryTestFixture
+import com.jjrapps.constanza.localization.AppLocaleController
 import com.jjrapps.constanza.reminding.NotificationPermission
 import com.jjrapps.constanza.reminding.NotificationPoster
 import com.jjrapps.constanza.reminding.ReminderSettingsStore
@@ -70,10 +71,15 @@ fun HabitRepositoryTestFixture.todayViewModel(
  * The scheduler here is left relaxed on purpose: unlike the ViewModel's, this one only re-arms
  * occurrences after a write, and no test observes that. It is [todayViewModel]'s scheduler, the one
  * the banner branch reads, that has to be stubbed explicitly.
+ *
+ * localization: [AppLocaleController] is a relaxed mock — none of these screens' scenarios post a
+ * reminder notification, so its locale resolution is never exercised here.
  */
 fun HabitRepositoryTestFixture.entryWriter(): EntryWriter = EntryWriter(
     database, database.entryDao(), database.reminderOccurrenceDao(),
-    mockk<AlarmScheduler>(relaxed = true), NotificationPoster(context), timeProvider,
+    mockk<AlarmScheduler>(relaxed = true),
+    NotificationPoster(context, mockk<AppLocaleController>(relaxed = true)),
+    timeProvider,
 )
 
 /**
