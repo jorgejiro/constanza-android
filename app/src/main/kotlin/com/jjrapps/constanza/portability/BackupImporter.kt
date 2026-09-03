@@ -13,17 +13,47 @@ import javax.inject.Inject
 
 private val IMPORT_JSON = Json { ignoreUnknownKeys = true }
 
-private const val MALFORMED_MESSAGE = "The selected file is not a valid Constanza backup."
+/**
+ * app-localization: why an import was refused, as a value rather than as a sentence.
+ *
+ * This class and its exceptions are deliberately Android-free — no injected `Context`, testable
+ * without the framework — so they cannot call `getString` and must not carry user-facing English.
+ * Previously they did: the message travelled all the way to `DataPortabilityScreen`, which rendered
+ * it verbatim, which meant a user who had chosen Spanish was told in English why their backup was
+ * rejected. Carrying the *reason* plus its interpolation arguments lets the Compose layer, which
+ * does have resources, pick the wording.
+ *
+ * Each case maps to exactly one `portability_import_error_*` string resource.
+ */
+sealed interface ImportFailure {
+    /** The SAF read itself produced nothing — the file was never parsed. */
+    data object UnreadableFile : ImportFailure
+
+    /** Unparseable JSON, or JSON that is not a Constanza backup at all. */
+    data object MalformedFile : ImportFailure
+
+    /** design.md §8.4's Forward compatibility row. */
+    data class UnsupportedVersion(val fileVersion: Int) : ImportFailure
+
+    /** Structurally parseable, but an entry points at a slot absent from its own habit's slots. */
+    data class UnknownSlotReference(val habitId: Long, val slotId: Long) : ImportFailure
+}
 
 /** data-portability: Malformed file leaves data intact. Thrown by [BackupImporter.parseAndValidate]
  *  before any database write, whether the cause is unparseable JSON or a structurally invalid
- *  backup (e.g. an entry referencing a slot id absent from its own habit's [BackupHabit.slots]). */
-class MalformedBackupException(message: String, cause: Throwable? = null) : Exception(message, cause)
+ *  backup (e.g. an entry referencing a slot id absent from its own habit's [BackupHabit.slots]).
+ *
+ *  [failure] is the authoritative payload. The exception message exists for logs and crash reports
+ *  and is deliberately technical: it is never shown to a user. */
+class MalformedBackupException(val failure: ImportFailure, cause: Throwable? = null) :
+    Exception("Backup rejected: $failure", cause)
 
 /** design.md §8.4's Forward compatibility row: a newer [BackupFile.formatVersion] refuses the
  *  whole import instead of importing partially. */
-class UnsupportedBackupVersionException(fileVersion: Int) :
-    Exception("This backup was made by a newer version of Constanza (format $fileVersion) and can't be imported here.")
+class UnsupportedBackupVersionException(val fileVersion: Int) :
+    Exception("Backup rejected: unsupported format version $fileVersion") {
+    val failure: ImportFailure.UnsupportedVersion = ImportFailure.UnsupportedVersion(fileVersion)
+}
 
 /**
  * Task 2.8 (data-portability: Backup Schema Version Read On Import, Legacy Habit Colour Normalized
@@ -70,9 +100,9 @@ class BackupImporter @Inject constructor(
     private fun decode(json: String): BackupFile = try {
         IMPORT_JSON.decodeFromString(BackupFile.serializer(), json)
     } catch (e: SerializationException) {
-        throw MalformedBackupException(MALFORMED_MESSAGE, e)
+        throw MalformedBackupException(ImportFailure.MalformedFile, e)
     } catch (e: IllegalArgumentException) {
-        throw MalformedBackupException(MALFORMED_MESSAGE, e)
+        throw MalformedBackupException(ImportFailure.MalformedFile, e)
     }
 
     private fun validateHabit(habit: BackupHabit) {
@@ -81,7 +111,7 @@ class BackupImporter @Inject constructor(
             val slotId = entry.slotId
             if (slotId != null && slotId !in slotIds) {
                 throw MalformedBackupException(
-                    "Habit ${habit.id} has an entry referencing unknown slot $slotId.",
+                    ImportFailure.UnknownSlotReference(habitId = habit.id, slotId = slotId),
                 )
             }
         }

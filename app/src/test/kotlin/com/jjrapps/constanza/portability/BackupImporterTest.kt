@@ -49,14 +49,28 @@ class BackupImporterTest {
         val json = validBackupJson().replace(""""formatVersion": 1""", """"formatVersion": 99""")
 
         val error = assertFailsWith<UnsupportedBackupVersionException> { importer.parseAndValidate(json) }
-        assertTrue(error.message.orEmpty().contains("99"), "message should name the offending version")
+        // app-localization: asserted on the typed payload, not on the message. Reading the offending
+        // version out of a sentence is exactly the coupling this refactor removed — the message is
+        // now a technical log line and the UI never sees it.
+        assertEquals(99, error.fileVersion)
+        assertEquals(ImportFailure.UnsupportedVersion(99), error.failure)
     }
 
     @Test
     fun `an entry referencing a slot id absent from its habit's slots is malformed`() {
         val json = validBackupJson().replace(""""slotId": 10""", """"slotId": 999""")
 
-        assertFailsWith<MalformedBackupException> { importer.parseAndValidate(json) }
+        val error = assertFailsWith<MalformedBackupException> { importer.parseAndValidate(json) }
+        // Both interpolation arguments survive to the UI layer, which is what lets the Spanish
+        // string say WHICH habit and WHICH slot rather than falling back to a vague sentence.
+        assertEquals(ImportFailure.UnknownSlotReference(habitId = 1L, slotId = 999L), error.failure)
+    }
+
+    @Test
+    fun `unparseable text reports the malformed-file reason rather than a sentence`() {
+        val error = assertFailsWith<MalformedBackupException> { importer.parseAndValidate("not json at all") }
+
+        assertEquals(ImportFailure.MalformedFile, error.failure)
     }
 
     @Test

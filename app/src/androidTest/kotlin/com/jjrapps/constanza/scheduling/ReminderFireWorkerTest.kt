@@ -15,9 +15,9 @@ import com.jjrapps.constanza.core.data.AppDatabase
 import com.jjrapps.constanza.core.data.entity.EntryEntity
 import com.jjrapps.constanza.core.data.entity.ReminderOccurrenceEntity
 import com.jjrapps.constanza.reminding.NotificationPoster
-import io.mockk.every
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
-import io.mockk.verify
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -81,13 +81,13 @@ class ReminderFireWorkerTest {
 
     @Test
     fun postsTheNotificationAndRecordsFiredState() = runBlocking {
-        every { notificationPoster.postReminder(any(), any(), any(), any()) } returns true
+        coEvery { notificationPoster.postReminder(any(), any(), any(), any()) } returns true
         val habitId = insertHabit(kind = "DAILY")
         val now = Instant.parse("2026-09-01T08:00:00Z")
         val occId = insertArmedOccurrence(habitId, "2026-09-01", now)
         buildWorker(occId, now).doWork()
 
-        verify { notificationPoster.postReminder(occId, "Exercise", "Did you exercise?", 0) }
+        coVerify { notificationPoster.postReminder(occId, "Exercise", "Did you exercise?", 0) }
         val stored = database.reminderOccurrenceDao().findById(occId)
         assertEquals("FIRED", stored?.state)
         assertEquals(now.toEpochMilli(), stored?.notifiedAtEpochMs)
@@ -103,7 +103,7 @@ class ReminderFireWorkerTest {
      */
     @Test
     fun aGatedPostRecordsNoNotifiedAtAndStillLandsOnFired() = runBlocking {
-        every { notificationPoster.postReminder(any(), any(), any(), any()) } returns false
+        coEvery { notificationPoster.postReminder(any(), any(), any(), any()) } returns false
         val habitId = insertHabit(kind = "DAILY")
         val now = Instant.parse("2026-09-01T08:00:00Z")
         val occId = insertArmedOccurrence(habitId, "2026-09-01", now)
@@ -125,7 +125,7 @@ class ReminderFireWorkerTest {
         val occId = insertArmedOccurrence(habitId, "2026-09-02", now)
         buildWorker(occId, now).doWork()
 
-        verify(exactly = 0) { notificationPoster.postReminder(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { notificationPoster.postReminder(any(), any(), any(), any()) }
         assertEquals("SUPPRESSED", database.reminderOccurrenceDao().findById(occId)?.state)
     }
 
