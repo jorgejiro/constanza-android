@@ -3,7 +3,6 @@ package com.jjrapps.constanza.tracking
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -11,7 +10,6 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.habit.HabitRepositoryTestFixture
-import com.jjrapps.constanza.scheduling.insertHabitWithSchedule
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -20,17 +18,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Bound for awaiting a Room-Flow-fed row. 15s rather than the 5s the older Today tests use, and
- * matched to `CoreFlowE2ETest`'s own bound, because 5s is not a statement about correctness — it is
- * headroom, and there was not enough of it. Measured: these five tests take ~7.5s in total in
- * isolation, so ~1.5s each; under the full 91-test suite on the api37 emulator two of them blew a
- * 5s wait while their identically-seeded siblings passed, and all five pass three runs out of three
- * alone. The same load-induced race `openspec/config.yaml`'s `compose-test-db-teardown-race` and
- * `TodayComposeTest`'s own KDoc already describe. Waiting longer costs nothing when the row arrives
- * on time.
- */
-private const val WAIT_TIMEOUT_MS = 15_000L
 private const val MORNING_MINUTE = 8 * 60
 private const val HABIT_NAME = "Stretch"
 
@@ -78,7 +65,6 @@ class TodayAddHabitComposeTest {
             TodayRoute(onManageHabits = {}, onAddHabit = { addHabitTaps++ }, viewModel = viewModel)
         }
 
-        awaitTag(TODAY_ADD_HABIT_EMPTY_TEST_TAG)
         composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_EMPTY_TEST_TAG).assertIsDisplayed()
         composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_TRAILING_TEST_TAG).assertDoesNotExist()
         // The sentence stays: it says what the state IS, and the button says what to do about it.
@@ -90,15 +76,14 @@ class TodayAddHabitComposeTest {
 
     @Test
     fun aPopulatedTodayShowsTheTrailingAddActionAndNoCentredOne() = runBlocking {
-        val habitId = fixture.database.insertHabitWithSchedule(name = HABIT_NAME)
-        fixture.insertEnabledSlot(habitId, MORNING_MINUTE)
+        fixture.seedHabitWithEnabledSlot(name = HABIT_NAME, minuteOfDay = MORNING_MINUTE)
+        viewModel.awaitRows(1)
 
         var addHabitTaps = 0
         composeTestRule.setContent {
             TodayRoute(onManageHabits = {}, onAddHabit = { addHabitTaps++ }, viewModel = viewModel)
         }
 
-        awaitTag(TODAY_ADD_HABIT_TRAILING_TEST_TAG)
         composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_TRAILING_TEST_TAG).assertIsDisplayed()
         composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_EMPTY_TEST_TAG).assertDoesNotExist()
         composeTestRule.onNodeWithText(text(R.string.today_empty)).assertDoesNotExist()
@@ -117,13 +102,12 @@ class TodayAddHabitComposeTest {
      */
     @Test
     fun theTrailingAddActionSitsBelowEveryHabitRow() = runBlocking {
-        val habitId = fixture.database.insertHabitWithSchedule(name = HABIT_NAME)
-        fixture.insertEnabledSlot(habitId, MORNING_MINUTE)
+        fixture.seedHabitWithEnabledSlot(name = HABIT_NAME, minuteOfDay = MORNING_MINUTE)
+        viewModel.awaitRows(1)
 
         composeTestRule.setContent {
             TodayRoute(onManageHabits = {}, viewModel = viewModel)
         }
-        awaitTag(TODAY_ADD_HABIT_TRAILING_TEST_TAG)
 
         val rowName = composeTestRule.onNodeWithText(HABIT_NAME).fetchSemanticsNode().boundsInRoot
         val answerButton = composeTestRule.onNodeWithText(text(R.string.today_answer_yes))
@@ -133,13 +117,5 @@ class TodayAddHabitComposeTest {
 
         assertTrue("the add action must sit below the habit's name", rowName.bottom <= action.top)
         assertTrue("the add action must sit below the habit's answer buttons", answerButton.bottom <= action.top)
-    }
-
-    /** An idle composition is not one that has received Room's first emission; the same race, and
-     *  the same fix, [TodayComposeTest] documents for its own text finders. */
-    private fun awaitTag(tag: String) {
-        composeTestRule.waitUntil(WAIT_TIMEOUT_MS) {
-            composeTestRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
-        }
     }
 }

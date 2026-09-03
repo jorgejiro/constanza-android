@@ -13,7 +13,6 @@ import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
 import com.jjrapps.constanza.habit.HabitRepositoryTestFixture
 import com.jjrapps.constanza.habit.newHabit
-import com.jjrapps.constanza.scheduling.insertHabitWithSchedule
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -22,11 +21,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Bound for awaiting a Room-Flow-fed row. Raised from 5s to 15s with `today-add-habit`: three
- *  more Room-backed Compose classes joined this suite and the extra contention started blowing the
- *  old bound on the matrix while the same tests passed in isolation. The assertions are unchanged;
- *  only the headroom is. See `TodayAddHabitComposeTest` for the measurements. */
-private const val WAIT_TIMEOUT_MS = 15_000L
 private const val MORNING_MINUTE = 8 * 60
 private const val EVENING_MINUTE = 20 * 60
 
@@ -67,18 +61,17 @@ class TodayComposeTest {
         )
         val habitId = fixture.habitRepository.create(newHabit("Stretch"), Schedule.TimesPerDay(), slots)
 
+        viewModel.awaitOneRowWithSlots(2)
+
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
-        awaitNodeWithText(text(R.string.today_expand))
         composeTestRule.onNodeWithText(text(R.string.today_expand)).performClick()
         composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes))[0].performClick()
         // The localised label, not `EntryStatus.COMPLETED.name`, which is what this row used to
         // render (today-row-answering-is-cramped-and-always-on, defect 2). Keeping the assertion on
         // the string resource is also what stops the raw constant coming back unnoticed — the
         // explicit check below says so directly.
-        composeTestRule.waitUntil(WAIT_TIMEOUT_MS) {
-            composeTestRule.onAllNodesWithText(text(R.string.today_slot_completed), substring = true)
-                .fetchSemanticsNodes().isNotEmpty()
-        }
+        viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.COMPLETED)
+        composeTestRule.onNodeWithText(text(R.string.today_slot_completed), substring = true).assertExists()
         composeTestRule.onNodeWithText(EntryStatus.COMPLETED.name, substring = true).assertDoesNotExist()
 
         // The sibling slot's own row still reads pending — never touched by the first slot's answer.
@@ -110,17 +103,14 @@ class TodayComposeTest {
      */
     @Test
     fun skippingInAppPersistsSkippedOnTheAnsweredSlotAndDate() = runBlocking {
-        val habitId = fixture.database.insertHabitWithSchedule(name = "Journal")
-        val slotId = fixture.insertEnabledSlot(habitId, EVENING_MINUTE)
+        val (habitId, slotId) = fixture.seedHabitWithEnabledSlot(name = "Journal", minuteOfDay = EVENING_MINUTE)
+        viewModel.awaitRows(1)
 
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
-        awaitNodeWithText(text(R.string.today_answer_skip))
         composeTestRule.onNodeWithText(text(R.string.today_answer_skip)).performClick()
         // Again the localised label rather than the enum constant; see the sibling test above.
-        composeTestRule.waitUntil(WAIT_TIMEOUT_MS) {
-            composeTestRule.onAllNodesWithText(text(R.string.today_slot_skipped), substring = true)
-                .fetchSemanticsNodes().isNotEmpty()
-        }
+        viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.SKIPPED)
+        composeTestRule.onNodeWithText(text(R.string.today_slot_skipped), substring = true).assertExists()
         composeTestRule.onNodeWithText(EntryStatus.SKIPPED.name, substring = true).assertDoesNotExist()
 
         val entry = fixture.database.entryDao().findByHabitId(habitId).single()
@@ -128,22 +118,4 @@ class TodayComposeTest {
         assertEquals(fixture.timeProvider.today().toString(), entry.date)
         assertEquals(slotId, entry.slotId)
     }
-
-    /**
-     * `performClick()` waits for the composition to be idle, which is NOT the same as waiting for
-     * the row to exist: [TodayViewModel.uiState] is fed by Room Flows through `combine`, so an idle
-     * composition can simply be one that has not received the first emission yet. Clicking then
-     * either misses the node or hits a row whose occurrence handle is still null.
-     *
-     * That is not theoretical — it failed exactly once in a full-suite run while passing four times
-     * out of four in isolation, because the full suite loads the device enough to lose the race.
-     * Await the node, never assume it; the same discipline the notification-post visibility and the
-     * WorkManager enqueue assertions in this project already needed.
-     */
-    private fun awaitNodeWithText(label: String) {
-        composeTestRule.waitUntil(WAIT_TIMEOUT_MS) {
-            composeTestRule.onAllNodesWithText(label).fetchSemanticsNodes().isNotEmpty()
-        }
-    }
-
 }
