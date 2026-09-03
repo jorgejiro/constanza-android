@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    app-localization: es-ES informal (tú), Spain lexicon ("Ajustes", "Aplazar", "Eliminar hábito").
+    `app_name` is omitted — it is `translatable="false"` in `values/strings.xml` and stays
+    "Constanza" everywhere (D9's StringResourceParityTest honours that attribute both ways).
+    Key parity, per-key format-specifier multiset parity, the literal `%%` in `progress_compliance`,
+    and both plural forms below are all enforced by `StringResourceParityTest` (design.md D9).
+-->
+<resources>
+    <!-- reminder-response: Notification Actions (task 5.1). -->
+    <string name="notification_channel_reminders_name">Recordatorios de hábitos</string>
+    <string name="notification_action_yes">Sí</string>
+    <string name="notification_action_no">No</string>
+    <string name="notification_action_snooze">Aplazar</string>
+    <string name="notification_default_question">¿Lo has hecho?</string>
+
+    <!-- habit-management: Habit list (task 6a.4). -->
+    <string name="habit_list_title">Hábitos</string>
+    <string name="habit_list_add_habit">Añadir hábito</string>
+    <string name="habit_list_show_archived">Mostrar archivados</string>
+    <string name="habit_list_empty_active">Aún no tienes hábitos. Toca + para añadir uno.</string>
+    <string name="habit_list_empty_archived">No hay hábitos archivados.</string>
+    <string name="habit_list_archive">Archivar</string>
+    <string name="habit_list_unarchive">Desarchivar</string>
+
+    <!-- habit-management: Habit Deletion (design.md D2/D4, task 3.4). -->
+    <string name="habit_list_more_options">Más opciones</string>
+    <string name="habit_list_delete">Eliminar</string>
+    <string name="habit_delete_dialog_title">¿Eliminar %1$s?</string>
+    <plurals name="habit_delete_dialog_body">
+        <item quantity="one">Se eliminará permanentemente %1$d respuesta registrada junto con este hábito. Esta acción no se puede deshacer.</item>
+        <item quantity="other">Se eliminarán permanentemente %1$d respuestas registradas junto con este hábito. Esta acción no se puede deshacer.</item>
+    </plurals>
+    <string name="habit_delete_dialog_confirm">Eliminar</string>
+
+    <!-- habit-management: Habit editor (tasks 6a.1, 6a.2, 6a.3). -->
+    <string name="habit_editor_title_create">Nuevo hábito</string>
+    <string name="habit_editor_title_edit">Editar hábito</string>
+    <string name="habit_editor_name_label">Nombre</string>
+    <string name="habit_editor_name_error">El nombre es obligatorio</string>
+    <string name="habit_editor_question_label">Pregunta guía (opcional)</string>
+    <string name="habit_editor_notes_label">Notas (opcional)</string>
+    <string name="habit_editor_color_label">Color</string>
+    <string name="habit_editor_save">Guardar</string>
+
+    <!-- habit-management: leaving the editor without saving. -->
+    <string name="habit_editor_discard_title">¿Descartar cambios?</string>
+    <string name="habit_editor_discard_body">Este hábito tiene cambios sin guardar. Si sales ahora, se perderán.</string>
+    <string name="habit_editor_discard_confirm">Descartar</string>
+
+    <!-- habit-scheduling: schedule-kind picker and per-kind parameter editors (task 6a.1, slice ii-a). -->
+    <string name="habit_editor_schedule_label">Frecuencia</string>
+    <string name="schedule_kind_daily">Diaria</string>
+    <string name="schedule_kind_times_per_day">Varias veces al día</string>
+    <string name="schedule_kind_n_times_per_week">Veces por semana</string>
+    <string name="schedule_kind_weekly">Semanal</string>
+    <string name="schedule_kind_monthly">Mensual</string>
+    <string name="schedule_kind_every_n_days">Cada N días</string>
+    <string name="habit_editor_times_per_week_label">Veces por semana</string>
+    <string name="habit_editor_day_of_week_label">Día de la semana</string>
+    <string name="habit_editor_day_of_month_label">Día del mes</string>
+    <string name="habit_editor_every_n_days_label">Repetir cada (días)</string>
+    <string name="habit_editor_anchor_date_label">Fecha de inicio (AAAA-MM-DD)</string>
+    <string name="habit_editor_anchor_date_error">Introduce una fecha válida como AAAA-MM-DD</string>
+    <string name="habit_editor_decrement">−</string>
+    <string name="habit_editor_increment">+</string>
+
+    <!-- habit-scheduling: TIMES_PER_DAY reminder-slot editor (task 6a.1, slice ii-a). -->
+    <string name="habit_editor_slots_label">Horas de recordatorio</string>
+    <string name="habit_editor_slots_error">Añade al menos una hora de recordatorio</string>
+    <string name="habit_editor_slot_add">Añadir hora</string>
+    <string name="habit_editor_slot_remove">Eliminar</string>
+    <string name="habit_editor_slot_enabled_label">Activado</string>
+
+    <!-- habit-scheduling: single optional reminder time for the five non-TIMES_PER_DAY kinds. -->
+    <string name="habit_editor_reminder_time_switch">Recordármelo</string>
+    <string name="habit_editor_reminder_time_label">Hora del recordatorio</string>
+    <string name="habit_editor_reminder_time_none">No hay ningún recordatorio configurado. Aún puedes seguir este hábito en la aplicación.</string>
+
+    <!-- habit-entry-tracking: Today screen, expandable per-habit rollup rows (task 6b.1, OA-2). -->
+    <string name="today_title">Hoy</string>
+    <string name="today_manage_habits">Gestionar hábitos</string>
+    <string name="today_empty">No hay nada pendiente hoy.</string>
+    <string name="today_add_habit">Añadir hábito</string>
+    <string name="today_status_all_completed">Todo hecho</string>
+    <string name="today_status_partial">En progreso</string>
+    <string name="today_status_any_missed">Algo pendiente</string>
+    <string name="today_status_all_skipped">Omitido</string>
+    <string name="today_status_pending">Pendiente</string>
+    <string name="today_expand">Mostrar horas</string>
+    <string name="today_collapse">Ocultar horas</string>
+
+    <!-- reminder-response: pending/snoozed rendering by reading reminder_occurrences (task 6b.3, design D3). -->
+    <string name="today_slot_pending">Pendiente</string>
+    <string name="today_slot_completed">Hecho</string>
+    <string name="today_slot_missed">Perdido</string>
+    <string name="today_slot_skipped">Omitido</string>
+    <string name="today_slot_pending_snoozed_until">Pendiente, aplazado hasta %1$s</string>
+
+    <!-- habit-entry-tracking: in-app Entry write path, SKIPPED is in-app only (task 6b.2). -->
+    <string name="today_answer_yes">Sí</string>
+    <string name="today_answer_no">No</string>
+    <string name="today_answer_skip">Omitir</string>
+
+    <!-- today-answered-slot-collapse: %1$s is the habit name, %2$s is the answered-status text
+         (see TodayScreen.kt). Spanish word order legitimately reorders the two arguments while
+         keeping both positional indices — this is the exact case D9's StringResourceParityTest
+         checks a multiset for, not a sequence. -->
+    <string name="today_slot_change">Cambiar</string>
+    <string name="today_slot_change_a11y">Cambiar respuesta de %2$s para %1$s</string>
+
+    <!-- design §12/§13.1: non-blocking exact-alarm banner (task 6b.9). -->
+    <string name="today_settings">Ajustes</string>
+    <string name="today_exact_alarm_banner">Es posible que los recordatorios lleguen unos minutos tarde en este dispositivo.</string>
+    <string name="today_exact_alarm_banner_action">Abrir ajustes</string>
+
+    <!-- reminder-response: Notification Permission Scope. -->
+    <string name="today_notification_permission_banner">Los recordatorios no podrán llegarte hasta que permitas las notificaciones.</string>
+    <string name="today_notification_permission_allow">Permitir</string>
+    <string name="today_notification_permission_open_settings">Abrir ajustes</string>
+
+    <!-- habit-progress: Streak Calculation, Compliance Calculation (task 6b.4, OA-4 30-day window).
+         `progress_compliance` carries a literal `%%` that MUST survive translation unescaped
+         (D9, scenario "A literal percent sign survives translation"). -->
+    <string name="progress_title">Progreso</string>
+    <string name="progress_no_schedule">No se encontró ninguna programación para este hábito.</string>
+    <string name="progress_current_streak">Racha actual: %1$d</string>
+    <string name="progress_best_streak">Mejor racha: %1$d</string>
+    <string name="progress_compliance">Cumplimiento (últimos 30 días): %1$d%%</string>
+
+    <!-- reminder-response: Snooze Configuration and Re-arm (task 6b.5, bound to task 5.6's DataStore entry). -->
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_snooze_section_title">Duración de aplazamiento predeterminada</string>
+    <string name="settings_snooze_minutes">%1$d min</string>
+    <string name="settings_snooze_hours">%1$d h</string>
+
+    <!-- app-localization: the in-app three-option language picker (Three-State Language Override). -->
+    <string name="settings_language_section_title">Idioma</string>
+    <string name="settings_language_system_default">Predeterminado del sistema</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_language_spanish">Español</string>
+
+    <!-- habit-management: per-habit progress entry point (task 6b.4). -->
+    <string name="habit_list_progress">Progreso</string>
+
+    <!-- data-portability: manual export/import (tasks 7.2, 7.3, 7.4). -->
+    <string name="portability_section_title">Datos y copia de seguridad</string>
+    <string name="portability_export_action">Exportar datos</string>
+    <string name="portability_import_action">Importar datos</string>
+    <string name="portability_import_confirm_title">¿Reemplazar todos los datos?</string>
+    <string name="portability_import_confirm_body">Importar este archivo reemplaza todos los hábitos, programaciones y registros actuales en este dispositivo. Esta acción no se puede deshacer.</string>
+    <string name="portability_import_confirm_action">Reemplazar</string>
+    <string name="portability_import_success">Importación completada.</string>
+
+    <!-- data-portability: Import (MODIFIED) — one message per ImportFailure variant (design.md D6). -->
+    <string name="portability_import_error_unreadable_file">No se ha podido leer el archivo de copia de seguridad.</string>
+    <string name="portability_import_error_malformed_file">Este archivo no es una copia de seguridad válida de Constanza.</string>
+    <string name="portability_import_error_unsupported_version">Esta copia de seguridad se creó con una versión más reciente de Constanza (formato %1$d) y no se puede importar aquí.</string>
+    <string name="portability_import_error_unknown_slot_reference">Esta copia de seguridad hace referencia a una hora de recordatorio que ya no existe (hábito %1$d, franja %2$d).</string>
+
+    <string name="action_back">Atrás</string>
+    <string name="action_ok">Aceptar</string>
+    <string name="action_cancel">Cancelar</string>
+    <string name="action_dismiss">Descartar</string>
+
+    <!-- first-run-onboarding: two-screen, API-conditional first-run flow (design.md §6, §7). -->
+    <string name="onboarding_screen1_title">Bienvenido a Constanza</string>
+    <string name="onboarding_screen1_body">Controla tus hábitos sin ruido. Añade un hábito y Constanza te lo recuerda cuando toca.</string>
+    <string name="onboarding_screen2_title">Mantente al día con los recordatorios</string>
+    <string name="onboarding_permission_should_request_body">Permite las notificaciones para que Constanza pueda recordarte cuando un hábito esté pendiente.</string>
+    <string name="onboarding_permission_should_request_action">Permitir</string>
+    <string name="onboarding_permission_granted_body">Las notificaciones están activadas. Los recordatorios te llegarán cuando un hábito esté pendiente.</string>
+    <string name="onboarding_permission_blocked_body">Las notificaciones están desactivadas. Abre los ajustes para volver a activarlas y que los recordatorios puedan llegarte.</string>
+    <string name="onboarding_permission_blocked_action">Abrir ajustes</string>
+    <string name="onboarding_action_continue">Continuar</string>
+    <string name="onboarding_action_finish">Finalizar</string>
+    <string name="onboarding_exact_alarm_granted_body">Los recordatorios exactos están activados. Los hábitos sonarán justo a tiempo.</string>
+    <string name="onboarding_exact_alarm_denied_body">Los recordatorios seguirán llegando, pero en este dispositivo pueden llegar unos minutos tarde a menos que actives las alarmas exactas.</string>
+    <string name="onboarding_exact_alarm_denied_action">Abrir ajustes</string>
+</resources>

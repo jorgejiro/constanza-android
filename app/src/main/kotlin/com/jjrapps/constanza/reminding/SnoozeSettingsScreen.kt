@@ -42,7 +42,7 @@ fun SnoozeSettingsScreen(current: SnoozeDuration, onSelect: (SnoozeDuration) -> 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.settings_snooze_title)) },
+                title = { Text(stringResource(R.string.settings_title)) },
                 actions = { TextButton(onClick = onBack) { Text(stringResource(R.string.action_back)) } },
             )
         },

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- app-localization: Supported Language Set And Universal Fallback. Declares the two locales this
+     app ships resources for; referenced from AndroidManifest.xml's `android:localeConfig` so API
+     33+ exposes this app in Android Settings > Apps > Language (design.md's File Changes table). -->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="es" />
+</locale-config>
