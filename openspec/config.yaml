@@ -1261,7 +1261,7 @@ carried_forward_open_items:
 
     - id: "today-never-rolls-over-at-midnight"
       title: "TodayViewModel captures the date once at construction, so an open screen still shows yesterday after midnight"
-      status: open
+      status: resolved
       severity: >
         Reachable by an ordinary user with no unusual sequence: open the app
         before midnight, leave it backgrounded, come back after. The screen is
@@ -1306,6 +1306,32 @@ carried_forward_open_items:
         banned by detekt's `ForbiddenMethodCall` and the ban is enforced.
         Do not close this with a poll or a refresh-on-resume alone: resume does
         not fire for an app that is already foregrounded at midnight.
+      resolution: >
+        The date became an observed source: a `CurrentDateSource` port emitting
+        the local date and re-emitting at each local midnight, with
+        `TodayViewModel` keying `uiState` on it through `flatMapLatest`. The
+        inner `combine` keeps exactly five typed sources — the date is the key,
+        not a sixth input. `ON_RESUME` pushes the current date into the same
+        flow for an app backgrounded across midnight.
+
+        `answer()` now reads `uiState.value.date` rather than the date source or
+        a fresh clock read, because both can advance between the row being
+        rendered and the user tapping it. That was the half that corrupted data
+        — an after-midnight answer written against yesterday.
+
+        The tick loop re-reads the clock and recomputes `millisUntilNextMidnight()`
+        every iteration instead of adding 24 hours, so a sleeping device ticks
+        late but never wrong, and carries a 1-second positive floor because the
+        helper clamps to zero at exact midnight.
+      resolution_verified: >
+        Verified: 196 JVM unit tests, 0 failures, 0 errors; detekt zero findings;
+        all three source sets compile; matrix green on both legs 2026-09-03 —
+        api31 115 tests / 0 failures / 0 errors / 2 skipped, api37 115 / 0 / 0 /
+        1 skipped, the skips complementary by design.
+
+        Not covered, deliberately, and tracked separately as
+        `today-foregrounded-timezone-travel`: timezone travel while the app stays
+        continuously foregrounded.
 
     - id: "today-rows-are-built-from-tables-the-screen-does-not-observe"
       title: "TodayViewModel reads each habit's schedule and slots imperatively inside a combine that observes neither table"
