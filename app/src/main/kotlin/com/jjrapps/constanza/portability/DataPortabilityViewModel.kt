@@ -13,11 +13,15 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** Surfaced by [DataPortabilityViewModel.importResult] so the UI can render a result message
- *  without re-deriving it from an exception type. */
+ *  without re-deriving it from an exception type.
+ *
+ *  app-localization: [Failed] carries an [ImportFailure], not a sentence. The wording is chosen by
+ *  the Compose layer, which is the only layer that has resources and therefore the only one that
+ *  can honour the user's language. */
 sealed interface ImportResult {
     data object Idle : ImportResult
     data object Success : ImportResult
-    data class Failed(val message: String) : ImportResult
+    data class Failed(val failure: ImportFailure) : ImportResult
 }
 
 /**
@@ -53,14 +57,14 @@ class DataPortabilityViewModel @Inject constructor(
     }
 
     private suspend fun runImport(text: String?): ImportResult {
-        if (text == null) return ImportResult.Failed("Could not read the selected file.")
+        if (text == null) return ImportResult.Failed(ImportFailure.UnreadableFile)
         return try {
             importer.replaceAll(importer.parseAndValidate(text))
             ImportResult.Success
         } catch (e: MalformedBackupException) {
-            ImportResult.Failed(e.message.orEmpty())
+            ImportResult.Failed(e.failure)
         } catch (e: UnsupportedBackupVersionException) {
-            ImportResult.Failed(e.message.orEmpty())
+            ImportResult.Failed(e.failure)
         }
     }
 

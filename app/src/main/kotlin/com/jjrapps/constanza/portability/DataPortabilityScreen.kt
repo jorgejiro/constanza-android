@@ -70,11 +70,31 @@ private fun ImportResultMessage(result: ImportResult, onDismiss: () -> Unit) {
     when (result) {
         ImportResult.Idle -> Unit
         ImportResult.Success -> Text(stringResource(R.string.portability_import_success))
-        is ImportResult.Failed -> Text(result.message)
+        is ImportResult.Failed -> Text(importFailureMessage(result.failure))
     }
     if (result != ImportResult.Idle) {
         TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_dismiss)) }
     }
+}
+
+/**
+ * app-localization: the one place an [ImportFailure] becomes words. `BackupImporter` is deliberately
+ * Android-free and has no `Context`, so it can only report *which* failure occurred and with what
+ * arguments; the resource lookup belongs here, where `stringResource` follows the resolved language.
+ * The `when` is exhaustive on purpose — a new failure case will not compile until it has copy.
+ */
+@Composable
+private fun importFailureMessage(failure: ImportFailure): String = when (failure) {
+    ImportFailure.UnreadableFile -> stringResource(R.string.portability_import_error_unreadable_file)
+    ImportFailure.MalformedFile -> stringResource(R.string.portability_import_error_malformed_file)
+    is ImportFailure.UnsupportedVersion ->
+        stringResource(R.string.portability_import_error_unsupported_version, failure.fileVersion)
+    is ImportFailure.UnknownSlotReference ->
+        stringResource(
+            R.string.portability_import_error_unknown_slot_reference,
+            failure.habitId,
+            failure.slotId,
+        )
 }
 
 /** data-portability: Import MUST be preceded by an explicit confirmation stating the action is
