@@ -1261,7 +1261,7 @@ carried_forward_open_items:
 
     - id: "today-never-rolls-over-at-midnight"
       title: "TodayViewModel captures the date once at construction, so an open screen still shows yesterday after midnight"
-      status: open
+      status: resolved
       severity: >
         Reachable by an ordinary user with no unusual sequence: open the app
         before midnight, leave it backgrounded, come back after. The screen is
@@ -1306,6 +1306,32 @@ carried_forward_open_items:
         banned by detekt's `ForbiddenMethodCall` and the ban is enforced.
         Do not close this with a poll or a refresh-on-resume alone: resume does
         not fire for an app that is already foregrounded at midnight.
+      resolution: >
+        The date became an observed source: a `CurrentDateSource` port emitting
+        the local date and re-emitting at each local midnight, with
+        `TodayViewModel` keying `uiState` on it through `flatMapLatest`. The
+        inner `combine` keeps exactly five typed sources — the date is the key,
+        not a sixth input. `ON_RESUME` pushes the current date into the same
+        flow for an app backgrounded across midnight.
+
+        `answer()` now reads `uiState.value.date` rather than the date source or
+        a fresh clock read, because both can advance between the row being
+        rendered and the user tapping it. That was the half that corrupted data
+        — an after-midnight answer written against yesterday.
+
+        The tick loop re-reads the clock and recomputes `millisUntilNextMidnight()`
+        every iteration instead of adding 24 hours, so a sleeping device ticks
+        late but never wrong, and carries a 1-second positive floor because the
+        helper clamps to zero at exact midnight.
+      resolution_verified: >
+        Verified: 196 JVM unit tests, 0 failures, 0 errors; detekt zero findings;
+        all three source sets compile; matrix green on both legs 2026-09-03 —
+        api31 115 tests / 0 failures / 0 errors / 2 skipped, api37 115 / 0 / 0 /
+        1 skipped, the skips complementary by design.
+
+        Not covered, deliberately, and tracked separately as
+        `today-foregrounded-timezone-travel`: timezone travel while the app stays
+        continuously foregrounded.
 
     - id: "today-rows-are-built-from-tables-the-screen-does-not-observe"
       title: "TodayViewModel reads each habit's schedule and slots imperatively inside a combine that observes neither table"
@@ -1360,6 +1386,47 @@ carried_forward_open_items:
         removes the staleness and the N+1 in the transform together. Whichever is
         chosen, do not close this with a retry, a poll, or a longer wait
         anywhere — that is what the parent item spent two changes learning.
+
+    - id: "today-foregrounded-timezone-travel"
+      title: "A continuously foregrounded Today screen does not notice a timezone change on its own"
+      status: open
+      severity: >
+        Narrow: only a device whose timezone changes while the today screen is
+        open AND never backgrounded in between. Both ordinary midnight rollover
+        and a backgrounded resume are already covered by this change
+        (today-midnight-rollover); this is the one path that was deliberately
+        left out rather than missed.
+      origin: >
+        Named and scoped in today-midnight-rollover's spec delta itself (the
+        "Foregrounded timezone travel remains a known, accepted gap" scenario
+        under habit-entry-tracking: Day-Level Rollup and Per-Slot Display),
+        recorded here per this file's own carried-forward policy so the
+        boundary is not lost once that change's folder moves under archive/.
+      reason: >
+        `CurrentDateSource`'s self-rescheduling timer re-anchors on
+        `TimeProvider.today()`/`millisUntilNextMidnight()` at every emission, so
+        it already absorbs a DST shift or a timezone change on the NEXT
+        boundary it computes. What it cannot do is notice a change to the
+        ambient zone WHILE it is already asleep inside a `delay()`, because
+        that delay's length was computed from the zone at the moment it was
+        scheduled. `TodayViewModel.refreshDate()`, called on `ON_RESUME`,
+        corrects this on any backgrounding — even a brief one — but a screen
+        that is never backgrounded has no trigger to re-read the clock at all.
+      why_it_matters: >
+        The screen may keep showing the prior date until the user leaves and
+        returns, exactly as the spec's own scenario states. This is a
+        continuously-foregrounded edge case of an already-narrow trigger
+        (changing the device's timezone), not a regression of ordinary
+        midnight rollover or of resume-after-backgrounding, both of which this
+        change fixes outright.
+      owner_condition: >
+        A future change that already needs an in-process app-wide time
+        signal — a broadcast receiver for `ACTION_TIMEZONE_CHANGED` /
+        `ACTION_DATE_CHANGED` wired to something wider than one screen, for
+        example. Not worth introducing that surface for this screen alone;
+        today-midnight-rollover's design.md deliberately rejected a broadcast
+        bridge / event bus for the whole change ("Technical Approach", and the
+        Threat Matrix's note that the broadcast/IPC option was rejected).
 stack:
   status: ratified
   note: >

@@ -5,7 +5,7 @@ import com.jjrapps.constanza.core.data.dao.EntryDao
 import com.jjrapps.constanza.core.data.dao.ReminderOccurrenceDao
 import com.jjrapps.constanza.core.data.entity.EntryEntity
 import com.jjrapps.constanza.core.data.entity.ReminderOccurrenceEntity
-import com.jjrapps.constanza.core.time.TimeProvider
+import com.jjrapps.constanza.core.time.CurrentDateSource
 import com.jjrapps.constanza.domain.model.DayStatus
 import com.jjrapps.constanza.domain.model.EntryStatus
 import com.jjrapps.constanza.domain.model.Habit
@@ -22,6 +22,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -39,6 +40,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 private val TODAY: LocalDate = LocalDate.parse("2026-09-01")
+private val TOMORROW: LocalDate = TODAY.plusDays(1)
 private val FIXED_INSTANT: Instant = Instant.parse("2026-09-01T08:00:00Z")
 private val ZONE: ZoneId = ZoneId.of("UTC")
 private const val HABIT_ID = 7L
@@ -60,8 +62,8 @@ private fun habit(id: Long = HABIT_ID, name: String = "Read", colorArgb: Int = H
 private fun slot(id: Long, minuteOfDay: Int) =
     ReminderSlot(id = id, habitId = HABIT_ID, minuteOfDay = minuteOfDay, enabled = true)
 
-private fun entryEntity(slotId: Long, status: EntryStatus) = EntryEntity(
-    habitId = HABIT_ID, date = TODAY.toString(), slotId = slotId, status = status.name,
+private fun entryEntity(slotId: Long, status: EntryStatus, date: LocalDate = TODAY) = EntryEntity(
+    habitId = HABIT_ID, date = date.toString(), slotId = slotId, status = status.name,
     value = null, answeredAt = FIXED_INSTANT.toString(), source = "IN_APP",
 )
 
@@ -76,6 +78,49 @@ private fun occurrence(
     state = state, snoozeUntilEpochMs = snoozeUntilEpochMs, snoozeCount = 0, notifiedAtEpochMs = null,
     resolveDeadlineMs = 0,
 )
+
+/** today-midnight-rollover, task 3.1: [TimeProvider][com.jjrapps.constanza.core.time.TimeProvider]
+ *  was a stateless synchronous clock, so a plain `mockk` returning one fixed [TODAY] was enough.
+ *  [CurrentDateSource] is a live stream, so it needs a fake with two independently controllable
+ *  values instead of one: [emissions] is what the timer has already pushed through [dates] — a
+ *  rollover test moves this — and [current] is a separate synchronous read for [today], moved
+ *  independently to simulate [TodayViewModel.refreshDate]'s resume case, where the timer's own
+ *  coroutine can be stale (backgrounded) while the real current date has already moved on. */
+private class FakeCurrentDateSource(initial: LocalDate, private val zone: ZoneId = ZONE) : CurrentDateSource {
+    val emissions = MutableStateFlow(initial)
+    var current: LocalDate = initial
+
+    override fun dates(): Flow<LocalDate> = emissions
+    override fun today(): LocalDate = current
+    override fun zone(): ZoneId = zone
+
+    /** Moves both values together, for the ordinary case where the timer fires normally while the
+     *  screen is displayed (task 3.2 / 3.3) — as opposed to [current] alone, for the backgrounded
+     *  resume case (task 3.4). */
+    fun advanceTo(date: LocalDate) {
+        current = date
+        emissions.value = date
+    }
+}
+
+/** today-midnight-rollover, task 3.1: replaces the old fixed
+ *  `every { observeByDate(TODAY.toString()) } returns MutableStateFlow(emptyList())` stub, which
+ *  had no answer at all for any other date — an unanticipated call surfaced as an opaque
+ *  `MockKException` rather than a readable assertion failure. [entriesByDate] registers every date
+ *  a test actually needs; any other date fails with a message naming the missing date instead. */
+private fun entryDaoStub(entriesByDate: Map<LocalDate, List<EntryEntity>> = mapOf(TODAY to emptyList())): EntryDao {
+    val flowsByDate = entriesByDate.mapKeys { (date, _) -> date.toString() }
+        .mapValues { (_, entries) -> MutableStateFlow(entries) }
+    return mockk {
+        every { observeByDate(any()) } answers {
+            val date = firstArg<String>()
+            flowsByDate[date] ?: error(
+                "TodayViewModelTest.entryDaoStub: no fixture registered for date '$date' — " +
+                    "add it to buildViewModel()'s entriesByDate map.",
+            )
+        }
+    }
+}
 
 /**
  * Task 6b.7 debt item 3 — the JVM-level cover for the Today state that needed no Android at all.
@@ -215,6 +260,99 @@ class TodayViewModelTest {
         }
     }
 
+    /** today-midnight-rollover, task 3.2 / design.md decision 2. The date is a key OUTSIDE the
+     *  `combine`, so crossing it must re-subscribe [EntryDao.observeByDate] against the new date
+     *  (the rollup moves from `PARTIAL` to `PENDING` because it is now reading TOMORROW's, empty,
+     *  entries) and the unresolved-occurrence filter inside [buildTodayHabitRow] must follow it too
+     *  (the live occurrence handle moves from the morning slot to the evening one, because that is
+     *  the one scheduled for TOMORROW). */
+    @Test
+    fun `crossing midnight while displayed re-subscribes EntryDao and moves both the rollup and the occurrence filter`() =
+        runTest {
+            val currentDateSource = FakeCurrentDateSource(TODAY)
+            val viewModel = buildViewModel(
+                currentDateSource = currentDateSource,
+                entriesByDate = mapOf(
+                    TODAY to listOf(entryEntity(MORNING_SLOT_ID, EntryStatus.COMPLETED, TODAY)),
+                    TOMORROW to emptyList(),
+                ),
+                unresolvedOccurrences = listOf(
+                    occurrence(OCCURRENCE_ID, MORNING_SLOT_ID, STATE_ARMED, null, scheduledDate = TODAY),
+                    occurrence(OCCURRENCE_ID + 1, EVENING_SLOT_ID, STATE_ARMED, null, scheduledDate = TOMORROW),
+                ),
+            )
+
+            viewModel.uiState.test {
+                val onToday = awaitItem().rows.single()
+                assertEquals(DayStatus.PARTIAL, onToday.dayStatus)
+                assertEquals(listOf(EntryStatus.COMPLETED, EntryStatus.UNKNOWN), onToday.slots.map { it.status })
+                assertEquals(listOf(OCCURRENCE_ID, null), onToday.slots.map { it.occurrenceId })
+
+                currentDateSource.advanceTo(TOMORROW)
+
+                val onTomorrow = awaitItem().rows.single()
+                assertEquals(DayStatus.PENDING, onTomorrow.dayStatus)
+                assertEquals(listOf(EntryStatus.UNKNOWN, EntryStatus.UNKNOWN), onTomorrow.slots.map { it.status })
+                assertEquals(listOf(null, OCCURRENCE_ID + 1), onTomorrow.slots.map { it.occurrenceId })
+            }
+        }
+
+    /** today-midnight-rollover, task 3.3 / design.md decision 3 — the write-path corruption fix
+     *  itself. [slotFromBeforeMidnight] is captured from the row drawn BEFORE the rollover, exactly
+     *  like a tap that lands just after midnight on a row the user was already looking at: the
+     *  write must still target the date [TodayUiState] displays at the moment of the tap, never the
+     *  date the slot reference happens to have been built against. */
+    @Test
+    fun `answer writes against the currently displayed date, even for a slot captured before midnight rolled over`() =
+        runTest {
+            val entryWriter = mockk<EntryWriter>(relaxUnitFun = true)
+            val currentDateSource = FakeCurrentDateSource(TODAY)
+            val viewModel = buildViewModel(
+                entryWriter = entryWriter,
+                currentDateSource = currentDateSource,
+                entriesByDate = mapOf(TODAY to emptyList(), TOMORROW to emptyList()),
+            )
+            val slotFromBeforeMidnight = viewModel.uiState.first { it.rows.isNotEmpty() }.rows.single().slots.first()
+
+            currentDateSource.advanceTo(TOMORROW)
+            assertEquals(TOMORROW, viewModel.uiState.value.date)
+
+            viewModel.answer(HABIT_ID, slotFromBeforeMidnight, InAppEntryStatus.COMPLETED)
+
+            coVerify(exactly = 1) {
+                entryWriter.answerInApp(
+                    HABIT_ID,
+                    TOMORROW,
+                    slotFromBeforeMidnight.slotId,
+                    InAppEntryStatus.COMPLETED,
+                    slotFromBeforeMidnight.occurrenceId,
+                )
+            }
+            coVerify(exactly = 0) { entryWriter.answerInApp(HABIT_ID, TODAY, any(), any(), any()) }
+        }
+
+    /** today-midnight-rollover, task 3.4 — the spec's "backgrounded app corrects the date on
+     *  resume" scenario, isolated from the timer path: [FakeCurrentDateSource.current] is moved
+     *  directly, standing in for a real device whose wall clock kept moving while its process (and
+     *  the timer coroutine inside it) was fully suspended, so [CurrentDateSource.dates] itself never
+     *  emitted the new date. */
+    @Test
+    fun `refreshDate corrects a stale observedDate left over from backgrounding`() = runTest {
+        val currentDateSource = FakeCurrentDateSource(TODAY)
+        val viewModel = buildViewModel(
+            currentDateSource = currentDateSource,
+            entriesByDate = mapOf(TODAY to emptyList(), TOMORROW to emptyList()),
+        )
+        viewModel.uiState.first { it.rows.isNotEmpty() }
+        assertEquals(TODAY, viewModel.uiState.value.date)
+
+        currentDateSource.current = TOMORROW
+
+        viewModel.refreshDate()
+
+        assertEquals(TOMORROW, viewModel.uiState.value.date)
+    }
+
     /** Task 6b.9 — [alarmScheduler] backs the exact-alarm banner. Explicitly stubbed for the same
      *  reason as every other collaborator here: a relaxed mock answers `false` for a `Boolean`,
      *  which would silently arm the banner branch in every test that is not about it. */
@@ -339,26 +477,23 @@ class TodayViewModelTest {
         reminderSettingsStore: ReminderSettingsStore = mockk(relaxUnitFun = true) {
             coEvery { hasRequestedNotificationPermission() } returns false
         },
+        currentDateSource: FakeCurrentDateSource = FakeCurrentDateSource(TODAY),
+        entriesByDate: Map<LocalDate, List<EntryEntity>> = mapOf(TODAY to emptyList()),
+        unresolvedOccurrences: List<ReminderOccurrenceEntity> =
+            listOf(occurrence(OCCURRENCE_ID, MORNING_SLOT_ID, STATE_ARMED, null)),
     ): TodayViewModel {
         val habitRepository = mockk<HabitRepository> {
             every { observeAll() } returns MutableStateFlow(listOf(habit()))
             coEvery { findScheduleFor(HABIT_ID) } returns Schedule.Daily()
             coEvery { findSlotsFor(HABIT_ID) } returns twoSlots()
         }
-        val entryDao = mockk<EntryDao> {
-            every { observeByDate(TODAY.toString()) } returns MutableStateFlow(emptyList())
-        }
+        val entryDao = entryDaoStub(entriesByDate)
         val occurrenceDao = mockk<ReminderOccurrenceDao> {
-            every { observeUnresolved() } returns
-                MutableStateFlow(listOf(occurrence(OCCURRENCE_ID, MORNING_SLOT_ID, STATE_ARMED, null)))
-        }
-        val timeProvider = mockk<TimeProvider> {
-            every { today() } returns TODAY
-            every { zone() } returns ZONE
+            every { observeUnresolved() } returns MutableStateFlow(unresolvedOccurrences)
         }
         return TodayViewModel(
             habitRepository, entryDao, occurrenceDao, entryWriter, alarmScheduler,
-            notificationPermission, reminderSettingsStore, timeProvider,
+            notificationPermission, reminderSettingsStore, currentDateSource,
         )
     }
 }

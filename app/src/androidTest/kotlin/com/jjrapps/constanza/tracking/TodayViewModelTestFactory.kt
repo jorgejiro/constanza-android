@@ -1,5 +1,6 @@
 package com.jjrapps.constanza.tracking
 
+import com.jjrapps.constanza.core.time.SelfReschedulingCurrentDateSource
 import com.jjrapps.constanza.habit.HabitRepositoryTestFixture
 import com.jjrapps.constanza.reminding.NotificationPermission
 import com.jjrapps.constanza.reminding.NotificationPoster
@@ -33,6 +34,14 @@ import io.mockk.mockk
  * Stubbing it is part of the scenario, not boilerplate — this codebase's own established
  * `mockk(relaxed = true)` lesson. See [exactAlarmsAllowedScheduler].
  *
+ * **Why the real [SelfReschedulingCurrentDateSource] rather than a fake.** `today-midnight-rollover`
+ * replaced this ViewModel's `TimeProvider` with a `CurrentDateSource`. Wrapping the fixture's own
+ * fake clock in the production source keeps every scenario here behaving exactly as it did before:
+ * the source emits `timeProvider.today()` immediately and then sleeps until the next local midnight,
+ * which no test in this file reaches. Rollover itself is a JVM virtual-time surface
+ * (`MidnightDateSourceTest`, `TodayViewModelTest`) — the managed-device images are unrooted and
+ * their wall clock cannot be moved, so an instrumented rollover assertion would prove nothing.
+ *
  * Every parameter defaults to the collaborator those call sites used verbatim, so calling this with
  * no arguments reproduces them exactly. Override only what a scenario is actually about:
  * `EntryWriteParityTest` passes its own [entryWriter] because it drives that adapter directly and
@@ -48,7 +57,8 @@ fun HabitRepositoryTestFixture.todayViewModel(
 ): TodayViewModel = register(
     TodayViewModel(
         habitRepository, database.entryDao(), database.reminderOccurrenceDao(),
-        entryWriter, alarmScheduler, notificationPermission, reminderSettingsStore, timeProvider,
+        entryWriter, alarmScheduler, notificationPermission, reminderSettingsStore,
+        SelfReschedulingCurrentDateSource(timeProvider),
     ),
 )
 

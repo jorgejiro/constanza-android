@@ -1,5 +1,7 @@
 package com.jjrapps.constanza.core.di
 
+import com.jjrapps.constanza.core.time.CurrentDateSource
+import com.jjrapps.constanza.core.time.SelfReschedulingCurrentDateSource
 import com.jjrapps.constanza.core.time.SystemTimeProvider
 import com.jjrapps.constanza.core.time.TimeProvider
 import dagger.Binds
@@ -16,4 +18,9 @@ abstract class TimeModule {
     @Binds
     @Singleton
     abstract fun bindTimeProvider(impl: SystemTimeProvider): TimeProvider
+
+    /** today-midnight-rollover, design.md decision 1. */
+    @Binds
+    @Singleton
+    abstract fun bindCurrentDateSource(impl: SelfReschedulingCurrentDateSource): CurrentDateSource
 }
