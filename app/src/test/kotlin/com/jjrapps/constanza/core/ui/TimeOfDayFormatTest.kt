@@ -171,6 +171,23 @@ class TimeOfDayFormatTest {
         assertEquals("21:05", format.format(LocalTime.of(21, 5, 45)))
     }
 
+    /**
+     * app-localization: the hour cycle is the device's setting, not the language's convention.
+     * Spain writes clock times as 24-hour by convention, so a naive implementation that derived the
+     * cycle from the locale would silently override a user who chose 12-hour on their phone the
+     * moment they picked Español. The two Spanish renderings below must differ, and the 12-hour one
+     * must stay 12-hour.
+     */
+    @Test
+    fun `an explicit hour cycle wins over the locale's own convention`() {
+        val evening = 21 * MINUTES_PER_HOUR + 5
+        val spanish12 = TimeOfDayFormat(is24Hour = false, locale = SPAIN).format(evening)
+        val spanish24 = TimeOfDayFormat(is24Hour = true, locale = SPAIN).format(evening)
+        assertEquals("21:05", spanish24)
+        assertTrue(spanish12.startsWith("9:05 "), "expected 12-hour Spanish to start \"9:05 \", got \"$spanish12\"")
+        assertTrue(spanish12 != spanish24, "the hour cycle must change the rendering, not just the marker")
+    }
+
     /** [TimeOfDayFormat.is24Hour] is read by `habit.ReminderTimeField` to seed `TimePickerState`. */
     @Test
     fun `the hour cycle is readable back off the format`() {

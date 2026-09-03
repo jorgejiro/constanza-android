@@ -18,6 +18,9 @@ import androidx.lifecycle.viewModelScope
 import com.jjrapps.constanza.core.ui.theme.ConstanzaTheme
 import com.jjrapps.constanza.habit.HabitEditorRoute
 import com.jjrapps.constanza.habit.HabitListRoute
+import com.jjrapps.constanza.localization.AppLanguage
+import com.jjrapps.constanza.localization.AppLocaleController
+import com.jjrapps.constanza.localization.ProvideAppLocale
 import com.jjrapps.constanza.onboarding.OnboardingRoute
 import com.jjrapps.constanza.progress.ProgressRoute
 import com.jjrapps.constanza.reminding.ReminderSettingsStore
@@ -29,6 +32,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
 /**
@@ -175,12 +179,31 @@ private fun ConstanzaApp(startRoute: ConstanzaRoute = ConstanzaRoute.Today) {
 @HiltViewModel
 internal class FirstRunGateViewModel @Inject constructor(
     settingsStore: ReminderSettingsStore,
+    appLocaleController: AppLocaleController,
 ) : ViewModel() {
     /** `null` only while the first DataStore read is in flight. Retained across configuration
-     *  change, so the blank hold happens at most once per process, not once per rotation. */
-    val onboardingDone: StateFlow<Boolean?> =
-        settingsStore.onboardingDone.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+     *  change, so the blank hold happens at most once per process, not once per rotation.
+     *
+     *  app-localization (design.md D3) folds the language into this same gate rather than adding a
+     *  second one. Below API 33 the language tag and [ReminderSettingsStore.onboardingDone] are
+     *  both reads of the one `DataStore`, so combining them resolves at the same moment
+     *  `onboardingDone` already did — the blank hold does not grow and there is no first frame in
+     *  the wrong language. On API 33+ the platform applied the override before this process
+     *  started, so the value carried here is inert and [ProvideAppLocale] passes straight through. */
+    val startupState: StateFlow<StartupState?> =
+        combine(
+            settingsStore.onboardingDone,
+            appLocaleController.observe(),
+        ) { onboardingDone, language ->
+            StartupState(onboardingDone = onboardingDone, language = language)
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 }
+
+/** The two facts [FirstRunGate] must have before it can render anything at all. */
+internal data class StartupState(
+    val onboardingDone: Boolean,
+    val language: AppLanguage,
+)
 
 /**
  * The tri-state wrapper [MainActivity.onCreate] renders instead of [ConstanzaApp] directly
@@ -192,22 +215,30 @@ internal class FirstRunGateViewModel @Inject constructor(
  */
 @Composable
 private fun FirstRunGate(viewModel: FirstRunGateViewModel = hiltViewModel()) {
-    val onboardingDone by viewModel.onboardingDone.collectAsState()
+    val startupState by viewModel.startupState.collectAsState()
     // Write-once. Set synchronously inside onFinished, BEFORE the flag write is requested
     // (design.md §9). rememberSaveable, not remember: a rotation in the frame between onFinished
     // and the flag emission would otherwise reset the seed and drop the user on Today instead of
     // the editor.
     var startRoute by rememberSaveable { mutableStateOf<ConstanzaRoute>(ConstanzaRoute.Today) }
-    when (onboardingDone) {
+    when (val state = startupState) {
+        // Still nothing, deliberately: the window background is already the right colour.
         null -> Unit
-        false -> OnboardingRoute(
-            onFinished = {
-                startRoute = ConstanzaRoute.HabitEditor(
-                    habitId = null,
-                    origin = ConstanzaRoute.EditorOrigin.Onboarding,
+        // Everything below the gate renders in the resolved language, onboarding included — a user
+        // whose device is in Spanish must not meet the first-run flow in English.
+        else -> ProvideAppLocale(state.language) {
+            if (state.onboardingDone) {
+                ConstanzaApp(startRoute = startRoute)
+            } else {
+                OnboardingRoute(
+                    onFinished = {
+                        startRoute = ConstanzaRoute.HabitEditor(
+                            habitId = null,
+                            origin = ConstanzaRoute.EditorOrigin.Onboarding,
+                        )
+                    },
                 )
-            },
-        )
-        true -> ConstanzaApp(startRoute = startRoute)
+            }
+        }
     }
 }
