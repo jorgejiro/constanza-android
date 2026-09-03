@@ -1360,6 +1360,47 @@ carried_forward_open_items:
         removes the staleness and the N+1 in the transform together. Whichever is
         chosen, do not close this with a retry, a poll, or a longer wait
         anywhere — that is what the parent item spent two changes learning.
+
+    - id: "today-foregrounded-timezone-travel"
+      title: "A continuously foregrounded Today screen does not notice a timezone change on its own"
+      status: open
+      severity: >
+        Narrow: only a device whose timezone changes while the today screen is
+        open AND never backgrounded in between. Both ordinary midnight rollover
+        and a backgrounded resume are already covered by this change
+        (today-midnight-rollover); this is the one path that was deliberately
+        left out rather than missed.
+      origin: >
+        Named and scoped in today-midnight-rollover's spec delta itself (the
+        "Foregrounded timezone travel remains a known, accepted gap" scenario
+        under habit-entry-tracking: Day-Level Rollup and Per-Slot Display),
+        recorded here per this file's own carried-forward policy so the
+        boundary is not lost once that change's folder moves under archive/.
+      reason: >
+        `CurrentDateSource`'s self-rescheduling timer re-anchors on
+        `TimeProvider.today()`/`millisUntilNextMidnight()` at every emission, so
+        it already absorbs a DST shift or a timezone change on the NEXT
+        boundary it computes. What it cannot do is notice a change to the
+        ambient zone WHILE it is already asleep inside a `delay()`, because
+        that delay's length was computed from the zone at the moment it was
+        scheduled. `TodayViewModel.refreshDate()`, called on `ON_RESUME`,
+        corrects this on any backgrounding — even a brief one — but a screen
+        that is never backgrounded has no trigger to re-read the clock at all.
+      why_it_matters: >
+        The screen may keep showing the prior date until the user leaves and
+        returns, exactly as the spec's own scenario states. This is a
+        continuously-foregrounded edge case of an already-narrow trigger
+        (changing the device's timezone), not a regression of ordinary
+        midnight rollover or of resume-after-backgrounding, both of which this
+        change fixes outright.
+      owner_condition: >
+        A future change that already needs an in-process app-wide time
+        signal — a broadcast receiver for `ACTION_TIMEZONE_CHANGED` /
+        `ACTION_DATE_CHANGED` wired to something wider than one screen, for
+        example. Not worth introducing that surface for this screen alone;
+        today-midnight-rollover's design.md deliberately rejected a broadcast
+        bridge / event bus for the whole change ("Technical Approach", and the
+        Threat Matrix's note that the broadcast/IPC option was rejected).
 stack:
   status: ratified
   note: >

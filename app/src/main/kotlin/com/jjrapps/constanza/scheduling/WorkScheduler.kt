@@ -8,22 +8,13 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.jjrapps.constanza.core.di.ReconcilePeriodHours
 import com.jjrapps.constanza.core.time.TimeProvider
+import com.jjrapps.constanza.core.time.millisUntilNextMidnight
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.time.Duration
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 internal const val RECONCILE_WORK_NAME = "reconcile-worker"
 internal const val MIDNIGHT_SWEEP_WORK_NAME = "midnight-sweep-worker"
-
-/** Milliseconds from [TimeProvider.now] to the next local midnight, read through the injected
- *  [TimeProvider] and never the ambient clock (design.md §4). Clamped at zero so a provider whose
- *  `now()` has already passed its own `today() + 1` boundary yields an immediate run rather than a
- *  negative delay, which `setInitialDelay` would reject. */
-internal fun TimeProvider.millisUntilNextMidnight(): Long {
-    val nextMidnight = today().plusDays(1).atStartOfDay(zone())
-    return Duration.between(now(), nextMidnight.toInstant()).toMillis().coerceAtLeast(0)
-}
 
 /**
  * design.md §9.2: enrolls work unit 4b's two workers as persistent `WorkManager` work, called once

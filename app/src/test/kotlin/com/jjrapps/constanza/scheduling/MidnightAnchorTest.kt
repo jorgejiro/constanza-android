@@ -1,6 +1,7 @@
 package com.jjrapps.constanza.scheduling
 
 import com.jjrapps.constanza.core.time.TimeProvider
+import com.jjrapps.constanza.core.time.millisUntilNextMidnight
 import io.mockk.every
 import io.mockk.mockk
 import java.time.Duration

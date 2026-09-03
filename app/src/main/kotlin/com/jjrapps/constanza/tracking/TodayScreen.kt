@@ -45,7 +45,12 @@ import java.time.ZoneId
  *  [TodayViewModel.refreshExactAlarmPermission] on `ON_RESUME`, since the user can grant the
  *  permission from system Settings and come back without any Room write to react to. The same
  *  hook re-checks [TodayViewModel.refreshNotificationPermission] for the identical reason — a
- *  `BLOCKED` notification permission can only be undone from system settings. */
+ *  `BLOCKED` notification permission can only be undone from system settings.
+ *
+ *  today-midnight-rollover, task 2.7: the same `ON_RESUME` hook also calls
+ *  [TodayViewModel.refreshDate], correcting the displayed date if the app was backgrounded across
+ *  local midnight — the spec's resume scenario. It runs first, since a stale date should not be
+ *  left standing behind a permission re-check that happens to run before it. */
 @Composable
 fun TodayRoute(
     onManageHabits: () -> Unit,
@@ -58,6 +63,7 @@ fun TodayRoute(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshDate()
                 viewModel.refreshExactAlarmPermission()
                 viewModel.refreshNotificationPermission()
             }

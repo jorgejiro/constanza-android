@@ -1,21 +1,25 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package com.jjrapps.constanza.tracking
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.jjrapps.constanza.core.data.dao.EntryDao
 import com.jjrapps.constanza.core.data.dao.ReminderOccurrenceDao
-import com.jjrapps.constanza.core.time.TimeProvider
+import com.jjrapps.constanza.core.time.CurrentDateSource
 import com.jjrapps.constanza.habit.HabitRepository
 import com.jjrapps.constanza.reminding.NotificationPermission
 import com.jjrapps.constanza.reminding.NotificationPermissionDecision
 import com.jjrapps.constanza.reminding.ReminderSettingsStore
 import com.jjrapps.constanza.scheduling.AlarmScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -73,10 +77,16 @@ class TodayViewModel @Inject constructor(
     private val alarmScheduler: AlarmScheduler,
     private val notificationPermission: NotificationPermission,
     private val reminderSettingsStore: ReminderSettingsStore,
-    private val timeProvider: TimeProvider,
+    private val currentDateSource: CurrentDateSource,
 ) : ViewModel() {
 
-    private val today = timeProvider.today()
+    /** today-midnight-rollover, design.md decision 2: the date the screen currently displays,
+     *  seeded synchronously from [CurrentDateSource.today] and kept live by the [init] collection
+     *  below plus [refreshDate]'s `ON_RESUME` correction. [uiState]'s `combine` sits inside a
+     *  `flatMapLatest` keyed on this flow rather than reading it once, so a rollover re-subscribes
+     *  every date-scoped source ([EntryDao.observeByDate] and [TodaySnapshot]) instead of leaving
+     *  them pinned to the date the ViewModel happened to be constructed on. */
+    private val observedDate = MutableStateFlow(currentDateSource.today())
     private val expandedHabitIds = MutableStateFlow<Set<Long>>(emptySet())
 
     /** today-answered-slot-collapse, design.md decision 1. Cleared per-slot by [answer], never
@@ -103,31 +113,46 @@ class TodayViewModel @Inject constructor(
         reopenedSlots,
     ) { expanded, reopened -> ExpansionState(expanded, reopened) }
 
-    val uiState: StateFlow<TodayUiState> = combine(
-        habitRepository.observeAll(),
-        entryDao.observeByDate(today.toString()),
-        reminderOccurrenceDao.observeUnresolved(),
-        expansionState,
-        permissionBanners,
-    ) { habits, entriesToday, unresolved, expansion, banners ->
-        val snapshot = TodaySnapshot(entriesToday, unresolved, today)
-        val rows = habits.filterNot { it.archived }.mapNotNull { habit ->
-            val schedule = habitRepository.findScheduleFor(habit.id) ?: return@mapNotNull null
-            val slots = habitRepository.findSlotsFor(habit.id)
-            buildTodayHabitRow(habit, schedule, slots, snapshot)
+    /** today-midnight-rollover, design.md decision 2: [observedDate] is a KEY outside the
+     *  `combine`, never a sixth source inside it — the `combine` below keeps exactly the same five
+     *  typed sources it always had. A rollover (or [refreshDate]'s resume correction) changes the
+     *  key, `flatMapLatest` cancels the previous inner flow and re-subscribes
+     *  [EntryDao.observeByDate] against the new date, and [TodaySnapshot]/[TodayUiState] both take
+     *  that same date from the lambda parameter — never from [observedDate] read separately, which
+     *  could have already moved on again by the time this lambda runs. */
+    val uiState: StateFlow<TodayUiState> = observedDate.flatMapLatest { date ->
+        combine(
+            habitRepository.observeAll(),
+            entryDao.observeByDate(date.toString()),
+            reminderOccurrenceDao.observeUnresolved(),
+            expansionState,
+            permissionBanners,
+        ) { habits, entriesToday, unresolved, expansion, banners ->
+            val snapshot = TodaySnapshot(entriesToday, unresolved, date)
+            val rows = habits.filterNot { it.archived }.mapNotNull { habit ->
+                val schedule = habitRepository.findScheduleFor(habit.id) ?: return@mapNotNull null
+                val slots = habitRepository.findSlotsFor(habit.id)
+                buildTodayHabitRow(habit, schedule, slots, snapshot)
+            }
+            TodayUiState(
+                rows = rows,
+                expandedHabitIds = expansion.expandedHabitIds,
+                reopenedSlots = expansion.reopenedSlots,
+                zone = currentDateSource.zone(),
+                date = date,
+                canScheduleExactAlarms = banners.canScheduleExactAlarms,
+                notificationPermission = banners.notificationPermission,
+            )
         }
-        TodayUiState(
-            rows = rows,
-            expandedHabitIds = expansion.expandedHabitIds,
-            reopenedSlots = expansion.reopenedSlots,
-            zone = timeProvider.zone(),
-            canScheduleExactAlarms = banners.canScheduleExactAlarms,
-            notificationPermission = banners.notificationPermission,
-        )
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, TodayUiState(zone = timeProvider.zone()))
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        TodayUiState(zone = currentDateSource.zone(), date = observedDate.value),
+    )
 
     init {
         refreshNotificationPermission()
+        viewModelScope.launch { currentDateSource.dates().collect { observedDate.value = it } }
     }
 
     fun toggleExpanded(habitId: Long) = expandedHabitIds.update {
@@ -142,12 +167,29 @@ class TodayViewModel @Inject constructor(
      *  (design.md decision 4) — waiting for the Room round-trip would let the reopened buttons
      *  linger for a frame after the tap that is meant to collapse them. If the write itself fails,
      *  the slot still collapses back to its previous status with its own Change control intact, so
-     *  nothing here is unrecoverable. */
+     *  nothing here is unrecoverable.
+     *
+     *  today-midnight-rollover, design.md decision 3: writes against [uiState]'s CURRENT `date`,
+     *  never [observedDate] read directly and never a fresh clock read. Both of those can already
+     *  have advanced past the date this row was drawn against by the time the user taps it; reading
+     *  `uiState.value.date` instead makes "the date written" and "the date the tapped row belongs
+     *  to" the same value by construction — this is the fix for the In-App Answer Date Attribution
+     *  requirement. */
     fun answer(habitId: Long, slot: TodaySlot, status: InAppEntryStatus) {
         reopenedSlots.update { it - slot.keyIn(habitId) }
+        val date = uiState.value.date
         viewModelScope.launch {
-            entryWriter.answerInApp(habitId, today, slot.slotId, status, slot.occurrenceId)
+            entryWriter.answerInApp(habitId, date, slot.slotId, status, slot.occurrenceId)
         }
+    }
+
+    /** Called from [TodayRoute] on `ON_RESUME`, alongside [refreshExactAlarmPermission] and
+     *  [refreshNotificationPermission] (task 2.7): corrects [observedDate] if the app was
+     *  backgrounded across local midnight, per the spec's "backgrounded app corrects the date on
+     *  resume" scenario. A rollover that already fired while foregrounded is a no-op here — the
+     *  timer already advanced [observedDate], and `MutableStateFlow` conflates the identical value. */
+    fun refreshDate() {
+        observedDate.value = currentDateSource.today()
     }
 
     /** Called from [TodayRoute] on `ON_RESUME` — the permission may have changed while this
@@ -187,6 +229,12 @@ data class TodayUiState(
      *  their answer actions again instead of their status text and Change control. */
     val reopenedSlots: Set<TodaySlotKey> = emptySet(),
     val zone: ZoneId = ZoneId.of("UTC"),
+    /** today-midnight-rollover, design.md decisions 2-3: the date this state's [rows] and
+     *  [TodaySnapshot] were built against — never re-derived from the clock at the point of use.
+     *  [TodayViewModel] always constructs a real value from [CurrentDateSource]; the placeholder
+     *  default here exists only so previews/tests that do not care about the date compile without
+     *  naming one, the same reason [zone] defaults to a fixed value instead of an ambient read. */
+    val date: LocalDate = LocalDate.EPOCH,
     val canScheduleExactAlarms: Boolean = true,
     /** Defaults to [NotificationPermissionDecision.GRANTED] — the one value that renders nothing —
      *  so no existing preview, test or pre-emission state shows a banner it never asked for. */
