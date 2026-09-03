@@ -1427,6 +1427,107 @@ carried_forward_open_items:
         today-midnight-rollover's design.md deliberately rejected a broadcast
         bridge / event bus for the whole change ("Technical Approach", and the
         Threat Matrix's note that the broadcast/IPC option was rejected).
+    - id: "device-locale-resolution-has-no-runtime-test"
+      title: "Nothing exercises a Spanish DEVICE locale with no override stored"
+      status: open
+      severity: >
+        Low confidence rather than low risk. The behaviour is Android's own
+        resource-qualifier resolution, which is very unlikely to break — but it
+        is the path a first-install user actually takes, and it is the only one
+        of the nine app-localization requirements with no runtime coverage at
+        all.
+      origin: >
+        Found by app-localization-es-en's verify pass and recorded in its
+        verify-report.md as finding 1.
+      reason: >
+        The device-free emulator matrix runs both legs (API 31, API 37) with an
+        English device locale, and `AppLocaleInstrumentedTest` exercises the
+        OVERRIDE wrapping path via `localizedContext`. Those are genuinely
+        different code paths: one asks Android to resolve `values-es/` from the
+        device configuration, the other hands it a Configuration we built
+        ourselves. Passing the second says nothing about the first.
+      why_it_matters: >
+        Requirements "Device-Locale Resolution", "Supported Language Set And
+        Universal Fallback" and "First-Install Resolution Needs No User Action"
+        all rest on it, and all three describe what happens before the user has
+        touched anything.
+      owner_condition: >
+        Any change that already builds a locale-configured `Context` in an
+        instrumented test, or a matrix leg configured with a non-English device
+        locale. Closing it needs an assertion that `values-es/` is selected with
+        NO stored override — not another test of the override path.
+    - id: "system-settings-language-parity-is-one-directional"
+      title: "A language change made from Android Settings is never asserted to reach the in-app picker"
+      status: open
+      severity: >
+        API 33+ only, and only the system-to-app direction. The app-to-system
+        direction is covered.
+      origin: >
+        app-localization-es-en verify-report.md, finding 2.
+      reason: >
+        `AppLocaleController` reads and writes `LocaleManager`, and
+        `LanguageOverrideStoreInstrumentedTest` covers that on the 33+ leg. The
+        mechanism that makes the reverse direction work is
+        `LifecycleStartEffect { refresh() }` in `LanguageSection` — chosen over
+        observing a Flow precisely because `LocaleManager` exposes none — and
+        nothing exercises it. `LanguageOverrideComposeTest` is API 31/32 only
+        by design, since `ProvideAppLocale` is a deliberate pass-through above
+        that.
+      why_it_matters: >
+        The requirement "API 33+ System-Settings Parity, In-App Picker Only
+        Below" names both directions. On the maintainer's own device (API 36)
+        the system picker is the one a user is most likely to reach for.
+      owner_condition: >
+        A change that already drives `LocaleManager` from an instrumented test
+        AND renders the picker — the two halves exist separately today.
+    - id: "cold-process-notification-test-is-not-real-process-death"
+      title: "The Spanish cold-process notification test proves 'no Activity created', not process death"
+      status: open
+      severity: >
+        Stated honestly in the test's own KDoc rather than discovered later.
+        The gap is between "no Activity ever existed in this process" and "this
+        process was killed and restarted by AlarmManager".
+      origin: >
+        app-localization-es-en verify-report.md finding 3; already flagged in
+        design.md's own testing section before the test was written.
+      reason: >
+        An instrumented test runs inside a live instrumentation process; it
+        cannot kill and let AlarmManager resurrect its own host. What
+        `SpanishColdProcessNotificationInstrumentedTest` does prove is that
+        `NotificationPoster` resolved Spanish from the persisted tag with no
+        Activity in the picture, which is the part the mechanism is responsible
+        for.
+      why_it_matters: >
+        This is the headline failure the whole change exists to prevent — a user
+        who picked Spanish receiving an English reminder. The remaining
+        uncovered slice is the process lifecycle, not the localization logic.
+      owner_condition: >
+        The same manual `adb` check already listed under
+        testing.instrumented.device_free_matrix.limits. Fold it in there rather
+        than inventing a second mechanism for this change alone.
+    - id: "import-failure-message-mapping-is-untested"
+      title: "importFailureMessage's four branches are compiler-checked for completeness, not for correctness"
+      status: open
+      severity: >
+        Four one-line mappings. Low risk, and the cheapest of these four items
+        to close.
+      origin: >
+        app-localization-es-en verify-report.md finding 4; flagged in PR #71's
+        own description before merge.
+      reason: >
+        The `when` over `ImportFailure` in `DataPortabilityScreen` is
+        exhaustive, so a new failure case cannot be added without copy in both
+        string files. Nothing asserts that each existing branch selects the
+        right resource. Covering it means making `ImportResultMessage` and
+        `importFailureMessage` `internal` so a Compose test can render them.
+      why_it_matters: >
+        A Spanish user shown the wrong rejection reason is the exact bug class
+        the typed-error refactor was written to eliminate. It would be a poor
+        joke for that refactor to introduce it.
+      owner_condition: >
+        Any change touching data-portability's UI, or a deliberate
+        test-coverage pass. Needs two private composables promoted to
+        `internal`.
 stack:
   status: ratified
   note: >
