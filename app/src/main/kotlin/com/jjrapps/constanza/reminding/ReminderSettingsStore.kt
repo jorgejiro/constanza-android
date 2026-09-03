@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -69,9 +70,29 @@ class ReminderSettingsStore @Inject constructor(
         dataStore.edit { it[ONBOARDING_DONE_KEY] = true }
     }
 
+    /** app-localization: the below-API-33 language override (design.md D1). Absent means
+     *  [AppLanguage.SystemDefault] on read — there is no third persisted value (design.md D7). On
+     *  API 33+ this key is never written or read; [AppLocaleController] is the only place that API
+     *  split lives. */
+    val languageTag: Flow<String?> = dataStore.data.map { it[LANGUAGE_TAG_KEY] }
+
+    @Suppress("RedundantSuspendModifier")
+    suspend fun currentLanguageTag(): String? = languageTag.first()
+
+    /** design.md D7 — the tri-state clear removes, it never stores a third value. `tag == null`
+     *  (`AppLanguage.SystemDefault`) removes the key instead of writing one, so a later device
+     *  locale change takes effect exactly as if no override had ever been set. */
+    @Suppress("RedundantSuspendModifier")
+    suspend fun setLanguageTag(tag: String?) {
+        dataStore.edit { prefs ->
+            if (tag == null) prefs.remove(LANGUAGE_TAG_KEY) else prefs[LANGUAGE_TAG_KEY] = tag
+        }
+    }
+
     internal companion object {
         val SNOOZE_DURATION_MINUTES_KEY = intPreferencesKey("snooze_duration_minutes")
         val REQUESTED_NOTIFICATION_PERMISSION_KEY = booleanPreferencesKey("requested_notification_permission")
         val ONBOARDING_DONE_KEY = booleanPreferencesKey("onboarding_done")
+        val LANGUAGE_TAG_KEY = stringPreferencesKey("language_tag")
     }
 }

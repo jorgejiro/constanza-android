@@ -10,6 +10,7 @@ import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.localization.AppLocaleController
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 
@@ -33,7 +34,10 @@ private const val NO_ACTION_ICON = 0
  * [NotificationCompat.Builder.setColor] tint over a vector small icon
  * ([R.drawable.ic_notification_reminder]), never as a bitmap.
  */
-class NotificationPoster @Inject constructor(@ApplicationContext private val context: Context) {
+class NotificationPoster @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val appLocaleController: AppLocaleController,
+) {
 
     private val manager = NotificationManagerCompat.from(context)
 
@@ -48,10 +52,17 @@ class NotificationPoster @Inject constructor(@ApplicationContext private val con
      * assuming a post happened — [canPost] promises "no post, never a silent lie about delivery",
      * and only the caller can keep the second half of that promise in the database (design.md
      * §13.4 finding 1, task G.3).
+     *
+     * app-localization (design.md D4): resolves one localized [Context] per post via
+     * [AppLocaleController.localizedApplicationContext] and uses it for the channel name, the
+     * question, and all three action labels — the whole reason this function is now `suspend`.
+     * `Every User-Visible String Renders In The Resolved Language`, including a notification fired
+     * by a cold process with no Activity ever created.
      */
-    fun postReminder(occurrenceId: Long, habitName: String, question: String?, colorArgb: Int): Boolean {
-        if (!canPost()) return false
-        postToSystem(occurrenceId, buildNotification(occurrenceId, habitName, question, colorArgb))
+    suspend fun postReminder(occurrenceId: Long, habitName: String, question: String?, colorArgb: Int): Boolean {
+        val localizedContext = appLocaleController.localizedApplicationContext()
+        if (!canPost(localizedContext)) return false
+        postToSystem(occurrenceId, buildNotification(localizedContext, occurrenceId, habitName, question, colorArgb))
         return true
     }
 
@@ -90,9 +101,13 @@ class NotificationPoster @Inject constructor(@ApplicationContext private val con
     }
 
     /** design.md §11's degradation table, restated as one predicate: not-enabled OR muted-channel
-     *  both mean "no post", never a crash and never a silent lie about delivery. */
-    fun canPost(): Boolean {
-        ensureChannel()
+     *  both mean "no post", never a crash and never a silent lie about delivery. Public signature
+     *  stays non-suspend (design.md D4) — this app's base, non-localized [context] is enough for a
+     *  gate check that never renders user-visible text itself. */
+    fun canPost(): Boolean = canPost(context)
+
+    private fun canPost(ctx: Context): Boolean {
+        ensureChannel(ctx)
         if (!manager.areNotificationsEnabled()) return false
         val importance = manager.getNotificationChannel(REMINDER_CHANNEL_ID)?.importance
             ?: NotificationManager.IMPORTANCE_DEFAULT
@@ -101,49 +116,59 @@ class NotificationPoster @Inject constructor(@ApplicationContext private val con
 
     /** Idempotent: `createNotificationChannel` on an already-existing channel id is a no-op that
      *  never resets a user's own importance choice. Called from [canPost] itself, not once at
-     *  startup, so every gate check is self-contained regardless of call order. */
-    private fun ensureChannel() {
+     *  startup, so every gate check is self-contained regardless of call order. Re-invoked on
+     *  every post with [ctx] — design.md D4's "channel-name re-localization comes free": the
+     *  channel name follows a language change on the very next post. */
+    private fun ensureChannel(ctx: Context) {
         manager.createNotificationChannel(
             NotificationChannel(
                 REMINDER_CHANNEL_ID,
-                context.getString(R.string.notification_channel_reminders_name),
+                ctx.getString(R.string.notification_channel_reminders_name),
                 NotificationManager.IMPORTANCE_HIGH,
             ),
         )
     }
 
     private fun buildNotification(
+        ctx: Context,
         occurrenceId: Long,
         habitName: String,
         question: String?,
         colorArgb: Int,
     ): Notification =
-        NotificationCompat.Builder(context, REMINDER_CHANNEL_ID)
+        NotificationCompat.Builder(ctx, REMINDER_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_reminder)
             .setColor(colorArgb)
             .setContentTitle(habitName)
-            .setContentText(question ?: context.getString(R.string.notification_default_question))
+            .setContentText(question ?: ctx.getString(R.string.notification_default_question))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(false)
-            .addAction(action(occurrenceId, ActionIntentContract.ACTION_YES, R.string.notification_action_yes))
-            .addAction(action(occurrenceId, ActionIntentContract.ACTION_NO, R.string.notification_action_no))
-            .addAction(action(occurrenceId, ActionIntentContract.ACTION_SNOOZE, R.string.notification_action_snooze))
+            .addAction(action(ctx, occurrenceId, ActionIntentContract.ACTION_YES, R.string.notification_action_yes))
+            .addAction(action(ctx, occurrenceId, ActionIntentContract.ACTION_NO, R.string.notification_action_no))
+            .addAction(
+                action(ctx, occurrenceId, ActionIntentContract.ACTION_SNOOZE, R.string.notification_action_snooze),
+            )
             .build()
 
-    private fun action(occurrenceId: Long, actionString: String, labelRes: Int): NotificationCompat.Action {
+    private fun action(
+        ctx: Context,
+        occurrenceId: Long,
+        actionString: String,
+        labelRes: Int,
+    ): NotificationCompat.Action {
         // Not chained: same reason as AlarmScheduler.pendingIntentFor — Intent's fluent setters
         // return a Java platform type, and chaining inserts a Kotlin non-null assertion that
         // breaks under the AGP mockable-jar unit-test path (`isReturnDefaultValues` stubs a null
         // return, and the assertion then throws before the mock is even reached).
         val intent = Intent(actionString)
-        intent.setClassName(context.packageName, ActionIntentContract.ACTION_RECEIVER_CLASS)
+        intent.setClassName(ctx.packageName, ActionIntentContract.ACTION_RECEIVER_CLASS)
         intent.putExtra(ActionIntentContract.EXTRA_OCCURRENCE_ID, occurrenceId)
         val pendingIntent = PendingIntent.getBroadcast(
-            context,
+            ctx,
             occurrenceId.toInt(),
             intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        return NotificationCompat.Action(NO_ACTION_ICON, context.getString(labelRes), pendingIntent)
+        return NotificationCompat.Action(NO_ACTION_ICON, ctx.getString(labelRes), pendingIntent)
     }
 }
