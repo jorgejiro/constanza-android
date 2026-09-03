@@ -37,14 +37,16 @@ import kotlin.test.assertTrue
  * picked a synonym it didn't list. Reflection plus a name-shape pattern catches the whole family
  * instead of enumerating it. [ReminderSettingsStore] already legitimately exposes
  * `hasRequestedNotificationPermission`/`recordRequestedNotificationPermission` for
- * `POST_NOTIFICATIONS` — precisely the shape this test forbids for exact alarms — so its check does
- * not ban the shape outright; it bans that shape combined with any exact-alarm naming, which is the
- * one combination this feature must never introduce. [AlarmScheduler] has no legitimate
+ * `POST_NOTIFICATIONS` — precisely the shape this test forbids for exact alarms — so its check
+ * allow-lists the members that legitimately carry it — that latch and the onboarding-completed
+ * flag — and bans the shape everywhere else on that class. That is
+ * stronger than scoping the ban to exact-alarm naming, which a synonym would walk through.
+ * [AlarmScheduler] has no legitimate
  * persistence-shaped member at all today, so its check is unconditional.
  *
- * **What it cannot see.** It reads declared members by name, so a flag stored under a
- * deliberately-obscure name, or state added to a third type this test does not know about, slips
- * past. It also cannot see a flag smuggled through an existing parameter's semantics rather than a
+ * **What it cannot see.** It reads declared members by name, so state added to a third type this
+ * test does not know about slips past, as does a flag whose name carries neither a recording verb
+ * nor a completion noun. It also cannot see a flag smuggled through an existing parameter's semantics rather than a
  * new member. It is a floor, not a proof of the entire codebase's innocence — the "obvious other
  * candidate" named by `sdd-verify`'s own re-verify pass, made executable.
  */
@@ -68,7 +70,7 @@ class NoExactAlarmAskPersistenceTest {
     fun `ReminderSettingsStore gained no exact-alarm equivalent of its notification-ask latch`() {
         val offenders = publicMembersOf(ReminderSettingsStore::class.java)
             .filter(::isPersistenceShaped)
-            .filter { member -> member.name.namesExactAlarm() }
+            .filterNot { member -> member.name in ALLOWED_PERSISTENCE_MEMBERS }
         assertTrue(
             actual = offenders.isEmpty(),
             message = "ReminderSettingsStore gained ${offenders.joinToString { it.name }} — an " +
@@ -128,6 +130,27 @@ class NoExactAlarmAskPersistenceTest {
         fun isPersistenceShaped(member: Member): Boolean =
             PERSISTENCE_VERB.containsMatchIn(member.name) && COMPLETION_NOUN.containsMatchIn(member.name)
 
-        fun String.namesExactAlarm(): Boolean = Regex("(?i)exact.?alarm").containsMatchIn(this)
+        /**
+         * The only persistence-shaped members [ReminderSettingsStore] is allowed to carry: the
+         * `POST_NOTIFICATIONS` latch, which predates this feature and is legitimate.
+         *
+         * Allow-listing beats keyword-scoping here, and the difference is not cosmetic. Scoping the
+         * ban to names containing "exact alarm" would let `hasAskedAboutPreciseTiming` — or any
+         * other synonym a future author reaches for — walk straight through. The legitimate
+         * exceptions are two, known, and stable; the space of violations is open-ended, so the
+         * closed set is the one worth enumerating. A property contributes both a field and a
+         * getter, hence both spellings.
+         */
+        val ALLOWED_PERSISTENCE_MEMBERS = setOf(
+            // The POST_NOTIFICATIONS latch. Predates this feature, and is the shape onboarding's
+            // exact-alarm ask must never grow an equivalent of.
+            "hasRequestedNotificationPermission",
+            "recordRequestedNotificationPermission",
+            // The onboarding-completed flag. Matches on "done" rather than on an ask, and is
+            // unrelated to either permission. A `val` contributes both a field and a getter.
+            "onboardingDone",
+            "getOnboardingDone",
+            "setOnboardingDone",
+        )
     }
 }
