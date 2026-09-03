@@ -101,32 +101,55 @@ carried_forward_open_items:
         — before treating this as closed on device.
     - id: "habit-editor-has-no-cancel-affordance"
       title: "The habit editor cannot be backed out of; cancelling closes the app"
-      status: open
+      status: resolved
       origin: >
         Found on 2026-09-02 while settling first-run-onboarding's finish
-        destination. Verified in source, not inferred.
+        destination, and reported independently by the maintainer, who hit it
+        on their own phone while creating a habit.
       reason: >
-        `HabitEditorTopBar` (HabitEditorScreen.kt:191-193) is
-        `TopAppBar(title = { Text(stringResource(titleRes)) })` with no
-        navigation icon. `onDone` fires only from `viewModel.events`
-        (HabitEditorScreen.kt:77), which emits after a successful save. And
-        `BackHandler` does not appear anywhere in app/src/main, so system back
-        falls through to the Activity default and finishes it. There is
-        therefore no way to leave the editor without saving except closing the
-        app.
+        `HabitEditorTopBar` was `TopAppBar(title = { Text(...) })` with no
+        navigation icon; `onDone` fired only from `viewModel.events`, which
+        emits after a successful save; and `BackHandler` appeared nowhere in
+        app/src/main, so system back fell through to the Activity default and
+        finished it. There was no way to leave the editor without saving except
+        closing the app.
       why_it_matters: >
-        Tolerable today, because every current route into the editor is one the
-        user chose from the habit list. It stops being tolerable the moment
-        anything else lands them there. first-run-onboarding scopes a
-        BackHandler into its own gate for exactly that reason, which fixes the
-        onboarding entry and leaves every other entry point unchanged — so this
-        item survives that change rather than being closed by it.
-      owner_condition: >
-        The same change that resolves `today-has-no-add-habit-affordance`,
-        since adding an add-habit affordance to Today creates a second entry
-        point into the editor and makes the missing escape reachable by
-        ordinary use. Needs a real decision, not just a back arrow: whether an
-        editor with unsaved edits should confirm before discarding.
+        Tolerable while every route into the editor was one the user chose from
+        the habit list. It stopped being tolerable the moment anything else
+        landed them there.
+      resolution: >
+        Closed across two changes rather than one, which is why this item
+        outlived the first of them.
+
+        PR #47 gave the editor its own exit: a navigation icon
+        (`HabitEditorScreen.kt:281-284`), an `onBack` parameter on the Route
+        (`:88`), the codebase's first `BackHandler` (`:116`, disabled while the
+        discard dialog is up so the two never stack), and a confirm-before-
+        discard dialog gated on derived dirty state — leaving is immediate when
+        nothing was touched.
+
+        PR #57 supplied the second entry point this item predicted, adding an
+        add-habit action to Today, and `ConstanzaRoute.EditorOrigin` now gives
+        every route in a defined exit: HabitList returns to the list,
+        Onboarding and Today both return to Today
+        (`MainActivity.kt:140-142`).
+      resolution_note: >
+        The owner_condition asked for a real decision rather than just a back
+        arrow, on whether an editor with unsaved edits should confirm before
+        discarding. It does, and the dirty state behind it is derived by
+        comparing the whole form against its pristine baseline rather than by
+        setting a flag per field — so a field added later participates the
+        moment it is declared, instead of being silently missed.
+      verified: >
+        Re-checked in source on 2026-09-03, after both changes merged: all five
+        of this item's stated gaps are closed, and all three EditorOrigin
+        branches resolve to a destination. The item's own text was stale rather
+        than open.
+
+        Confirmed on hardware the same day. The maintainer installed the release
+        build on their Galaxy S25 and reported back that the screen can now be
+        left — the same person who found the defect, on the same device, closing
+        it by use rather than by reading the diff.
     - id: "today-has-no-add-habit-affordance"
       title: "Today offers no way to add a habit, and reads as broken when it is empty"
       status: resolved
