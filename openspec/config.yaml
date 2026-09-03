@@ -1079,6 +1079,27 @@ carried_forward_open_items:
         of every observed matrix flake across two consecutive verify sessions and four distinct
         methods.
 
+      escalation_2026_09_03: >
+        Worse than first recorded, and no longer confined to one test class.
+        habit-deletion's verify phase ran the matrix twice on identical bytes:
+        api31 was clean both times, and api37 failed BOTH times, each on a
+        different Today-screen compose test — TodayAddHabitComposeTest on one
+        run and TodaySlotRowComposeTest on the other, both
+        ComposeTimeoutException at exactly 15000 ms. The apply phase's single
+        clean run did not reproduce.
+
+        Two things change with this. The pattern is a bounded-wait problem
+        across the whole tracking package, not a defect in one helper. And the
+        api37 leg is now failing roughly every run for reasons unrelated to
+        whatever change is under test, which means the matrix has stopped being
+        a gate anyone can read: the next person to see it red will re-run
+        rather than investigate, and the run after that will be believed for
+        the wrong reason.
+
+        Fix this before it swallows a real regression. The deadline is not
+        hypothetical: every change since the item was filed has carried the
+        instruction "re-run before attributing a failure to yourself", which is
+        exactly the habit that teaches people to ignore red.
 stack:
   status: ratified
   note: >
