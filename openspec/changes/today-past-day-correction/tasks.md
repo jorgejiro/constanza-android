@@ -88,31 +88,31 @@ Chain strategy: pending
 
 ## Phase 3: `TodayScreen` UI (Slice B)
 
-- [ ] 3.1 Create `tracking/TodayDateBar.kt`: `TodayDateBar` composable — previous/next `IconButton`s (`Icons.AutoMirrored.Filled.KeyboardArrowLeft`/`KeyboardArrowRight`, absent at the live edge for "next"), a centred `Text` with `Modifier.weight(1f)`, and a `TextButton` labelled `today_back_to_today` present only off the live edge. Fall back to text-label buttons if either icon is unavailable at implementation time (per `DataPortabilityScreen.kt:31-32`'s established rule).
-- [ ] 3.2 In the same file, add `TodayPastDayEmptyState()` — text-only, `today_empty_past`, no button.
-- [ ] 3.3 Add a `DateNavActions` holder in `tracking/TodayScreen.kt`, in the exact shape of `SlotActions` (`:129-143`), bundling `onPreviousDay`/`onNextDay`/`onToday`. No new `@Suppress`.
-- [ ] 3.4 Hoist `TodayDateBar` above the `LazyColumn` in `TodayContent`'s non-empty branch (never as the list's first item) and above `TodayPermissionBanners` in both branches; `TopAppBar` stays untouched.
-- [ ] 3.5 Update `TodayContent` (`:144-151`) to accept `DateNavActions`, render `TodayPastDayEmptyState()` instead of `TodayEmptyState(onAddHabit)` when `state.isPastDay && state.rows.isEmpty()`, and omit `TrailingAddHabitAction(onAddHabit)` from the non-empty branch when `state.isPastDay`.
-- [ ] 3.6 Wire `showPreviousDay()`/`showNextDay()`/`showToday()` from `TodayScreen` into `DateNavActions`; format the date label with a locally-`remember`ed `DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(...)` keyed on `LocalConfiguration`.
+- [x] 3.1 Create `tracking/TodayDateBar.kt`: `TodayDateBar` composable — previous/next `IconButton`s (`Icons.AutoMirrored.Filled.KeyboardArrowLeft`/`KeyboardArrowRight`, absent at the live edge for "next"), a centred `Text` with `Modifier.weight(1f)`, and a `TextButton` labelled `today_back_to_today` present only off the live edge. Fall back to text-label buttons if either icon is unavailable at implementation time (per `DataPortabilityScreen.kt:31-32`'s established rule). **Verified available (task preamble); icons used directly, no text-label fallback needed.**
+- [x] 3.2 In the same file, add `TodayPastDayEmptyState()` — text-only, `today_empty_past`, no button.
+- [x] 3.3 Add a `DateNavActions` holder in `tracking/TodayScreen.kt`, in the exact shape of `SlotActions` (`:129-143`), bundling `onPreviousDay`/`onNextDay`/`onToday`. No new `@Suppress`. **Deviation, found in apply:** a second holder, `TodayContentActions` (bundling `onAddHabit`/`onNotificationPermissionRequested`), was also added. Adding `DateNavActions` alone as `TodayContent`'s 6th parameter still failed `detekt`'s `LongParameterList`: its check fires at `parameterCount >= functionThreshold` (verified by disassembling `LongParameterList.class`'s bytecode — an `if_icmplt` skip-if-less-than, meaning report-if-`>=`), not only strictly above it, so 6 parameters was already one too many. No new `@Suppress` was added; the fix is a second holder of the same established shape.
+- [x] 3.4 Hoist `TodayDateBar` above the `LazyColumn` in `TodayContent`'s non-empty branch (never as the list's first item) and above `TodayPermissionBanners` in both branches; `TopAppBar` stays untouched.
+- [x] 3.5 Update `TodayContent` (`:144-151`) to accept `DateNavActions`, render `TodayPastDayEmptyState()` instead of `TodayEmptyState(onAddHabit)` when `state.isPastDay && state.rows.isEmpty()`, and omit `TrailingAddHabitAction(onAddHabit)` from the non-empty branch when `state.isPastDay`.
+- [x] 3.6 Wire `showPreviousDay()`/`showNextDay()`/`showToday()` from `TodayScreen` into `DateNavActions`; format the date label with a locally-`remember`ed `DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(...)` keyed on `LocalConfiguration`.
 
 ## Phase 4: Strings (Slice B)
 
-- [ ] 4.1 Add `today_previous_day`, `today_next_day`, `today_back_to_today`, `today_empty_past` to `res/values/strings.xml`.
-- [ ] 4.2 Add the same four keys, translated into neutral Spanish, to `res/values-es/strings.xml`.
+- [x] 4.1 Add `today_previous_day`, `today_next_day`, `today_back_to_today`, `today_empty_past` to `res/values/strings.xml`.
+- [x] 4.2 Add the same four keys, translated into neutral Spanish, to `res/values-es/strings.xml`.
 
 ## Phase 5: Instrumented Tests + Audits (Slice B)
 
-- [ ] 5.1 Create `androidTest/.../tracking/TodayPastDayComposeTest.kt` via `TodayViewModelTestFactory.kt` (real `SelfReschedulingCurrentDateSource`) and `TodayScreenWaits.kt` (no per-class `waitUntil`): navigate back, a force-resolved `MISSED` slot shows Missed + Change; Change → Yes → Done.
-- [ ] 5.2 Same file: add-habit affordance absent on a past day, present again after tapping `Today`.
-- [ ] 5.3 Same file: an empty past day shows `today_empty_past` and no button.
-- [ ] 5.4 Same file: unrestricted re-editing — from a past day, drive a slot through `COMPLETED → MISSED → SKIPPED` twice via the Change control; each edit lands.
-- [ ] 5.5 Extend `androidTest/.../tracking/EntryWriteParityTest.kt`: `answerInApp(habitId, pastDate, slotId, COMPLETED, occurrenceId = null)` upserts on the past date and does not resurrect the `RESOLVED` occurrence.
-- [ ] 5.6 Audit `app/src/androidTest/kotlin/com/jjrapps/constanza/e2e/CoreFlowE2ETest.kt` for date-label and add-habit-position assumptions the new date bar could break; update any broken assertion in the same file.
-- [ ] 5.7 Re-run `androidTest/.../tracking/TodayAddHabitComposeTest.kt` and `androidTest/.../tracking/TodayAdaptiveComposeTest.kt` unmodified against the new date bar; if a geometry or clipping assertion fails because of the bar's added vertical extent, fix that assertion in the same file (contingent — this is why both carry a non-zero estimate above).
+- [x] 5.1 Create `androidTest/.../tracking/TodayPastDayComposeTest.kt` via `TodayViewModelTestFactory.kt` (real `SelfReschedulingCurrentDateSource`) and `TodayScreenWaits.kt` (no per-class `waitUntil`): navigate back, a force-resolved `MISSED` slot shows Missed + Change; Change → Yes → Done.
+- [x] 5.2 Same file: add-habit affordance absent on a past day, present again after tapping `Today`.
+- [x] 5.3 Same file: an empty past day shows `today_empty_past` and no button.
+- [x] 5.4 Same file: unrestricted re-editing — from a past day, drive a slot through `COMPLETED → MISSED → SKIPPED` twice via the Change control; each edit lands.
+- [x] 5.5 Extend `androidTest/.../tracking/EntryWriteParityTest.kt`: `answerInApp(habitId, pastDate, slotId, COMPLETED, occurrenceId = null)` upserts on the past date and does not resurrect the `RESOLVED` occurrence.
+- [x] 5.6 Audit `app/src/androidTest/kotlin/com/jjrapps/constanza/e2e/CoreFlowE2ETest.kt` for date-label and add-habit-position assumptions the new date bar could break; update any broken assertion in the same file. **Audited: every assertion in this file addresses nodes by string resource or content description already unrelated to a formatted date string (habit names, onboarding/settings labels), and none assert add-habit position geometrically — that geometry is `TodayAddHabitComposeTest`'s job (task 5.7). No assumption broke; confirmed by the full emulator matrix run (task 7.5), not merely by reading.**
+- [x] 5.7 Re-run `androidTest/.../tracking/TodayAddHabitComposeTest.kt` and `androidTest/.../tracking/TodayAdaptiveComposeTest.kt` unmodified against the new date bar; if a geometry or clipping assertion fails because of the bar's added vertical extent, fix that assertion in the same file (contingent — this is why both carry a non-zero estimate above). **Re-run unmodified; both still pass on the emulator matrix (task 7.5) — the date bar's added vertical extent did not break either geometry or clipping assertion. No edit needed; the contingent 0–15 line estimate lands at 0 for both files.**
 
 ## Phase 6: Config Close-out (Slice B)
 
-- [ ] 6.1 In `openspec/config.yaml`, close carried-forward item `no-in-app-route-to-edit-a-past-day`: set `status: resolved` and add a `resolution:` field recording that Today gained in-place backward-unbounded date navigation (this change), with unrestricted past-slot editing and the add-habit affordance hidden on a past day.
+- [x] 6.1 In `openspec/config.yaml`, close carried-forward item `no-in-app-route-to-edit-a-past-day`: set `status: resolved` and add a `resolution:` field recording that Today gained in-place backward-unbounded date navigation (this change), with unrestricted past-slot editing and the add-habit affordance hidden on a past day.
 
 ## Phase 7: Verification
 
@@ -120,4 +120,4 @@ Chain strategy: pending
 - [x] 7.2 `./gradlew :domain:test :app:testDebugUnitTest` — all Phase 2/2.16 tests green. **(Slice A)** 221/221 `:app:testDebugUnitTest` (26/26 in `TodayViewModelTest`), 52/52 `:domain:test` (10/10 in `StreakCalculatorTest`) — 0 failures, 0 errors.
 - [x] 7.3 `./gradlew :domain:detektMain :app:detektMain` — **(Slice A subset only — the `TodayContent`/date-format checks are Slice B)** BUILD SUCCESSFUL, 0 issues on both modules after inlining `readNotificationPermission` to keep `TodayViewModel` at 10 functions under detekt's default `TooManyFunctions` ceiling of 11.
 - [x] 7.4 `./gradlew :app:compileDebugAndroidTestKotlin` — instrumented build compiles as its own step, independent of 7.2. **(Slice A)** BUILD SUCCESSFUL.
-- [ ] 7.5 `./gradlew :app:emulatorMatrixGroupDebugAndroidTest` — full matrix green on API 31 + API 37, device-free. **Slice B — not run in this slice.**
+- [x] 7.5 `./gradlew :app:emulatorMatrixGroupDebugAndroidTest` — full matrix green on API 31 + API 37, device-free. **Run to completion on the Slice B tree: api31 143 tests / 0 failures / 0 errors / 3 skipped, api37 143 tests / 0 failures / 0 errors / 6 skipped.** Counts read from the JUnit XML, whose mtimes (00:07:49 and 00:10:51) postdate the newest file under `app/src` — proven to describe this tree, not a stale run. Tasks 5.6 and 5.7 cite this run as their evidence.

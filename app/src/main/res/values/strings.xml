@@ -88,6 +88,12 @@
          list is empty, trailing the last row once it is not. Deliberately shared: it is one
          action, and two wordings would read as two different things. -->
     <string name="today_add_habit">Add habit</string>
+    <!-- today-past-day-correction: the date bar's navigation controls and the empty state shown
+         while viewing a past day. -->
+    <string name="today_previous_day">Previous day</string>
+    <string name="today_next_day">Next day</string>
+    <string name="today_back_to_today">Today</string>
+    <string name="today_empty_past">Nothing was scheduled on this day.</string>
     <string name="today_status_all_completed">All done</string>
     <string name="today_status_partial">In progress</string>
     <string name="today_status_any_missed">Missed something</string>

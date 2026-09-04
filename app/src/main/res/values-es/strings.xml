@@ -82,6 +82,12 @@
     <string name="today_manage_habits">Gestionar hábitos</string>
     <string name="today_empty">No hay nada pendiente hoy.</string>
     <string name="today_add_habit">Añadir hábito</string>
+    <!-- today-past-day-correction: los controles de navegación de la barra de fecha y el estado
+         vacío que se muestra al ver un día pasado. -->
+    <string name="today_previous_day">Día anterior</string>
+    <string name="today_next_day">Día siguiente</string>
+    <string name="today_back_to_today">Hoy</string>
+    <string name="today_empty_past">No había nada programado ese día.</string>
     <string name="today_status_all_completed">Todo hecho</string>
     <string name="today_status_partial">En progreso</string>
     <string name="today_status_any_missed">Algo pendiente</string>

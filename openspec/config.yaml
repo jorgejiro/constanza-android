@@ -377,7 +377,7 @@ carried_forward_open_items:
         proceeds with work still in flight.
     - id: "no-in-app-route-to-edit-a-past-day"
       title: "Provisional-Missed Correction mandates an in-app past-day edit, and no screen can reach one"
-      status: open
+      status: resolved
       origin: >
         Found on 2026-09-03 while spec'ing today-answered-slot-collapse, when
         the spec phase had to reason about whether that requirement needed a
@@ -411,6 +411,32 @@ carried_forward_open_items:
         surface for it, or whether the requirement is narrowed to the two
         routes that exist. Narrowing is a legitimate answer — but it has to be
         an argued decision, not the silence it is today.
+      resolution: >
+        Resolved by today-past-day-correction: Today itself is the chosen
+        surface, gaining in-place backward-unbounded date navigation rather
+        than a new route or a Progress-screen surface. `TodayViewModel` splits
+        clock truth from an optional deliberate navigation
+        (`TodayDate(clock, navigated)`, `viewed = navigated ?: clock`);
+        `showPreviousDay()`/`showNextDay()`/`showToday()` step that navigation,
+        with no lower bound backward and the live-today view as the forward
+        boundary. `TodayScreen` gained a fixed `TodayDateBar` above the
+        scrolling content in both branches, and a past day now permits
+        settling any slot to `COMPLETED`, `MISSED`, or `SKIPPED` any number of
+        times — not narrowed to the `MISSED -> COMPLETED` floor the spec
+        already required as a subset. The add-habit affordance is hidden while
+        viewing a past day, replaced by past-day empty-state text
+        (`today_empty_past`); a past day with nothing scheduled renders empty
+        rather than blocking navigation. `EntryWriter`, `TodayModel`,
+        `OccurrenceResolver` and `CurrentDateSource` were not modified, only
+        proven by regression.
+
+        Residual gap, honestly stated: a *backward* clock move (westward
+        timezone travel making `today()` return an earlier date) would leave
+        `navigated >= clock` and show past-day chrome on the live date until
+        the next forward tap self-heals it — accepted as consistent with the
+        already-open `today-foregrounded-timezone-travel` boundary, not built
+        around here. Progress was never wired as an alternate surface; Today
+        remains the one and only route this resolution reaches.
     - id: "today-row-answering-is-cramped-and-always-on"
       title: "Today's answer buttons never fit, and never go away once answered"
       status: resolved
