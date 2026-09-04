@@ -1698,6 +1698,107 @@ carried_forward_open_items:
         dismiss action. The rendered text is read out of the semantics tree by
         tagging a host `Column`, so a scenario asserts the WHOLE rendered
         output rather than the presence of one string among others.
+    - id: "reminder-notification-shows-a-question-and-truncates-long-habit-names"
+      title: "The reminder notification carries a question line the maintainer does not want, and clips long habit names"
+      status: open
+      severity: >
+        Cosmetic in the strict sense — no reminder is lost and no answer is
+        mis-recorded — but this is the surface the product is used from. The
+        notification IS the daily interaction; every other screen is optional.
+      origin: >
+        Reported by the maintainer on 2026-09-04 from a One UI screenshot of the
+        shade taken 2026-09-03 21:53, showing a reminder titled
+        "Terminar de cenar antes d..." over the body "Did you do it?".
+      reason: >
+        `NotificationPoster.buildNotification`
+        (app/src/main/kotlin/com/jjrapps/constanza/reminding/NotificationPoster.kt:142-143)
+        sets `setContentTitle(habitName)` and
+        `setContentText(question ?: ctx.getString(R.string.notification_default_question))`.
+        The builder declares no `setStyle`, so the post is a plain collapsed
+        notification: the system ellipsizes the title to a single line at
+        whatever width the shade gives it, and the body line is always present
+        because the default question backs it whenever a habit carries no
+        custom one.
+      not_a_defect_note: >
+        The English body in that screenshot is NOT a localization defect. The
+        string is translated — `notification_default_question` is
+        "Did you do it?" in app/src/main/res/values/strings.xml:12 and
+        "¿Lo has hecho?" in app/src/main/res/values-es/strings.xml:15, and
+        `SpanishColdProcessNotificationInstrumentedTest` asserts exactly that
+        Spanish body. The screenshot was taken from a build installed before the
+        Spanish resources landed on the device. Do not open a localization
+        investigation from it.
+      what_the_maintainer_wants: >
+        Confirmed by the maintainer on 2026-09-04, and it is a product stance
+        rather than a styling preference: the habit name IS the question, with
+        or without a question mark, so a separate question line adds nothing.
+        The `question` field is therefore REMOVED FROM THE PRODUCT, not merely
+        hidden from the notification. A habit keeps `name` plus `notes` as a
+        reference detail and nothing else. The notification carries the habit
+        name alone, and a long name must not be clipped.
+      blast_radius: >
+        Grepped 2026-09-04. Nine sites, two of them structural.
+        (1) domain/src/main/kotlin/com/jjrapps/constanza/domain/model/Model.kt:11
+        — `Habit.question`.
+        (2) core/data/entity/Entities.kt:17 — `HabitEntity.question` is a real
+        column, so this needs a Room migration. `AppDatabase` is at
+        `version = 2` (core/data/AppDatabase.kt:36), making this v2 to v3 with a
+        checked-in app/schemas/com.jjrapps.constanza.core.data.AppDatabase/3.json.
+        Dropping a column in SQLite is a table rebuild.
+        (3) core/data/mapper/Mappers.kt:34.
+        (4) Backup format — portability/BackupDto.kt:53 and
+        portability/BackupMapper.kt:23,40. Backups already exported carry it.
+        (5) reminding/NotificationPoster.kt:62,65,136,143 — the parameter and
+        the `setContentText`.
+        (6) scheduling/ReminderFireWorker.kt:52 — the only `postReminder` call
+        site.
+        (7) Editor UI — habit/HabitEditorFormState.kt:21,44 and
+        habit/HabitEditorScreen.kt:220,334 (`FIELD_QUESTION` and the
+        rotation-restore list).
+        (8) habit/HabitListScreen.kt:195 — the habit list renders
+        `habit.question` as `supportingContent`.
+        (9) Strings, in BOTH values/ and values-es/ or `StringResourceParityTest`
+        fails: `notification_default_question`, `habit_editor_question_label`,
+        and any sibling question copy.
+      open_questions_for_the_analysis: >
+        1. Old backups. Exports stop writing `question`, but importing a backup
+        that still carries it must keep working. Decide deliberately between
+        silent tolerance and a version bump handled through
+        `ImportFailure.UnsupportedVersion`. This is the sharpest decision in the
+        change, and it belongs to the maintainer, not the implementer.
+        2. SETTLED by the maintainer on 2026-09-04, no longer open: the habit
+        list row shows `notes` in place of `question`. habit/HabitListScreen.kt:195
+        becomes `habit.notes?.let { ... }` as `supportingContent`. Implement it
+        that way; do not re-open the question. What still needs deciding is only
+        the mechanical consequence — `notes` is free-form and can be far longer
+        than a guiding question was, so pick a `maxLines`/overflow for that row
+        deliberately instead of letting a long note reflow the list.
+        2b. SETTLED with it on 2026-09-04: the notes field in the EDITOR must be
+        a taller, multi-line input, because `notes` is now the habit's only free
+        text and is meant to hold more than a line. Today
+        habit/HabitEditorScreen.kt:228-236 renders it as an ordinary text field
+        with no `minLines`, so it opens one line tall and looks like the name
+        field beside it. Give it a `minLines` (three or four) and a deliberate
+        `maxLines` so it reads as a notes area on sight. This pairs with the
+        list-row decision above: the two together are what `notes` being the
+        reference detail actually means.
+        3. Notification shape. With the body line gone the notification has a
+        title and no text, and a collapsed title cannot be widened by any
+        builder call. `NotificationCompat.BigTextStyle` / `setBigContentTitle`
+        reveals the full name only once expanded; moving the name into the body
+        line wraps to two lines while collapsed but loses the bold title weight
+        AND directly contradicts removing that line. Resolve these as ONE
+        decision, never as two.
+        4. Whatever is chosen must keep the three actions (yes / no / snooze)
+        and must not change `REMINDER_CHANNEL_ID` or the notification id, which
+        `CoreFlowTestFixture.awaitPostedNotification` and the E2E flow depend on.
+      sizing: >
+        Domain model, Room migration, backup format, editor, list row,
+        notification and strings. This is an SDD-sized change, not a direct edit.
+      owner_condition: >
+        Deliberately deferred by the maintainer until the four app-localization
+        coverage items above are closed. Analyse it as its own change then;
+        do not fold it into that test-coverage pass.
 stack:
   status: ratified
   note: >
