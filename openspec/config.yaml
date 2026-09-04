@@ -1766,22 +1766,26 @@ carried_forward_open_items:
         silent tolerance and a version bump handled through
         `ImportFailure.UnsupportedVersion`. This is the sharpest decision in the
         change, and it belongs to the maintainer, not the implementer.
-        2. SETTLED by the maintainer on 2026-09-04, no longer open: the habit
-        list row shows `notes` in place of `question`. habit/HabitListScreen.kt:195
-        becomes `habit.notes?.let { ... }` as `supportingContent`. Implement it
-        that way; do not re-open the question. What still needs deciding is only
-        the mechanical consequence — `notes` is free-form and can be far longer
-        than a guiding question was, so pick a `maxLines`/overflow for that row
-        deliberately instead of letting a long note reflow the list.
-        2b. SETTLED with it on 2026-09-04: the notes field in the EDITOR must be
-        a taller, multi-line input, because `notes` is now the habit's only free
-        text and is meant to hold more than a line. Today
-        habit/HabitEditorScreen.kt:228-236 renders it as an ordinary text field
-        with no `minLines`, so it opens one line tall and looks like the name
-        field beside it. Give it a `minLines` (three or four) and a deliberate
-        `maxLines` so it reads as a notes area on sight. This pairs with the
-        list-row decision above: the two together are what `notes` being the
-        reference detail actually means.
+        2. SETTLED by the maintainer on 2026-09-04, no longer open, and note
+        this SUPERSEDES an earlier answer the same day of "show notes there
+        instead": the habit list row shows the habit NAME AND NOTHING ELSE.
+        `supportingContent` is removed from the `ListItem` at
+        habit/HabitListScreen.kt:195 rather than repointed at `notes`. The row
+        keeps its `leadingContent` colour dot, its `headlineContent` name, and
+        its `trailingContent` actions; only the supporting line goes. The
+        reasoning is the maintainer's and it is worth keeping: the habit list is
+        an index to scan, not a surface to read on, and `notes` is free text
+        that can run long enough to turn every row into a block. No `maxLines`
+        or overflow decision is needed for that row any more — there is no text
+        to bound.
+        2b. SETTLED with it: the notes field in the EDITOR is a taller
+        multi-line input, `minLines = 3` and `maxLines = 5`, so it opens looking
+        like a notes area and scrolls internally past five lines instead of
+        growing without bound. Today habit/HabitEditorScreen.kt:228-236 renders
+        it as an ordinary text field with no `minLines`, so it opens one line
+        tall and is indistinguishable from the name field beside it. With the
+        list row carrying no detail, the editor is now the ONLY place `notes` is
+        read, which is what makes the taller field worth having.
         3. Notification shape. With the body line gone the notification has a
         title and no text, and a collapsed title cannot be widened by any
         builder call. `NotificationCompat.BigTextStyle` / `setBigContentTitle`
