@@ -1,206 +1,266 @@
 ```yaml
 schema: gentle-ai.verify-result/v1
-evidence_revision: sha256:04a2d8508dcda55c8a8824fbae6d561a2f13d885ae57f297339bd204604074b3
-verdict: fail
+evidence_revision: sha256:4b6e330f90c64b0fda3000d231cb92df9efbb80c1babc507127ab0420f2aa64a
+verdict: pass_with_warnings
 blockers: 0
 critical_findings: 0
-requirements: 1/3
-scenarios: 15/24
-test_command: JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :domain:test :app:testDebugUnitTest --rerun
+requirements: 3/3
+scenarios: 24/24
+test_command: JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :domain:test :app:testDebugUnitTest --rerun-tasks
 test_exit_code: 0
-test_output_hash: sha256:0230f5f589a275c0483898f5c33712233abcf0a2f596707e756a8260d43a485f
-build_command: JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:compileDebugAndroidTestKotlin --rerun
+test_output_hash: sha256:17869e208ebbb693ee37d92ec9284614c91c428fb6146a67ac81ab45888e9110
+build_command: JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" ./gradlew :app:compileDebugAndroidTestKotlin --rerun-tasks
 build_exit_code: 0
-build_output_hash: sha256:b064ee149b1495e6216fed874a44da62127a6f22eba3a7225bb3039676b4a467
+build_output_hash: sha256:058b3785292c1d76a2064c07e021232a8a2458451bc597ee437cc74e036d47d7
 ```
 
 ## Verification Report
 
 **Change**: today-past-day-correction
-**Scope of THIS verification**: Slice A / PR 1 only — `TodayViewModel`'s viewed-date/clock-truth
-split, the three navigation gestures, the UI-state reset, its JVM tests, and the streak regression.
-Working tree on branch `feat/today-viewed-date-split`, uncommitted. Phases 3–6 (Slice B: screen,
-strings, instrumented tests, config close-out) are deliberately unstarted and are NOT scored as
-incomplete or blocking in this report — they land in PR 2.
+**Scope of THIS verification**: the whole change, now feature-complete. Slice A (PR 1,
+`TodayViewModel`'s viewed-date/clock split) previously verified and presumed merged to `main`
+per PR #75. Slice B (Phases 3-6 and task 7.5: `TodayDateBar`, `TodayScreen` wiring, strings,
+instrumented tests/audits, config close-out, emulator matrix) is verified here for the first
+time, on branch `feat/today-date-bar`, uncommitted. This report supersedes and merges with the
+prior Slice-A-only `verify-report.md`.
 **Version**: delta spec `openspec/changes/today-past-day-correction/specs/habit-entry-tracking/spec.md`
-**Mode**: Standard (`strict_tdd` scoped to `:domain` only; this change adds no `:domain` production
-code, so strict TDD has no subject — correctly not enforced)
+— **3 requirements, 24 scenarios** (`rg -c '^### Requirement:'` = 3, `rg -c '^#### Scenario:'` = 24),
+confirmed by direct count, not taken from `tasks.md`'s stale "22" figure (see WARNING below).
+**Mode**: Standard (no `:domain` production code touched by Slice B either)
 
-### Completeness (Slice A scope: Phases 1, 2, and the JVM-applicable parts of Phase 7)
+### Completeness — All Phases
 | Metric | Value |
 |--------|-------|
-| Slice A tasks total (Phase 1 + Phase 2 + applicable Phase 7) | 26 |
-| Slice A tasks complete | 26 |
-| Slice A tasks incomplete | 0 |
-| Slice B tasks (Phases 3–6, task 7.5) | 24, intentionally `[ ]` — out of scope for this report |
+| Total tasks (Phases 1-7) | 50 checkable line items |
+| Tasks marked `[x]` | 49 |
+| Tasks still `[ ]` | 1 — task 7.5 (emulator matrix), see WARNING below: the matrix was actually run and is green, but the checkbox in `tasks.md` was never flipped |
+| Slice A (Phases 1, 2, applicable Phase 7) | 26/26 complete, previously verified, unchanged since |
+| Slice B (Phases 3-6, task 7.5) | 24/24 substantively complete (23 checked `[x]`, 1 unchecked but evidenced) |
 
-### Build & Tests Execution
-**Build**: ✅ Passed (fresh, forced with `--rerun`, not cached `UP-TO-DATE`)
+### Build & Tests Execution — Independently Re-Run This Pass
+**JVM build/tests**: ✅ Passed (fresh, forced with `--rerun-tasks`, not cached `UP-TO-DATE`)
 ```text
-$ JAVA_HOME=".../jbr" ./gradlew :app:compileDebugAndroidTestKotlin --rerun
-> Task :app:compileDebugAndroidTestKotlin
-w: ...LanguageOverrideComposeTest.kt:68:27 'fun createComposeRule(...)' is deprecated (pre-existing,
-   unrelated to this change)
-BUILD SUCCESSFUL in 1s — exit 0
-```
-
-**Tests**: ✅ 273 passed / ❌ 0 failed / ⚠️ 0 skipped (fresh execution, JUnit XML read directly, not
-inferred from `BUILD SUCCESSFUL` text)
-```text
-$ JAVA_HOME=".../jbr" ./gradlew :domain:test :app:testDebugUnitTest --rerun
-:app:testDebugUnitTest  -> 221/221, 0 failures, 0 errors (26/26 in TodayViewModelTest, freshly
-                            re-executed at 2026-09-04T20:53:14Z, not cache-replayed)
-:domain:test            -> 52/52, 0 failures, 0 errors (10/10 in StreakCalculatorTest, freshly
-                            re-executed at 2026-09-04T20:53:28Z)
+$ JAVA_HOME=".../jbr" ./gradlew :domain:test :app:testDebugUnitTest --rerun-tasks
+:app:testDebugUnitTest -> 221/221, 0 failures, 0 errors (26/26 in TodayViewModelTest,
+                           5/5 in StringResourceParityTest)
+:domain:test           -> 52/52, 0 failures, 0 errors (10/10 in StreakCalculatorTest,
+                           9/9 in DayRollupTest)
 Total: 273/273 passed, 0 failed, 0 skipped
 ```
-Counts were read from `app/build/test-results/testDebugUnitTest/*.xml` and
-`domain/build/test-results/test/*.xml` `<testsuite tests=... failures=... errors=...>` attributes
-after a forced `--rerun`, per the "read the JUnit XML, a bare BUILD SUCCESSFUL is not evidence" rule.
+Counts read directly from `app/build/test-results/testDebugUnitTest/*.xml` and
+`domain/build/test-results/test/*.xml` `<testsuite tests=... failures=... errors=...>`
+attributes after a forced `--rerun-tasks` I ran myself in this session (not inferred from
+`BUILD SUCCESSFUL` text, and not reused from a prior session's numbers).
 
-**Static analysis**: `./gradlew :domain:detektMain :app:detektMain` (forced `--rerun`) — BUILD
-SUCCESSFUL, 0 findings on both modules (`## Findings (0)` in both `detekt.md` reports, empty
-`<checkstyle>` body in both `detekt.xml`), `maxIssues: 0` satisfied.
+**Instrumented build**: ✅ `./gradlew :app:compileDebugAndroidTestKotlin --rerun-tasks` — BUILD
+SUCCESSFUL, exit 0, freshly re-executed.
 
-**Coverage**: ➖ Not available (no coverage tool configured for this project; not part of the
-verification commands the orchestrator specified)
+**Static analysis**: `./gradlew :app:detektMain :domain:detektMain --rerun-tasks` — BUILD
+SUCCESSFUL, `11 actionable tasks: 11 executed` (genuinely re-run, not `UP-TO-DATE`). `## Findings
+(0)` in both `detekt.md` reports after this fresh run. `maxIssues: 0` satisfied.
 
-### Core Mechanism — Traced in Code, Not Taken on Trust
+**Instrumented device-free matrix (task 7.5)** — NOT re-run by me this pass, per the
+orchestrator's explicit instruction (already run to completion on this exact tree, ~9 minutes,
+no new information from a re-run). Independently confirmed from the existing JUnit XML rather
+than taken on trust:
+| Leg | File | Reported totals | mtime | Newer than newest `app/src` file? |
+|---|---|---|---|---|
+| API 31 | `TEST-api31-_app-.xml` | `tests="143" failures="0" errors="0" skipped="3"` | 2026-09-05 00:07:49 (epoch 1788559669) | ✅ Yes |
+| API 37 | `TEST-api37-_app-.xml` | `tests="143" failures="0" errors="0" skipped="6"` | 2026-09-05 00:10:51 (epoch 1788559851) | ✅ Yes |
+
+Newest file under `app/src` is `TodayPastDayComposeTest.kt` (epoch 1788558317, 2026-09-04
+23:45:17) — both result files postdate it by 14-25 minutes, so these results describe this
+exact tree, not a stale run. Both aggregate `<testsuites>` root elements report the numbers
+above; both per-class `<testsuite>` sub-elements were also spot-checked and contain no
+`failures`/`errors` beyond the root's `0`/`0`.
+
+**Coverage**: ➖ Not available (no coverage tool configured for this project)
+
+### Non-Negotiable #1 — `DateNavActions` holder, no new `@Suppress("LongParameterList")`
 | Check | Finding |
 |---|---|
-| Both clock-driven writers remain unconditional | ✅ Confirmed. `TodayViewModel.kt:186` (`init` timer collector) and `:229` (`refreshDate()`) both do a bare `dateState.update { it.copy(clock = date) }` / `dateState.update { it.copy(clock = currentDateSource.today()) }` with **no** `if`/guard on `navigated`. Neither writer grew a condition. |
-| Forward re-attachment sets `navigated = null`, never pins to clock | ✅ Confirmed. `showNextDay()` (`:253-267`): `if (next >= current.clock) { if (current.navigated != null) { …; dateState.update { it.copy(navigated = null) } } }` — sets `navigated = null`, never `navigated = current.clock`. Backed by `TodayViewModelTest.kt:565-581`, `forward navigation onto today re-attaches, so a later tick still moves the view`: navigates back, forward (lands on `TODAY`), then advances the fake clock to `TOMORROW` and asserts `uiState.value.date == TOMORROW` — this is exactly the test that would fail if `showNextDay()` pinned `navigated = clock` instead of nulling it. |
+| `DateNavActions` holder exists | ✅ `TodayScreen.kt:160-164` — `private data class DateNavActions(onPreviousDay, onNextDay, onToday)`, same shape as the pre-existing `SlotActions` |
+| No new `@Suppress` anywhere | ✅ `git diff origin/main -- TodayScreen.kt \| rg '^[+-].*Suppress'` shows exactly one hit, a `+` line that is a **doc comment** referencing the pre-existing suppression, not a new annotation. `git diff origin/main -- TodayScreen.kt \| rg '^\+' \| rg -v 'comment lines'` confirms the actual `@Suppress("LongParameterList")` annotation on `fun TodayScreen` is unchanged context (not a `+` line) — it was already there before this change. |
+| Confirmed via detekt | ✅ Fresh `detektMain` run (this pass): 0 findings on `:app`, including `TodayScreen.kt` |
 
-### Spec Compliance Matrix — All 24 Delta-Spec Scenarios
-The actual retrieved spec file (`specs/habit-entry-tracking/spec.md`) contains **3 requirements and
-24 scenarios** (`rg -c '^#### Scenario:'` = 24), not the 22 that `tasks.md`'s "Hard constraints
-honored" section and `design.md`'s Testing Strategy section both state — see WARNING below. Counts
-in the YAML envelope above use the actual 24, per this skill's rule to never invent totals.
+**Result**: ✅ Confirmed exactly as the non-negotiable states.
 
-| # | Requirement | Scenario | Status this PR | Test / evidence |
+### Non-Negotiable #2 — `TodayDateBar` rendered above the `LazyColumn`, not as its first item
+Traced in `TodayScreen.kt`'s non-empty branch (`TodayContent`, ~:212-230):
+```kotlin
+Column(modifier = Modifier.fillMaxSize()) {
+    TodayDateBar(...)                       // outside and above
+    LazyColumn(modifier = Modifier.weight(1f)) {
+        item { TodayPermissionBanners(...) }
+        items(state.rows, ...) { ... }
+        if (!state.isPastDay) { item { TrailingAddHabitAction(...) } }
+    }
+}
+```
+`TodayDateBar` is a direct child of the outer `Column`, a sibling of the `LazyColumn`, not an
+`item {}` inside it. It also appears above `TodayPermissionBanners` in the empty branch. ✅
+Confirmed exactly as the non-negotiable states — it will not scroll out of view on a long list.
+
+### Non-Negotiable #3 — add-habit affordance absent on a past day, both branches
+| Branch | Code | Finding |
+|---|---|---|
+| Empty (`state.rows.isEmpty()`) | `if (state.isPastDay) TodayPastDayEmptyState(...) else TodayEmptyState(onAddHabit, ...)` | ✅ No add-habit call on a past day |
+| Non-empty | `if (!state.isPastDay) { item { TrailingAddHabitAction(...) } }` | ✅ Item omitted entirely on a past day, not merely disabled |
+
+Backed by two passing instrumented tests in `TodayPastDayComposeTest.kt`:
+`addHabitAffordanceIsAbsentOnAPastDayAndReturnsAfterToday` (non-empty branch, then confirms it
+returns at the live edge) and `anEmptyPastDayShowsThePastEmptyTextAndNoButton` (empty branch).
+Both ran as part of the green 143/143 matrix. ✅ Confirmed in both branches.
+
+### Non-Negotiable #4 — forward navigation stops at today
+| Layer | Evidence |
+|---|---|
+| ViewModel (mechanism) | `TodayViewModel.showNextDay()`: `if (next >= current.clock) { ...; navigated = null }` — never advances past `clock`. Pinned by `TodayViewModelTest`'s `showNextDay at the live edge is a no-op` (2.7). |
+| UI (structural) | `TodayDateBar.kt:75-85`: the "next"/`IconButton` and the `today_back_to_today` `TextButton` are rendered **only when `isPastDay == true`**. At the live edge there is no forward control on screen at all, so a user cannot even attempt to go past today through this UI. |
+
+✅ Confirmed at both the ViewModel and the UI-affordance level.
+
+### Deviation Judged — the second `TodayContentActions` holder
+**Claim** (`tasks.md` task 3.3, apply-run): adding `DateNavActions` alone as `TodayContent`'s 6th
+parameter still failed detekt's `LongParameterList` because the check "fires at
+`parameterCount >= functionThreshold`, not only strictly above it," verified by disassembling
+`LongParameterList.class`'s bytecode. Fixed with a second holder, `TodayContentActions`
+(`onAddHabit`, `onNotificationPermissionRequested`), keeping `TodayContent` at 5 parameters.
+
+**Independent check performed**: confirmed `config/detekt/detekt.yml` has no `LongParameterList`
+override (unconfigured, so detekt's built-in default applies) and confirmed the final code
+compiles with 0 detekt findings at 5 parameters. I did **not** independently reproduce the
+specific ">= vs >" bytecode claim (that would require constructing a 6-parameter counter-example
+and re-running detekt against it, which mutates the candidate under review and was not done).
+
+**Judgment**: **sound and behaviour-neutral, but only "compliant," not clearly "clearer."**
+`DateNavActions` groups three genuinely related callbacks (all date navigation) — a clear win
+for readability, matching `SlotActions`'s precedent. `TodayContentActions` groups two callbacks
+that share no conceptual relationship (`onAddHabit` is an intake action;
+`onNotificationPermissionRequested` is a permission-banner callback) — its only reason to exist
+is arity, stated plainly in its own KDoc ("the identical arity reason ... exist"). This is
+functionally correct and zero-behavior-change (confirmed: both call sites unpacked from the
+holder identically to before), but it is the "merely compliant" case flagged for judgment, not
+the "genuinely clearer" case. **WARNING-adjacent but not code-blocking** — see SUGGESTION below.
+
+### Both-Locale Strings
+| Key | `values/strings.xml` | `values-es/strings.xml` (neutral professional register) |
+|---|---|---|
+| `today_previous_day` | "Previous day" | "Día anterior" |
+| `today_next_day` | "Next day" | "Día siguiente" |
+| `today_back_to_today` | "Today" | "Hoy" |
+| `today_empty_past` | "Nothing was scheduled on this day." | "No había nada programado ese día." |
+
+All four keys present in both files (`rg` confirmed). Spanish is neutral/professional — no
+regional slang, no `vos`/`tú` informalities, matches the register of surrounding strings in the
+same file (e.g. "Gestionar hábitos", "Añadir hábito"). `StringResourceParityTest`: ✅ 5/5 passing
+(freshly re-run this pass, `TEST-...StringResourceParityTest.xml`: `tests="5" failures="0"
+errors="0"`).
+
+### Tasks 5.6 / 5.7 — Audit Claims, Checked Against the Matrix Rather Than Taken on Trust
+| Task | Claim | Independent check |
+|---|---|---|
+| 5.6 | `CoreFlowE2ETest.kt` audited; no assertion addresses a formatted date string or add-habit position geometrically; confirmed unbroken by the full matrix run | `git diff --stat origin/main -- .../e2e/CoreFlowE2ETest.kt` → **no output, file unmodified**. Consistent with "audit found nothing to fix." The file's tests are part of the 143 androidTest classes in the matrix; matrix is 143/143 (both legs), so no `CoreFlowE2ETest` assertion is failing post-change. ✅ Claim holds. |
+| 5.7 | `TodayAddHabitComposeTest.kt` / `TodayAdaptiveComposeTest.kt` re-run **unmodified**; both still pass | `git diff --stat origin/main` for both files → **no output, both files unmodified**. Both are part of the matrix's 143 tests; matrix is green on both API 31 and API 37. ✅ Claim holds — genuinely unmodified files, genuinely exercised by a genuinely green matrix (verified fresh XML this pass, not reused unread). |
+
+### Full Spec Compliance Matrix — All 24 Delta-Spec Scenarios (Whole Change)
+| # | Requirement | Scenario | Status | Test / evidence |
 |---|---|---|---|---|
-| 1 | Provisional-Missed Correction | Happy path — live snooze never becomes missed, then completes | Not covered by either — out of scope (EntryWriter/OccurrenceResolver untouched by this diff; not re-verified in this pass) | — |
-| 2 | Provisional-Missed Correction | Force-resolved missed corrected by a late answer | Not covered by either — out of scope (same as above; `EntryWriteParityTest` extension for the past-date variant is Slice B task 5.5) | — |
-| 3 | Provisional-Missed Correction | Manual in-app edit corrects a past missed day | Covered now (mechanism) — full UI proof deferred to Slice B | `TodayViewModelTest.kt` "answer on a past day passes the viewed date to answerInApp" (2.9), "a past slot is freely re-editable through every status, twice around the cycle" (2.15); instrumented walk is Slice B task 5.1/12 |
-| 4 | Provisional-Missed Correction | Streak interaction | ✅ Covered now | `StreakCalculatorTest.kt` "streak recomputed after a late correction shows no break" — pre-existing, byte-identical to `origin/main`, independently re-verified (see below) |
-| 5 | Provisional-Missed Correction | Unbounded backward reach for a manual edit | Covered now (mechanism) — UI navigation deferred to Slice B | `TodayViewModelTest.kt` "N backward steps reach clock minus N, unbounded" (2.8) |
-| 6 | Provisional-Missed Correction | Any past slot is freely re-editable to any status | Covered now (mechanism) — UI-driven proof deferred to Slice B task 5.4 | `TodayViewModelTest.kt` "a past slot is freely re-editable through every status, twice around the cycle" (2.15) |
-| 7 | In-App Answer Date Attribution | Answer given before midnight is recorded on that date | ✅ Covered now | `TodayViewModelTest.kt` "answering hands EntryWriter the slot's live occurrence handle and the injected today" — pre-existing, unmodified, still green |
-| 8 | In-App Answer Date Attribution | Answer given after midnight is recorded on the new date, not the old one | ✅ Covered now | `TodayViewModelTest.kt` "answer writes against the currently displayed date, even for a slot captured before midnight rolled over" — pre-existing, unmodified, still green |
-| 9 | In-App Answer Date Attribution | Answering a navigated-to past day credits that date, not today | ✅ Covered now | `TodayViewModelTest.kt` "answer on a past day passes the viewed date to answerInApp" (2.9) |
-| 10 | Day-Level Rollup and Per-Slot Display | Day rollup reports partial completion | Not covered by either — out of scope this review (pre-existing `:domain` rollup, unmodified) | — |
-| 11 | Day-Level Rollup and Per-Slot Display | A missed slot alongside a completed slot reports partial, not missed | Not covered by either — out of scope this review | — |
-| 12 | Day-Level Rollup and Per-Slot Display | No completion at all still reports a missed day | Not covered by either — out of scope this review | — |
-| 13 | Day-Level Rollup and Per-Slot Display | Today screen shows independent slot rows | Not covered by either — out of scope this review (pre-existing UI, unmodified) | — |
-| 14 | Day-Level Rollup and Per-Slot Display | An answered slot names its specific answer and offers one route, without colour | Not covered by either — out of scope this review | — |
-| 15 | Day-Level Rollup and Per-Slot Display | The change route is reachable without a gesture and names its own slot | Not covered by either — out of scope this review | — |
-| 16 | Day-Level Rollup and Per-Slot Display | Today screen rolls over at local midnight while displayed | ✅ Covered now | `TodayViewModelTest.kt` "crossing midnight while displayed re-subscribes EntryDao and moves both the rollup and the occurrence filter" — pre-existing regression, extended by task 2.14's new expansion-state assertions (see below) |
-| 17 | Day-Level Rollup and Per-Slot Display | A backgrounded app corrects the date on resume | ✅ Covered now | `TodayViewModelTest.kt` "refreshDate corrects a stale observedDate left over from backgrounding" — pre-existing, unmodified, still green; `refreshDate()` confirmed unconditional at `:229` |
-| 18 | Day-Level Rollup and Per-Slot Display | Foregrounded timezone travel remains a known, accepted gap | ✅ Satisfied by definition | Explicitly accepted boundary in the spec itself ("screen MAY keep showing the prior date") and in `design.md`'s "Accepted boundary" note; no vehicle is required or expected |
-| 19 | Day-Level Rollup and Per-Slot Display | Midnight rollover does not move a deliberately viewed past date | Covered now (mechanism) — UI-level (real navigable screen) deferred to Slice B | `TodayViewModelTest.kt` "a midnight tick while on a past day does not move uiState's date" (2.2) |
-| 20 | Day-Level Rollup and Per-Slot Display | Resume does not move a deliberately viewed past date | Covered now (mechanism) — deferred to Slice B for UI | `TodayViewModelTest.kt` "refreshDate while on a past day does not move it" (2.3) |
-| 21 | Day-Level Rollup and Per-Slot Display | Returning to the live edge resumes following the clock | Covered now (mechanism) — deferred to Slice B for UI | `TodayViewModelTest.kt` "showToday after a tick that fired while away lands on the new clock date" (2.4), "forward navigation onto today re-attaches, so a later tick still moves the view" (2.6) |
-| 22 | Day-Level Rollup and Per-Slot Display | Forward navigation stops at today | Covered now (mechanism) — deferred to Slice B for UI | `TodayViewModelTest.kt` "showNextDay at the live edge is a no-op" (2.7) |
-| 23 | Day-Level Rollup and Per-Slot Display | Add-habit affordance is absent on a past day | Deferred to Slice B — `TodayUiState.isPastDay` exists and is proven (2.12), but `TodayContent`/`TrailingAddHabitAction` are not yet wired to it (tasks 3.5, 5.2) | — |
-| 24 | Day-Level Rollup and Per-Slot Display | Per-slot UI state does not leak across a navigation | Covered now (mechanism) — deferred to Slice B for a real Compose-level proof | `TodayViewModelTest.kt` "both expansion sets are empty after a navigation that changes the viewed date" (2.10), "a tick while navigated away neither clears expansion state nor re-subscribes Room" (2.11) |
+| 1 | Provisional-Missed Correction | Live snooze never becomes missed, then completes | ✅ Covered | `MidnightSweepWorkerTest.liveSnoozeAtMidnightLeavesNoEntriesRow` + `AnswerWorkerTest.answerGivenAfterMidnightCreditsTheOriginDate` (androidTest, pre-existing, unmodified, part of the green 143/143 matrix) |
+| 2 | Provisional-Missed Correction | Force-resolved missed corrected by a late answer | ✅ Covered (newly, Slice B) | `EntryWriteParityTest.answerInAppWithNoOccurrenceHandleUpsertsThePastDateAndLeavesTheResolvedOccurrenceUntouched` (task 5.5) |
+| 3 | Provisional-Missed Correction | Manual in-app edit corrects a past missed day | ✅ Covered (newly, Slice B) | `TodayPastDayComposeTest.navigatingToAPastMissedSlotShowsMissedAndCorrectingItWritesThePastDate` — full UI + real DB assertion |
+| 4 | Provisional-Missed Correction | Streak interaction | ✅ Covered (Slice A) | `StreakCalculatorTest`'s "streak recomputed after a late correction shows no break" |
+| 5 | Provisional-Missed Correction | Unbounded backward reach | ✅ Covered | `TodayViewModelTest` "N backward steps reach clock minus N, unbounded" (2.8, Slice A) + `TodayPastDayComposeTest` (real UI navigation, Slice B) |
+| 6 | Provisional-Missed Correction | Any past slot freely re-editable to any status | ✅ Covered | `TodayViewModelTest` 2.15 (Slice A) + `TodayPastDayComposeTest.aPastSlotIsFreelyReEditableThroughEveryStatusTwiceInARow` (Slice B, real UI, `COMPLETED → MISSED → SKIPPED` twice) |
+| 7 | In-App Answer Date Attribution | Answer before midnight recorded on that date | ✅ Covered (Slice A, pre-existing) | `TodayViewModelTest` |
+| 8 | In-App Answer Date Attribution | Answer after midnight recorded on the new date | ✅ Covered (Slice A, pre-existing) | `TodayViewModelTest` |
+| 9 | In-App Answer Date Attribution | Answering a navigated-to past day credits that date | ✅ Covered | `TodayViewModelTest` 2.9 (Slice A) + `TodayPastDayComposeTest` (Slice B, real UI + DB assertion that today's row stays empty) |
+| 10 | Day-Level Rollup and Per-Slot Display | Partial completion rollup | ✅ Covered | `DayRollupTest."a 3-slot day with 2 completed and 1 unknown reports partial completion"` (domain, pre-existing, unmodified) |
+| 11 | Day-Level Rollup and Per-Slot Display | Missed + completed → partial, not missed | ✅ Covered | `DayRollupTest."a missed slot alongside a completed one rolls up to PARTIAL, not ANY_MISSED"` |
+| 12 | Day-Level Rollup and Per-Slot Display | No completion at all → missed day | ✅ Covered | `DayRollupTest."all slots missed with no completion at all rolls up to ANY_MISSED"` |
+| 13 | Day-Level Rollup and Per-Slot Display | Independent slot rows | ✅ Covered | `TodayAnsweredSlotComposeTest.answeringEachSlotCollapsesItLeavesSiblingsUntouchedAndReopeningReAnswersOnlyThatSlot` (androidTest, pre-existing, unmodified) |
+| 14 | Day-Level Rollup and Per-Slot Display | Answered slot names its answer + one route, no colour | ✅ Covered | same test class (`TodayAnsweredSlotComposeTest`) |
+| 15 | Day-Level Rollup and Per-Slot Display | Change route reachable without gesture, distinct label | ✅ Covered | `TodayAnsweredSlotComposeTest.eachChangeControlHasAnAccessibleLabelDistinctFromItsSiblings` |
+| 16 | Day-Level Rollup and Per-Slot Display | Rolls over at local midnight while displayed | ✅ Covered (Slice A) | `TodayViewModelTest` rollover regression, extended by 2.14 |
+| 17 | Day-Level Rollup and Per-Slot Display | Backgrounded app corrects date on resume | ✅ Covered (Slice A) | `TodayViewModelTest` `refreshDate` test |
+| 18 | Day-Level Rollup and Per-Slot Display | Foregrounded timezone travel — accepted gap | ✅ Satisfied by definition | Explicit accepted boundary in spec + design.md; no vehicle required |
+| 19 | Day-Level Rollup and Per-Slot Display | Midnight rollover does not move a deliberately viewed past date | ✅ Covered (Slice A) | `TodayViewModelTest` 2.2 |
+| 20 | Day-Level Rollup and Per-Slot Display | Resume does not move a deliberately viewed past date | ✅ Covered (Slice A) | `TodayViewModelTest` 2.3 |
+| 21 | Day-Level Rollup and Per-Slot Display | Returning to live edge resumes following the clock | ✅ Covered (Slice A) | `TodayViewModelTest` 2.4, 2.6 |
+| 22 | Day-Level Rollup and Per-Slot Display | Forward navigation stops at today | ✅ Covered | `TodayViewModelTest` 2.7 (Slice A) + `TodayDateBar` structurally omits forward controls off a past day (Slice B, see Non-Negotiable #4) |
+| 23 | Day-Level Rollup and Per-Slot Display | Add-habit affordance absent on a past day | ✅ Covered (newly, Slice B) | `TodayPastDayComposeTest.addHabitAffordanceIsAbsentOnAPastDayAndReturnsAfterToday` + `.anEmptyPastDayShowsThePastEmptyTextAndNoButton` |
+| 24 | Day-Level Rollup and Per-Slot Display | Per-slot UI state does not leak across navigation | ✅ Covered (Slice A) | `TodayViewModelTest` 2.10, 2.11 |
 
-**Compliance summary**: 15/24 scenarios fully satisfied for the current shipped surface (14 "Covered
-now" + 1 "Satisfied by definition"); 1 scenario explicitly deferred to Slice B (23); 8 scenarios out
-of this review's file scope (1, 2, 10–15) — pre-existing and unmodified by this diff, not
-independently re-verified here. **None of the 9 not-yet-complete scenarios are failures**: 1
-(add-habit affordance) is expected and tracked for PR 2; the other 8 are inherited, unmodified
-behavior this change does not touch.
+**Compliance summary**: 24/24 scenarios fully satisfied by a passing runtime test (or, for #18,
+satisfied by explicit spec definition with no vehicle required). 3/3 requirements fully covered.
+**The whole change is feature-complete against its delta spec.**
 
-### Gap Scenarios the Design Flagged — Independently Checked
-| Gap | Claim in apply-progress | Independent check | Verdict |
-|---|---|---|---|
-| "Any past slot is freely re-editable to any status" | New JVM test added (2.15) | Read `TodayViewModelTest.kt:713-739`: walks `COMPLETED → MISSED → SKIPPED` twice via `viewModel.answer(...)`, then `coVerify(exactly = 2)` for each status against `YESTERDAY`. Genuinely exercises the unrestricted-transition claim. | ✅ Confirmed |
-| "Streak interaction" | Claimed satisfied by a **pre-existing, unmodified** test in `StreakCalculatorTest.kt` | `git diff origin/main -- domain/src/test/kotlin/com/jjrapps/constanza/domain/StreakCalculatorTest.kt` → **empty diff**, confirming the file is byte-identical to `origin/main`. Read the test (`streak recomputed after a late correction shows no break`, lines 105-116): asserts `StreakCalculator.current(daily, beforeCorrection, today) == 0` (broken, last day `MISSED`) and `StreakCalculator.current(daily, afterCorrection, today) == 6` (unbroken, last day `COMPLETED`) — the same before/after pattern the spec scenario describes ("a streak calculation that currently treats [a date] as broken... a streak calculation run after the correction MUST show an unbroken streak"). | ✅ The claim holds — this genuinely covers the scenario, not a false claim |
-
-### Task 2.14 Rollover Assertion — Independently Checked
-Claim: the missing assertion was added to the existing rollover test at
-`TodayViewModelTest.kt:270`, proving `expandedHabitIds`/`reopenedSlots` survive a midnight rollover
-at the live edge. Confirmed at lines 302-327: `expandedHabitIds`/`reopenedSlots` are populated
-*before* `currentDateSource.advanceTo(TOMORROW)`, then asserted unchanged *after* it —
-`assertEquals(setOf(HABIT_ID), onTomorrow.expandedHabitIds, "a live-edge midnight rollover must
-leave expandedHabitIds alone")` and the equivalent for `reopenedSlots`. This is exactly the
-assertion design.md's Decision 3 said was missing. ✅ Confirmed present and correctly asserting.
-
-### Design Deviations — Judged
-| Deviation | Claim | Independent check | Verdict |
-|---|---|---|---|
-| `clearPresentedSlotState()` not extracted as a shared helper | Inlined into all 3 gestures to stay under detekt's `TooManyFunctions` ceiling | `TodayViewModel.kt` has exactly 10 `fun` declarations (`rg -n "^\s*fun "` → 10 matches); no `clearPresentedSlotState` function exists anywhere in the file — only mentioned in a KDoc comment. `showPreviousDay`, `showNextDay`, `showToday` each duplicate the identical two-line `expandedHabitIds.value = emptySet(); reopenedSlots.value = emptySet()`. Behaviour-neutral: three call sites doing the same two assignments is identical at runtime to one shared private function doing it. | ✅ Behaviour-neutral, as claimed |
-| `readNotificationPermission` inlined | Former private helper inlined into `refreshNotificationPermission()` and `recordNotificationPermissionRequested()` | Confirmed: no `readNotificationPermission` function exists; both call sites independently call `notificationPermission.decide(reminderSettingsStore.hasRequestedNotificationPermission())`. Both existing tests for these two functions (`refreshNotificationPermission picks up a permission granted...`, `recordNotificationPermissionRequested writes the flag and moves...`) still pass unmodified. | ✅ Behaviour-neutral, as claimed |
-| `TooManyFunctions` ceiling itself | 10 functions stays under the default threshold | `config/detekt/detekt.yml` has no `TooManyFunctions` override (`rg -n "TooManyFunctions"` → no match), so detekt's built-in default applies. `:app:detektMain` (forced fresh) reports 0 findings for the whole module, including `TodayViewModel.kt`. | ✅ Confirmed — detekt is silent on this class |
-
-### Correctness (Static Evidence, Slice A scope)
-| Requirement / Decision | Status | Notes |
-|------------|--------|-------|
-| Decision 1 — one `TodayDate` state object, projected `viewed`, unconditional writers | ✅ Implemented | Traced in code (`TodayDate`/`DateView`, `:94-115`); both writers unconditional (`:186`, `:229`) |
-| Decision 1, invariant 4 — `navigated != null` ⇔ past day | ✅ Implemented | `isPastDay` derived exactly as `navigated != null` (`:114`); test 2.12 pins both directions |
-| Decision 2 — in-place navigation, no route change | ✅ Implemented | `ConstanzaRoute.Today` untouched; navigation state lives only in `TodayViewModel` |
-| Decision 3 — clear presented-state on navigate, not on live-edge rollover | ✅ Implemented | Three gestures clear both sets before writing; `init`/`refreshDate` never touch them; test 2.14 pins the live-edge non-clearing case explicitly |
-| `answer()`/`refreshDate()`/`requestChange()`/`toggleExpanded()` signatures unchanged | ✅ Confirmed | All four keep their exact prior signatures |
-| `EntryWriter`, `TodayModel`, `OccurrenceResolver`, `CurrentDateSource` not modified | ✅ Confirmed | `git status` shows only `TodayViewModel.kt` and `TodayViewModelTest.kt` under `app/`; none of those four files appear in the diff |
-
-### Coherence (Design)
+### Correctness / Design Coherence (Slice B additions)
 | Decision | Followed? | Notes |
-|----------|-----------|-------|
-| Decision 1 (state shape) | ✅ Yes | Exact `TodayDate`/`DateView` shape from design.md, same field names |
-| Decision 2 (no route change) | ✅ Yes | — |
-| Decision 3 (clear-on-navigate) | ✅ Yes | Including the "deliberately narrow" live-edge-rollover exception |
-| Decisions 4–5 (date bar, past-day empty state) | N/A — Slice B | Correctly not attempted in this PR; `isPastDay` field (the Decision 5 prerequisite) is already in `TodayUiState`, ready for Slice B to consume |
+|---|---|---|
+| Decision 4 (date bar, holder pattern, no new suppress) | ✅ Yes | Confirmed above |
+| Decision 4 (bar hoisted above `LazyColumn`) | ✅ Yes | Confirmed above |
+| Decision 5 (past-day empty state, no intake) | ✅ Yes | Confirmed above, both branches |
+| `EntryWriter`, `TodayModel`, `OccurrenceResolver`, `CurrentDateSource` still not modified | ✅ Confirmed | `git diff --stat origin/main` for Slice B touches only `TodayScreen.kt`, `TodayDateBar.kt` (new), two `strings.xml`, `EntryWriteParityTest.kt`, `TodayPastDayComposeTest.kt` (new), `tasks.md`, `openspec/config.yaml` |
+
+### `openspec/config.yaml` Close-Out
+`no-in-app-route-to-edit-a-past-day`: `status: resolved`, with a `resolution:` field. Read in
+full: it states which mechanism resolved the item, names the exact residual gap (westward
+timezone travel leaving `navigated >= clock` until a forward tap self-heals it), and explicitly
+does **not** claim Progress screen involvement or claim the accepted timezone-travel boundary is
+solved. ✅ Honest, does not overclaim.
 
 ### Issues Found
 
 **CRITICAL**: None.
 
 **WARNING**:
-1. `tasks.md`'s "Hard constraints honored" section and `design.md`'s Testing Strategy section both
-   state the delta spec has "22 scenarios"; the actual file
-   (`openspec/changes/today-past-day-correction/specs/habit-entry-tracking/spec.md`) has **24**
-   (`rg -c '^#### Scenario:'`). This is a pre-existing documentation count from an earlier phase
-   (design/tasks), not something Slice A's apply run introduced or can fix by editing code — flagging
-   for correction before the change is archived, per this skill's rule to count actual headings
-   rather than trust a stated total.
+1. `tasks.md` task **7.5 is still unchecked** (`- [ ]`) with the note "Slice B — not run in this
+   slice," even though the emulator matrix has in fact been run to completion on this exact tree
+   (both XML result files postdate every file under `app/src`, per the table above) and tasks
+   5.6/5.7 explicitly cite that run as their own evidence. The task list does not match the real
+   state of the work — this should be flipped to `[x]` with the actual result numbers before
+   archive, per this skill's rule that task completion state must match code/evidence state.
+2. (Carried from Slice A's report, still unresolved) `tasks.md`'s "Hard constraints honored"
+   section and `design.md`'s Testing Strategy section both still state "22 scenarios"; the
+   actual spec file has 24. Pre-existing documentation drift, not introduced by Slice B, but not
+   fixed by it either — flag for correction before archive.
 
 **SUGGESTION**:
-1. Scenarios 1, 2, and 10–15 were not independently re-verified in this Slice-A-scoped pass because
-   their backing files (`EntryWriter`, `OccurrenceResolver`, day-rollup/per-slot UI tests) are outside
-   this PR's file set. They are presumed intact (untouched by the diff, and the full JVM suite —
-   including their tests — still runs 273/273 green), but a full-spec `sdd-verify` pass covering
-   those files' own dedicated tests should still run once before the final archive of this change.
+1. The `TodayContentActions` holder (deviation judged above) groups two callbacks with no shared
+   concern beyond arity. It is correct and zero-behavior-change, but a maintainer reading it for
+   the first time gets no conceptual "why these two" the way `DateNavActions`/`SlotActions`
+   supply one. Not worth blocking on; worth a one-line comment addition if this file is touched
+   again.
+2. The bytecode-disassembly claim behind the `TodayContentActions` deviation (`>=` vs `>`
+   threshold semantics) was not independently reproduced in this pass — doing so would require
+   constructing a 6-parameter counter-example against the reviewed candidate, which this
+   verification intentionally avoided. The practical conclusion (0 detekt findings on the actual
+   shipped code) is independently confirmed either way.
 
 ### Verdict
-**FAIL (whole-change spec envelope) — but Slice A itself is PASS WITH WARNINGS and merge-ready.**
+**PASS WITH WARNINGS — the whole change is feature-complete and archive-ready after the two
+WARNING items are corrected (both are documentation/checkbox fixes, not code fixes).**
 
-The strict `requirements: 1/3` / `scenarios: 15/24` envelope above is scored against the FULL delta
-spec's totals, and the validator correctly reports `fail` for that envelope: 9 of 24 scenarios are
-not yet fully complete against the whole change. This is the accurate, honest state of the OVERALL
-change, and it is exactly what a mid-flight, chained-PR verification is supposed to show — it is
-**not** a defect in Slice A, and it does not block PR 1.
+- All 4 non-negotiables settled in validation are confirmed in code, not taken on trust.
+- All 24 delta-spec scenarios are satisfied by a passing runtime test (23 of them; #18 is
+  satisfied by explicit spec definition).
+- 273/273 JVM tests pass (freshly re-run this session), 0 detekt findings on `:domain`/`:app`
+  (freshly re-run this session), `:app:compileDebugAndroidTestKotlin` BUILD SUCCESSFUL (freshly
+  re-run this session).
+- The device-free emulator matrix is green on both API 31 (143/143, 3 skipped) and API 37
+  (143/143, 6 skipped) — confirmed from the actual JUnit XML, with mtimes proven newer than the
+  newest source file, not re-run (per explicit orchestrator instruction; re-running would cost
+  ~9 minutes for no new information).
+- Both new-string locales are present, correct, and neutral-register; `StringResourceParityTest`
+  passes 5/5.
+- Tasks 5.6/5.7's audit claims hold up against the actual diff (both named files genuinely
+  unmodified) and the actual matrix (genuinely green).
+- `openspec/config.yaml`'s close-out is honest and states its residual gap plainly.
+- 0 CRITICAL. 2 WARNING (both are stale bookkeeping — a tasks.md checkbox and a scenario-count
+  figure — neither is a code defect). 2 SUGGESTION (a holder-naming nit and one unreproduced
+  technical claim, both non-blocking).
 
-Read separately, for the scope this report was actually asked to judge (Slice A / PR 1 only):
-
-- All 26 Slice A tasks (Phase 1, Phase 2, applicable Phase 7) are complete and correct.
-- Both clock-driven writers are genuinely unconditional (`:186`, `:229`), traced in code, not taken
-  on trust.
-- The forward re-attachment edge genuinely sets `navigated = null` (never pins it to `clock`), and is
-  pinned by a dedicated test (`forward navigation onto today re-attaches, so a later tick still moves
-  the view`).
-- Both design-flagged coverage gaps (unrestricted editing, streak interaction) are genuinely closed —
-  the streak claim was independently re-verified against `origin/main` (empty diff) rather than taken
-  on trust.
-- The task 2.14 rollover assertion genuinely exists and asserts exactly what it claims.
-- Both reported design deviations (`clearPresentedSlotState` not extracted, `readNotificationPermission`
-  inlined) are genuinely behaviour-neutral.
-- 273/273 JVM tests pass (fresh, forced re-run, read from JUnit XML), 0 detekt findings on
-  `:domain`/`:app` (fresh, forced re-run), `:app:compileDebugAndroidTestKotlin` BUILD SUCCESSFUL
-  (fresh, forced re-run).
-- 0 CRITICAL issues. 1 WARNING (a pre-existing scenario-count documentation mismatch in
-  `tasks.md`/`design.md`, "22" vs. the actual 24 — does not block this PR). 1 SUGGESTION (re-verify
-  the 8 out-of-scope pre-existing scenarios' own dedicated tests before archiving the full change).
-
-**Recommendation**: proceed with PR 1 (Slice A). The `fail` verdict at the whole-spec level is
-expected to persist until a follow-up `sdd-verify` run after Slice B (PR 2) lands; it must not be
-read as a Slice A defect.
+**Recommendation**: proceed to `sdd-archive` once the two WARNING bookkeeping items in `tasks.md`
+are corrected (flip 7.5 to `[x]` with real numbers; fix the "22" → "24" scenario count). Neither
+requires touching shipped application code.
