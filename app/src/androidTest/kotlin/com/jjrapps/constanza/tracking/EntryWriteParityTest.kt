@@ -3,12 +3,15 @@ package com.jjrapps.constanza.tracking
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.jjrapps.constanza.core.data.entity.EntryEntity
 import com.jjrapps.constanza.core.data.entity.ReminderOccurrenceEntity
 import com.jjrapps.constanza.core.data.mapper.toDomain
+import com.jjrapps.constanza.domain.model.EntryStatus
 import com.jjrapps.constanza.habit.HabitRepositoryTestFixture
 import com.jjrapps.constanza.reminding.AnswerResponder
 import com.jjrapps.constanza.reminding.AnswerWorker
 import java.time.Instant
+import java.time.LocalDate
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -20,11 +23,13 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 private const val ORIGIN_DATE = "2026-08-31"
+private const val PAST_DATE = "2026-08-20"
 private const val EVENING_MINUTE = 20 * 60
 private const val AWAIT_TIMEOUT_MS = 5_000L
 private const val RESOLVE_DEADLINE_MS = 24 * 3600 * 1000L
 private const val STATE_ARMED = "ARMED"
 private const val STATE_RESOLVED = "RESOLVED"
+private const val ENTRY_SOURCE_IN_APP = "IN_APP"
 private const val BOTH_ROUTES = 2
 
 /**
@@ -115,6 +120,51 @@ class EntryWriteParityTest {
         assertTrue(fixture.database.entryDao().findByHabitAndDate(inAppHabit, today).isEmpty())
         assertEquals(STATE_RESOLVED, fixture.database.reminderOccurrenceDao().findById(notifyOcc)?.state)
         assertEquals(STATE_RESOLVED, fixture.database.reminderOccurrenceDao().findById(inAppOcc)?.state)
+    }
+
+    /**
+     * today-past-day-correction, task 5.5: the manual in-app edit path
+     * ([TodayViewModel.answer] calling [EntryWriter.answerInApp] with `occurrenceId = null`) is
+     * exactly what a force-resolved slot produces — [TodayModel.toTodaySlot] only ever reads
+     * `unresolvedOccurrences`, so a `RESOLVED` occurrence's slot always carries a `null` handle.
+     * This proves that null-handle write upserts on the PAST date the caller supplied and never
+     * touches the already-`RESOLVED` occurrence row at all — "resurrecting" it would mean flipping
+     * it back to armed/unresolved, which [resolveOccurrenceAndWrite] is never even reached to do.
+     */
+    @Test
+    fun answerInAppWithNoOccurrenceHandleUpsertsThePastDateAndLeavesTheResolvedOccurrenceUntouched() = runBlocking {
+        val (habitId, slotId) = fixture.seedHabitWithEnabledSlot(name = "Corrected", minuteOfDay = EVENING_MINUTE)
+        val scheduledAt = Instant.parse("${PAST_DATE}T20:00:00Z").toEpochMilli()
+        val occurrenceId = fixture.database.reminderOccurrenceDao().upsert(
+            ReminderOccurrenceEntity(
+                habitId = habitId, slotId = slotId, scheduledDate = PAST_DATE,
+                scheduledAtEpochMs = scheduledAt, state = STATE_RESOLVED, snoozeUntilEpochMs = null,
+                snoozeCount = 0, notifiedAtEpochMs = null, resolveDeadlineMs = scheduledAt + RESOLVE_DEADLINE_MS,
+            ),
+        )
+        fixture.database.entryDao().upsert(
+            EntryEntity(
+                habitId = habitId, date = PAST_DATE, slotId = slotId, status = EntryStatus.MISSED.name,
+                value = null, answeredAt = fixture.timeProvider.now().toString(), source = ENTRY_SOURCE_IN_APP,
+            ),
+        )
+
+        entryWriter.answerInApp(
+            habitId = habitId,
+            date = LocalDate.parse(PAST_DATE),
+            slotId = slotId,
+            status = InAppEntryStatus.COMPLETED,
+            occurrenceId = null,
+        )
+
+        val entries = fixture.database.entryDao().findByHabitAndDate(habitId, PAST_DATE)
+        assertEquals(1, entries.size)
+        assertEquals(EntryStatus.COMPLETED.name, entries.single().status)
+        assertEquals(
+            "a null occurrence handle must never resurrect the already-resolved occurrence",
+            STATE_RESOLVED,
+            fixture.database.reminderOccurrenceDao().findById(occurrenceId)?.state,
+        )
     }
 
     /** A daily habit with one enabled slot and one still-unresolved occurrence dated [ORIGIN_DATE] —

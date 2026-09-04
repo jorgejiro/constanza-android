@@ -80,6 +80,9 @@ fun TodayRoute(
         onAddHabit = onAddHabit,
         onOpenSettings = onOpenSettings,
         onNotificationPermissionRequested = viewModel::recordNotificationPermissionRequested,
+        onPreviousDay = viewModel::showPreviousDay,
+        onNextDay = viewModel::showNextDay,
+        onToday = viewModel::showToday,
     )
 }
 
@@ -102,9 +105,18 @@ fun TodayScreen(
     onAddHabit: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onNotificationPermissionRequested: () -> Unit = {},
+    onPreviousDay: () -> Unit = {},
+    onNextDay: () -> Unit = {},
+    onToday: () -> Unit = {},
 ) {
     val actions = remember(onRequestChange, onAnswer, state.reopenedSlots) {
         SlotActions(state.reopenedSlots, onRequestChange, onAnswer)
+    }
+    val dateNavActions = remember(onPreviousDay, onNextDay, onToday) {
+        DateNavActions(onPreviousDay, onNextDay, onToday)
+    }
+    val contentActions = remember(onAddHabit, onNotificationPermissionRequested) {
+        TodayContentActions(onAddHabit, onNotificationPermissionRequested)
     }
     Scaffold(
         topBar = {
@@ -122,7 +134,7 @@ fun TodayScreen(
         },
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
-            TodayContent(state, onToggleExpanded, actions, onAddHabit, onNotificationPermissionRequested)
+            TodayContent(state, onToggleExpanded, actions, contentActions, dateNavActions)
         }
     }
 }
@@ -140,13 +152,34 @@ private data class SlotActions(
     val onAnswer: (Long, TodaySlot, InAppEntryStatus) -> Unit,
 )
 
+/** today-past-day-correction, design.md decision 4: [TodayContent] already carries 5 parameters;
+ *  three more loose callbacks would push it to 8, past detekt's unconfigured `LongParameterList`
+ *  default of 6 — and the `@Suppress("LongParameterList")` on `fun TodayScreen` above covers only
+ *  that declaration, never this private sibling. Built the same way [SlotActions] is: one holder
+ *  instead of three separate parameters. */
+private data class DateNavActions(
+    val onPreviousDay: () -> Unit,
+    val onNextDay: () -> Unit,
+    val onToday: () -> Unit,
+)
+
+/** today-past-day-correction: bundles the two callbacks [TodayContent] invokes directly, never
+ *  threaded into [HabitRollupRow]/[SlotRow] — the identical arity reason [SlotActions] and
+ *  [DateNavActions] exist. Without this, [TodayContent] would carry [DateNavActions] as a sixth
+ *  loose parameter alongside these two, and detekt's unconfigured `LongParameterList` check fires
+ *  at `parameterCount >= functionThreshold` (6), not only above it. */
+private data class TodayContentActions(
+    val onAddHabit: () -> Unit,
+    val onNotificationPermissionRequested: () -> Unit,
+)
+
 @Composable
 private fun TodayContent(
     state: TodayUiState,
     onToggleExpanded: (Long) -> Unit,
     actions: SlotActions,
-    onAddHabit: () -> Unit,
-    onNotificationPermissionRequested: () -> Unit,
+    contentActions: TodayContentActions,
+    dateNavActions: DateNavActions,
 ) {
     // Two layouts, chosen by whether there is a list at all, rather than one LazyColumn with an
     // empty branch inside it. A `fillParentMaxSize` item is sized against the whole viewport and
@@ -154,19 +187,46 @@ private fun TodayContent(
     // was pushed into the bottom third of a real screen — seen on the emulator, not reasoned about.
     // A Column whose empty state takes `weight(1f)` centres in the space that is actually left.
     // Nothing scrolls in that case anyway: at most two banners and one call to action.
+    //
+    // today-past-day-correction, design.md decision 4: [TodayDateBar] is hoisted above BOTH layouts
+    // below rather than placed as the LazyColumn's first item, so it stays fixed on screen — its
+    // presence is the "you are not on today" signal, and a signal that scrolls away is not one.
     if (state.rows.isEmpty()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            TodayPermissionBanners(state, onNotificationPermissionRequested)
-            TodayEmptyState(onAddHabit, modifier = Modifier.weight(1f))
+            TodayDateBar(
+                state.date,
+                state.isPastDay,
+                dateNavActions.onPreviousDay,
+                dateNavActions.onNextDay,
+                dateNavActions.onToday,
+            )
+            TodayPermissionBanners(state, contentActions.onNotificationPermissionRequested)
+            if (state.isPastDay) {
+                TodayPastDayEmptyState(modifier = Modifier.weight(1f))
+            } else {
+                TodayEmptyState(contentActions.onAddHabit, modifier = Modifier.weight(1f))
+            }
         }
         return
     }
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
-        item { TodayPermissionBanners(state, onNotificationPermissionRequested) }
-        items(state.rows, key = { it.habitId }) { row ->
-            HabitRollupRow(row, row.habitId in state.expandedHabitIds, state.zone, onToggleExpanded, actions)
+    Column(modifier = Modifier.fillMaxSize()) {
+        TodayDateBar(
+            state.date,
+            state.isPastDay,
+            dateNavActions.onPreviousDay,
+            dateNavActions.onNextDay,
+            dateNavActions.onToday,
+        )
+        LazyColumn(modifier = Modifier.weight(1f)) {
+            item { TodayPermissionBanners(state, contentActions.onNotificationPermissionRequested) }
+            items(state.rows, key = { it.habitId }) { row ->
+                HabitRollupRow(row, row.habitId in state.expandedHabitIds, state.zone, onToggleExpanded, actions)
+            }
+            // today-past-day-correction, design.md decision 5: no intake affordance on a past day.
+            if (!state.isPastDay) {
+                item { TrailingAddHabitAction(contentActions.onAddHabit) }
+            }
         }
-        item { TrailingAddHabitAction(onAddHabit) }
     }
 }
 
