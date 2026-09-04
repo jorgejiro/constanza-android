@@ -20,6 +20,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -41,6 +42,9 @@ import kotlin.test.assertTrue
 
 private val TODAY: LocalDate = LocalDate.parse("2026-09-01")
 private val TOMORROW: LocalDate = TODAY.plusDays(1)
+private val YESTERDAY: LocalDate = TODAY.minusDays(1)
+private val TWO_DAYS_AGO: LocalDate = TODAY.minusDays(2)
+private val THREE_DAYS_AGO: LocalDate = TODAY.minusDays(3)
 private val FIXED_INSTANT: Instant = Instant.parse("2026-09-01T08:00:00Z")
 private val ZONE: ZoneId = ZoneId.of("UTC")
 private const val HABIT_ID = 7L
@@ -265,7 +269,13 @@ class TodayViewModelTest {
      *  (the rollup moves from `PARTIAL` to `PENDING` because it is now reading TOMORROW's, empty,
      *  entries) and the unresolved-occurrence filter inside [buildTodayHabitRow] must follow it too
      *  (the live occurrence handle moves from the morning slot to the evening one, because that is
-     *  the one scheduled for TOMORROW). */
+     *  the one scheduled for TOMORROW).
+     *
+     *  today-past-day-correction, task 2.14 / design.md decision 3: this is also the vehicle for
+     *  the ONE assertion Decision 3's "a live-edge rollover leaves the expansion sets alone"
+     *  justification was resting on with no coverage at all — [expandedHabitIds] and
+     *  [TodayUiState.reopenedSlots] are populated BEFORE the rollover and asserted UNCHANGED after
+     *  it, proving [clearPresentedSlotState] is never reached by the [init] collector. */
     @Test
     fun `crossing midnight while displayed re-subscribes EntryDao and moves both the rollup and the occurrence filter`() =
         runTest {
@@ -283,17 +293,38 @@ class TodayViewModelTest {
             )
 
             viewModel.uiState.test {
-                val onToday = awaitItem().rows.single()
+                val onTodayState = awaitItem()
+                val onToday = onTodayState.rows.single()
                 assertEquals(DayStatus.PARTIAL, onToday.dayStatus)
                 assertEquals(listOf(EntryStatus.COMPLETED, EntryStatus.UNKNOWN), onToday.slots.map { it.status })
                 assertEquals(listOf(OCCURRENCE_ID, null), onToday.slots.map { it.occurrenceId })
 
+                viewModel.toggleExpanded(HABIT_ID)
+                val expandedState = awaitItem()
+                assertEquals(setOf(HABIT_ID), expandedState.expandedHabitIds)
+                viewModel.requestChange(onToday.slots.first().keyIn(HABIT_ID))
+                val reopenedState = awaitItem()
+                assertEquals(setOf(onToday.slots.first().keyIn(HABIT_ID)), reopenedState.reopenedSlots)
+
                 currentDateSource.advanceTo(TOMORROW)
 
-                val onTomorrow = awaitItem().rows.single()
-                assertEquals(DayStatus.PENDING, onTomorrow.dayStatus)
-                assertEquals(listOf(EntryStatus.UNKNOWN, EntryStatus.UNKNOWN), onTomorrow.slots.map { it.status })
-                assertEquals(listOf(null, OCCURRENCE_ID + 1), onTomorrow.slots.map { it.occurrenceId })
+                val onTomorrow = awaitItem()
+                assertEquals(DayStatus.PENDING, onTomorrow.rows.single().dayStatus)
+                assertEquals(
+                    listOf(EntryStatus.UNKNOWN, EntryStatus.UNKNOWN),
+                    onTomorrow.rows.single().slots.map { it.status },
+                )
+                assertEquals(listOf(null, OCCURRENCE_ID + 1), onTomorrow.rows.single().slots.map { it.occurrenceId })
+                assertEquals(
+                    setOf(HABIT_ID),
+                    onTomorrow.expandedHabitIds,
+                    "a live-edge midnight rollover must leave expandedHabitIds alone",
+                )
+                assertEquals(
+                    setOf(onToday.slots.first().keyIn(HABIT_ID)),
+                    onTomorrow.reopenedSlots,
+                    "a live-edge midnight rollover must leave reopenedSlots alone",
+                )
             }
         }
 
@@ -464,6 +495,249 @@ class TodayViewModelTest {
         assertEquals(NotificationPermissionDecision.BLOCKED, viewModel.uiState.first().notificationPermission)
     }
 
+    /** today-past-day-correction, task 2.2 / design.md decision 1. [TodayDate.clock] moves via the
+     *  ordinary timer path, but with [TodayDate.navigated] set, [TodayDate.viewed] must not follow
+     *  it — the whole point of the projection over a guard. */
+    @Test
+    fun `a midnight tick while on a past day does not move uiState's date`() = runTest {
+        val currentDateSource = FakeCurrentDateSource(TODAY)
+        val viewModel = buildViewModel(
+            currentDateSource = currentDateSource,
+            entriesByDate = mapOf(TODAY to emptyList(), YESTERDAY to emptyList(), TOMORROW to emptyList()),
+        )
+        viewModel.uiState.first { it.rows.isNotEmpty() }
+
+        viewModel.showPreviousDay()
+        viewModel.uiState.first { it.date == YESTERDAY }
+
+        currentDateSource.advanceTo(TOMORROW)
+
+        assertEquals(YESTERDAY, viewModel.uiState.value.date)
+    }
+
+    /** today-past-day-correction, task 2.3 / design.md decision 1. [refreshDate] is the resume
+     *  path, distinct from the timer: it must be equally unconditional, and equally unable to move
+     *  [TodayDate.viewed] away from a deliberately navigated date. */
+    @Test
+    fun `refreshDate while on a past day does not move it`() = runTest {
+        val currentDateSource = FakeCurrentDateSource(TODAY)
+        val viewModel = buildViewModel(
+            currentDateSource = currentDateSource,
+            entriesByDate = mapOf(TODAY to emptyList(), YESTERDAY to emptyList(), TOMORROW to emptyList()),
+        )
+        viewModel.uiState.first { it.rows.isNotEmpty() }
+
+        viewModel.showPreviousDay()
+        viewModel.uiState.first { it.date == YESTERDAY }
+
+        currentDateSource.current = TOMORROW
+        viewModel.refreshDate()
+
+        assertEquals(YESTERDAY, viewModel.uiState.value.date)
+    }
+
+    /** today-past-day-correction, task 2.4 / design.md decision 1, invariant 3. [showToday] sets
+     *  `navigated = null`, which re-attaches [TodayDate.viewed] to whatever [TodayDate.clock]
+     *  CURRENTLY is — a date change that happened while away must be caught up, not ignored. */
+    @Test
+    fun `showToday after a tick that fired while away lands on the new clock date`() = runTest {
+        val currentDateSource = FakeCurrentDateSource(TODAY)
+        val viewModel = buildViewModel(
+            currentDateSource = currentDateSource,
+            entriesByDate = mapOf(TODAY to emptyList(), YESTERDAY to emptyList(), TOMORROW to emptyList()),
+        )
+        viewModel.uiState.first { it.rows.isNotEmpty() }
+
+        viewModel.showPreviousDay()
+        viewModel.uiState.first { it.date == YESTERDAY }
+
+        currentDateSource.advanceTo(TOMORROW)
+        viewModel.showToday()
+
+        assertEquals(TOMORROW, viewModel.uiState.value.date)
+    }
+
+    /** today-past-day-correction, task 2.6 / design.md decision 1's sharp edge: [showNextDay]
+     *  landing on the clock date MUST set `navigated = null`, never pin `navigated = clock`.
+     *  Pinning would freeze the view across the NEXT midnight — the same bug re-entered through
+     *  the forward door. A later tick moving the view is the only way to tell the two apart. */
+    @Test
+    fun `forward navigation onto today re-attaches, so a later tick still moves the view`() = runTest {
+        val currentDateSource = FakeCurrentDateSource(TODAY)
+        val viewModel = buildViewModel(
+            currentDateSource = currentDateSource,
+            entriesByDate = mapOf(TODAY to emptyList(), YESTERDAY to emptyList(), TOMORROW to emptyList()),
+        )
+        viewModel.uiState.first { it.rows.isNotEmpty() }
+
+        viewModel.showPreviousDay()
+        viewModel.uiState.first { it.date == YESTERDAY }
+        viewModel.showNextDay()
+        assertEquals(TODAY, viewModel.uiState.first { it.date == TODAY }.date)
+
+        currentDateSource.advanceTo(TOMORROW)
+
+        assertEquals(TOMORROW, viewModel.uiState.value.date)
+    }
+
+    /** today-past-day-correction, task 2.7 / design.md decision 1. The live edge is the forward
+     *  boundary: no future date is ever reachable, and — since [TodayDate.viewed] does not
+     *  actually change — the call must be a true no-op. */
+    @Test
+    fun `showNextDay at the live edge is a no-op`() = runTest {
+        val viewModel = buildViewModel(entriesByDate = mapOf(TODAY to emptyList()))
+        viewModel.uiState.first { it.rows.isNotEmpty() }
+
+        viewModel.showNextDay()
+
+        assertEquals(TODAY, viewModel.uiState.value.date)
+        assertTrue(viewModel.uiState.value.isPastDay.not())
+    }
+
+    /** today-past-day-correction, task 2.8 / design.md decision 1. Backward navigation has no
+     *  lower bound — N steps must reach exactly `clock - N`. */
+    @Test
+    fun `N backward steps reach clock minus N, unbounded`() = runTest {
+        val viewModel = buildViewModel(
+            entriesByDate = mapOf(
+                TODAY to emptyList(),
+                YESTERDAY to emptyList(),
+                TWO_DAYS_AGO to emptyList(),
+                THREE_DAYS_AGO to emptyList(),
+            ),
+        )
+        viewModel.uiState.first { it.rows.isNotEmpty() }
+
+        repeat(3) { viewModel.showPreviousDay() }
+
+        assertEquals(THREE_DAYS_AGO, viewModel.uiState.first { it.date == THREE_DAYS_AGO }.date)
+    }
+
+    /** today-past-day-correction, task 2.9 / habit-entry-tracking: In-App Answer Date Attribution.
+     *  [TodayViewModel.answer] must credit the NAVIGATED-TO date, not [TodayDate.clock], when the
+     *  user is deliberately viewing a past day. */
+    @Test
+    fun `answer on a past day passes the viewed date to answerInApp`() = runTest {
+        val entryWriter = mockk<EntryWriter>(relaxUnitFun = true)
+        val viewModel = buildViewModel(
+            entryWriter = entryWriter,
+            entriesByDate = mapOf(TODAY to emptyList(), YESTERDAY to emptyList()),
+        )
+        viewModel.uiState.first { it.rows.isNotEmpty() }
+
+        viewModel.showPreviousDay()
+        val slot = viewModel.uiState.first { it.date == YESTERDAY }.rows.single().slots.first()
+        viewModel.answer(HABIT_ID, slot, InAppEntryStatus.COMPLETED)
+
+        coVerify(exactly = 1) {
+            entryWriter.answerInApp(HABIT_ID, YESTERDAY, slot.slotId, InAppEntryStatus.COMPLETED, slot.occurrenceId)
+        }
+    }
+
+    /** today-past-day-correction, task 2.10 / design.md decision 3. Populate both presented-state
+     *  sets first, then navigate: a navigation that actually changes [TodayDate.viewed] must clear
+     *  both. */
+    @Test
+    fun `both expansion sets are empty after a navigation that changes the viewed date`() = runTest {
+        val viewModel = buildViewModel(entriesByDate = mapOf(TODAY to emptyList(), YESTERDAY to emptyList()))
+        val onToday = viewModel.uiState.first { it.rows.isNotEmpty() }.rows.single()
+        viewModel.toggleExpanded(HABIT_ID)
+        viewModel.requestChange(onToday.slots.first().keyIn(HABIT_ID))
+        viewModel.uiState.first { it.expandedHabitIds.isNotEmpty() && it.reopenedSlots.isNotEmpty() }
+
+        viewModel.showPreviousDay()
+
+        val onYesterday = viewModel.uiState.first { it.date == YESTERDAY }
+        assertTrue(onYesterday.expandedHabitIds.isEmpty())
+        assertTrue(onYesterday.reopenedSlots.isEmpty())
+    }
+
+    /** today-past-day-correction, task 2.11 / design.md decision 3. A clock tick while navigated
+     *  away must neither clear the presented-state sets NOR cause a second subscription to
+     *  [EntryDao.observeByDate] for the navigated-to date — [dateView]'s `distinctUntilChanged`
+     *  must swallow the tick entirely, since it does not move [TodayDate.viewed]. */
+    @Test
+    fun `a tick while navigated away neither clears expansion state nor re-subscribes Room`() = runTest {
+        val currentDateSource = FakeCurrentDateSource(TODAY)
+        val entryDao = entryDaoStub(mapOf(TODAY to emptyList(), YESTERDAY to emptyList(), TOMORROW to emptyList()))
+        val viewModel = buildViewModel(currentDateSource = currentDateSource, entryDao = entryDao)
+        val onToday = viewModel.uiState.first { it.rows.isNotEmpty() }.rows.single()
+
+        viewModel.showPreviousDay()
+        viewModel.toggleExpanded(HABIT_ID)
+        viewModel.requestChange(onToday.slots.first().keyIn(HABIT_ID))
+        viewModel.uiState.first { it.date == YESTERDAY && it.expandedHabitIds.isNotEmpty() }
+
+        currentDateSource.advanceTo(TOMORROW)
+
+        val stillOnYesterday = viewModel.uiState.value
+        assertEquals(YESTERDAY, stillOnYesterday.date)
+        assertEquals(setOf(HABIT_ID), stillOnYesterday.expandedHabitIds)
+        verify(exactly = 1) { entryDao.observeByDate(YESTERDAY.toString()) }
+    }
+
+    /** today-past-day-correction, task 2.12 / design.md decision 1, invariant 4. `isPastDay` is
+     *  exactly `navigated != null`: true off the live edge, false at it. */
+    @Test
+    fun `isPastDay is true off the live edge, false at it`() = runTest {
+        val viewModel = buildViewModel(entriesByDate = mapOf(TODAY to emptyList(), YESTERDAY to emptyList()))
+        assertTrue(viewModel.uiState.first { it.rows.isNotEmpty() }.isPastDay.not())
+
+        viewModel.showPreviousDay()
+        assertTrue(viewModel.uiState.first { it.date == YESTERDAY }.isPastDay)
+
+        viewModel.showToday()
+        assertTrue(viewModel.uiState.first { it.date == TODAY }.isPastDay.not())
+    }
+
+    /** today-past-day-correction, task 2.13 — proves [toTodaySlot] is unchanged: it filters
+     *  [TodaySnapshot.unresolvedOccurrences] by the snapshot's own date, so an occurrence scheduled
+     *  for a DIFFERENT date (here, the live-edge [TODAY]) never attaches to a slot built for the
+     *  navigated-to past date. */
+    @Test
+    fun `a past occurrence absent from observeUnresolved builds a slot with a null occurrenceId`() = runTest {
+        val viewModel = buildViewModel(
+            entriesByDate = mapOf(TODAY to emptyList(), YESTERDAY to emptyList()),
+            unresolvedOccurrences = listOf(
+                occurrence(OCCURRENCE_ID, MORNING_SLOT_ID, STATE_ARMED, null, scheduledDate = TODAY),
+            ),
+        )
+        viewModel.uiState.first { it.rows.isNotEmpty() }
+
+        viewModel.showPreviousDay()
+        val slot = viewModel.uiState.first { it.date == YESTERDAY }.rows.single().slots.first()
+
+        assertNull(slot.occurrenceId)
+    }
+
+    /** today-past-day-correction, task 2.15 / proposal.md's unrestricted-editing success
+     *  criterion: nothing in [TodayViewModel.answer] restricts the transition, so a past slot must
+     *  accept the full `COMPLETED -> MISSED -> SKIPPED` cycle, twice in a row, with every write
+     *  landing. */
+    @Test
+    fun `a past slot is freely re-editable through every status, twice around the cycle`() = runTest {
+        val entryWriter = mockk<EntryWriter>(relaxUnitFun = true)
+        val viewModel = buildViewModel(
+            entryWriter = entryWriter,
+            entriesByDate = mapOf(TODAY to emptyList(), YESTERDAY to emptyList()),
+        )
+        viewModel.uiState.first { it.rows.isNotEmpty() }
+
+        viewModel.showPreviousDay()
+        val slot = viewModel.uiState.first { it.date == YESTERDAY }.rows.single().slots.first()
+
+        val cycle = listOf(InAppEntryStatus.COMPLETED, InAppEntryStatus.MISSED, InAppEntryStatus.SKIPPED)
+        repeat(2) {
+            cycle.forEach { status -> viewModel.answer(HABIT_ID, slot, status) }
+        }
+
+        cycle.forEach { status ->
+            coVerify(exactly = 2) {
+                entryWriter.answerInApp(HABIT_ID, YESTERDAY, slot.slotId, status, slot.occurrenceId)
+            }
+        }
+    }
+
     private fun twoSlots() = listOf(slot(MORNING_SLOT_ID, MORNING_MINUTE), slot(EVENING_SLOT_ID, EVENING_MINUTE))
 
     private fun buildViewModel(
@@ -481,13 +755,16 @@ class TodayViewModelTest {
         entriesByDate: Map<LocalDate, List<EntryEntity>> = mapOf(TODAY to emptyList()),
         unresolvedOccurrences: List<ReminderOccurrenceEntity> =
             listOf(occurrence(OCCURRENCE_ID, MORNING_SLOT_ID, STATE_ARMED, null)),
+        // Overridable only so a test can keep a reference to the exact EntryDao mock and verify
+        // how many times observeByDate was called (task 2.11) — every other test relies on the
+        // default, built from entriesByDate exactly as before.
+        entryDao: EntryDao = entryDaoStub(entriesByDate),
     ): TodayViewModel {
         val habitRepository = mockk<HabitRepository> {
             every { observeAll() } returns MutableStateFlow(listOf(habit()))
             coEvery { findScheduleFor(HABIT_ID) } returns Schedule.Daily()
             coEvery { findSlotsFor(HABIT_ID) } returns twoSlots()
         }
-        val entryDao = entryDaoStub(entriesByDate)
         val occurrenceDao = mockk<ReminderOccurrenceDao> {
             every { observeUnresolved() } returns MutableStateFlow(unresolvedOccurrences)
         }
