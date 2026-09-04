@@ -1429,7 +1429,7 @@ carried_forward_open_items:
         Threat Matrix's note that the broadcast/IPC option was rejected).
     - id: "device-locale-resolution-has-no-runtime-test"
       title: "Nothing exercises a Spanish DEVICE locale with no override stored"
-      status: open
+      status: resolved
       severity: >
         Low confidence rather than low risk. The behaviour is Android's own
         resource-qualifier resolution, which is very unlikely to break — but it
@@ -1456,9 +1456,55 @@ carried_forward_open_items:
         instrumented test, or a matrix leg configured with a non-English device
         locale. Closing it needs an assertion that `values-es/` is selected with
         NO stored override — not another test of the override path.
+      resolution: >
+        Closed by the first half of the owner_condition, not the second: no
+        matrix leg was given a locale, because AGP's `ManagedVirtualDevice`
+        exposes no locale property at all, so both legs still boot English and
+        the Spanish configuration has to be built from inside the test.
+
+        New file
+        `app/src/androidTest/kotlin/com/jjrapps/constanza/localization/DeviceLocaleResolutionInstrumentedTest.kt`,
+        four scenarios, every one of them starting from a cleared override
+        rather than a stored one:
+
+        1. `withNoOverrideStoredNeitherSurfaceHoldsALanguage` — the
+        first-install precondition asserted rather than assumed:
+        `AppLocaleController.current()` is `SystemDefault` and
+        `ReminderSettingsStore.currentLanguageTag()` is null.
+
+        2. `withNoOverrideStoredTheApplicationContextIsNotWrappedAtAll` —
+        `AppLocaleController.localizedApplicationContext()` returns the base
+        application context, asserted with `assertSame` rather than an equality
+        check. A wrapper that happened to resolve the same strings would still
+        mean the app had inserted itself into a decision the platform owns.
+        This is `First-Install Resolution Needs No User Action`.
+
+        3. `aSpanishDeviceConfigurationResolvesTheSpanishResourceFolder` —
+        `Device-Locale Resolution`. A `Configuration` copied from
+        `Resources.getSystem()` — the DEVICE configuration, not this app's —
+        with only its locale list replaced by `es-ES`, handed to
+        `createConfigurationContext`, must resolve `values-es/`:
+        `notification_action_yes` reads "Sí".
+
+        4. `anUnsupportedDeviceLocaleFallsBackToTheBaseResourceFolder` —
+        `Supported Language Set And Universal Fallback`, which had no runtime
+        coverage either. `fr-FR` has no `values-fr/`, so it must fall through to
+        the base folder: asserted equal to "Yes", equal to what an `en-US`
+        configuration resolves, and NOT equal to the Spanish rendering, so a
+        context that resolved nothing at all could not pass.
+      residual_gap: >
+        Stated in the test's own KDoc rather than only here. This proves
+        Android's qualifier resolution and the absence of wrapping. It does NOT
+        prove the behaviour of a device actually BOOTED in Spanish, where the
+        locale arrives through the system configuration at process start instead
+        of through `createConfigurationContext`. That slice stays uncovered, and
+        it stays uncovered for a concrete reason rather than an oversight: AGP
+        managed devices cannot be given a locale, so the only way to close it is
+        a real device or a hand-built AVD, neither of which is in the standard
+        device-free cycle.
     - id: "system-settings-language-parity-is-one-directional"
       title: "A language change made from Android Settings is never asserted to reach the in-app picker"
-      status: open
+      status: resolved
       severity: >
         API 33+ only, and only the system-to-app direction. The app-to-system
         direction is covered.
@@ -1480,9 +1526,59 @@ carried_forward_open_items:
       owner_condition: >
         A change that already drives `LocaleManager` from an instrumented test
         AND renders the picker — the two halves exist separately today.
+      resolution: >
+        The owner_condition asked for the two halves in one test, and that is
+        what closed it. New file
+        `app/src/androidTest/kotlin/com/jjrapps/constanza/localization/SystemSettingsLanguageParityComposeTest.kt`,
+        gated to API 33+ with `assumeTrue` in `@Before` — the exact mirror of
+        `LanguageOverrideComposeTest`'s 31/32 gate, and for the mirror reason:
+        below 33 there is no `LocaleManager` and no system-Settings surface a
+        language could be changed from in the first place.
+
+        The write goes STRAIGHT to `LocaleManager.applicationLocales`, not
+        through `AppLocaleController.set`. Android Settings writes that surface
+        and nothing else, and going through the controller would have made the
+        test depend on the same writer the in-app picker uses — precisely the
+        coupling the scenario exists to rule out.
+
+        The STATEFUL half is rendered — `LanguageSection(viewModel = ...)`, not
+        `LanguageSectionContent` — because the mechanism under test is that
+        section's `LifecycleStartEffect { refresh() }`, chosen over observing a
+        Flow because `LocaleManager` exposes none (design.md D2). The view model
+        is constructed by the test and passed in, so the parameter's
+        `hiltViewModel()` default is never reached and no Hilt-enabled Activity
+        is needed. `createAndroidComposeRule<ComponentActivity>()` rather than
+        the sibling files' `createComposeRule`, so the effect gets a real
+        Activity lifecycle that actually reaches STARTED.
+
+        The external write happens in `@BeforeClass`, which runs before the
+        per-test rule launches the host Activity. That ordering is load-bearing:
+        `LocaleManager.setApplicationLocales` restarts the app's activities, so
+        writing it after launch would recreate the Activity the compose rule is
+        holding and take the composition with it.
+
+        `aLanguageSetOutsideThePickerIsShownAsSelectedWhenTheSectionStarts`
+        asserts the precondition (`controller.current()` is Spanish, having been
+        set by nobody but the system), then that the Spanish row renders
+        selected and the System-default row does not — System default being the
+        value the view model is seeded with, so it is exactly what the picker
+        would still show had the `ON_START` re-read never happened. Labels are
+        read through `composeTestRule.activity.getString`, so the assertions
+        stay language-agnostic under the Spanish app locale the test itself
+        installed.
+      residual_gap: >
+        Stated in the test's own KDoc as well. Only the FIRST `ON_START` after
+        an external change is proven. A second change made while the section
+        sits in the background, followed by a stop/start cycle, is NOT covered:
+        writing `applicationLocales` restarts the app's activities, which would
+        tear down the composition the assertions read from, and a stop/start
+        with no locale change in between would only prove the effect re-fires
+        rather than that it re-reads anything new. The requirement's remaining
+        uncovered slice is therefore "a change arriving while backgrounded",
+        not "a change arriving at all".
     - id: "cold-process-notification-test-is-not-real-process-death"
       title: "The Spanish cold-process notification test proves 'no Activity created', not process death"
-      status: open
+      status: resolved
       severity: >
         Stated honestly in the test's own KDoc rather than discovered later.
         The gap is between "no Activity ever existed in this process" and "this
@@ -1505,9 +1601,47 @@ carried_forward_open_items:
         The same manual `adb` check already listed under
         testing.instrumented.device_free_matrix.limits. Fold it in there rather
         than inventing a second mechanism for this change alone.
+      resolution: >
+        Closed exactly as the owner_condition asked, and with NO new test code —
+        writing one would have been the second mechanism it warned against, and
+        would have proven nothing an instrumented test can prove anyway.
+
+        `testing.instrumented.device_free_matrix.limits` now carries the manual
+        recipe as a second paragraph alongside the One UI throttling limit that
+        was already there; the original prose is untouched. The recipe is seven
+        numbered steps against the debug build: set the app to Spanish without
+        opening the picker (`adb shell cmd locale set-app-locales
+        com.jjrapps.constanza --locales es` on 33+, the in-app picker below 33
+        where the tag lives in the app's own DataStore); create a habit with a
+        reminder a few minutes out; record the pid and then `am force-stop` the
+        package, confirming the kill by getting NOTHING back from a second
+        `pidof` — the step no instrumented test can perform on its own host;
+        let `AlarmManager` deliver the broadcast to
+        `.scheduling.ReminderFireReceiver`, which is what restarts the process;
+        read the post out of `dumpsys notification_manager --noredact` and
+        require `¿Lo has hecho?` with `Sí` / `No` / `Aplazar`; require the
+        `reminders` channel to be named `Recordatorios de hábitos` rather than
+        `Habit reminders`, which is the channel-name re-localization design.md
+        D4 promises comes free on the very next post; and confirm a genuinely
+        new pid with no resumed activity for the package.
+
+        The identifiers in the recipe were taken from the code, not guessed:
+        `reminders` is `NotificationPoster`'s channel id
+        (`NotificationPoster.kt:17`), the three action labels and the default
+        question are the exact strings
+        `SpanishColdProcessNotificationInstrumentedTest` already asserts, and
+        `com.jjrapps.constanza` is both the applicationId and the namespace with
+        no debug suffix.
+      residual_gap: >
+        The gap this item named is not closed by automation and never will be —
+        it is closed by being a named, reproducible manual step in the one place
+        the limits of the device-free matrix are already recorded. Until someone
+        runs it, real post-process-death cold start remains unverified; the item
+        is resolved in the sense that the check now exists and is findable, not
+        in the sense that it has been performed.
     - id: "import-failure-message-mapping-is-untested"
       title: "importFailureMessage's four branches are compiler-checked for completeness, not for correctness"
-      status: open
+      status: resolved
       severity: >
         Four one-line mappings. Low risk, and the cheapest of these four items
         to close.
@@ -1528,6 +1662,147 @@ carried_forward_open_items:
         Any change touching data-portability's UI, or a deliberate
         test-coverage pass. Needs two private composables promoted to
         `internal`.
+      resolution: >
+        Closed by the deliberate test-coverage pass the owner_condition allowed
+        for. `ImportResultMessage` and `importFailureMessage` in
+        `app/src/main/kotlin/com/jjrapps/constanza/portability/DataPortabilityScreen.kt`
+        went from `private` to `internal`, and both KDocs now say why the
+        visibility is wider than the call graph needs: the compiler proves every
+        case is HANDLED, never that a case picked the right resource, and a
+        branch pointing at a neighbouring id — or a swapped `%1$d`/`%2$d` — is a
+        clean compile. `internal` and not `public`: androidTest is associated
+        with the main compilation in this module, which was verified by
+        compiling `:app:compileDebugAndroidTestKotlin` rather than assumed.
+
+        New file
+        `app/src/androidTest/kotlin/com/jjrapps/constanza/portability/ImportResultMessageComposeTest.kt`,
+        seven scenarios covering all four `ImportFailure` branches plus
+        `ImportResult.Success` and `ImportResult.Idle`.
+
+        The assertions are deliberately NOT tautological. Each scenario names
+        the resource id it expects independently of the production `when`,
+        resolves it with `context.getString(id, args)`, and compares that
+        against the text the composable actually rendered — so what is under
+        test is which id the branch selected, not whether `stringResource`
+        works. It is language-agnostic by construction, since expected and
+        actual resolve through the same configuration: the file pins no Spanish
+        or English sentence and would pass unchanged on a Spanish device.
+
+        `unknownSlotReferenceSelectsItsResourceWithHabitIdBeforeSlotId` uses
+        distinct ids (71 and 93) and additionally asserts the rendered text is
+        NOT the same resource formatted in the opposite order, so an argument
+        swap in the only two-placeholder branch fails here rather than shipping.
+
+        Idle and non-Idle are covered as a pair: Idle must render neither a
+        message nor `action_dismiss`, and a non-Idle result must render the
+        dismiss action. The rendered text is read out of the semantics tree by
+        tagging a host `Column`, so a scenario asserts the WHOLE rendered
+        output rather than the presence of one string among others.
+    - id: "reminder-notification-shows-a-question-and-truncates-long-habit-names"
+      title: "The reminder notification carries a question line the maintainer does not want, and clips long habit names"
+      status: open
+      severity: >
+        Cosmetic in the strict sense — no reminder is lost and no answer is
+        mis-recorded — but this is the surface the product is used from. The
+        notification IS the daily interaction; every other screen is optional.
+      origin: >
+        Reported by the maintainer on 2026-09-04 from a One UI screenshot of the
+        shade taken 2026-09-03 21:53, showing a reminder titled
+        "Terminar de cenar antes d..." over the body "Did you do it?".
+      reason: >
+        `NotificationPoster.buildNotification`
+        (app/src/main/kotlin/com/jjrapps/constanza/reminding/NotificationPoster.kt:142-143)
+        sets `setContentTitle(habitName)` and
+        `setContentText(question ?: ctx.getString(R.string.notification_default_question))`.
+        The builder declares no `setStyle`, so the post is a plain collapsed
+        notification: the system ellipsizes the title to a single line at
+        whatever width the shade gives it, and the body line is always present
+        because the default question backs it whenever a habit carries no
+        custom one.
+      not_a_defect_note: >
+        The English body in that screenshot is NOT a localization defect. The
+        string is translated — `notification_default_question` is
+        "Did you do it?" in app/src/main/res/values/strings.xml:12 and
+        "¿Lo has hecho?" in app/src/main/res/values-es/strings.xml:15, and
+        `SpanishColdProcessNotificationInstrumentedTest` asserts exactly that
+        Spanish body. The screenshot was taken from a build installed before the
+        Spanish resources landed on the device. Do not open a localization
+        investigation from it.
+      what_the_maintainer_wants: >
+        Confirmed by the maintainer on 2026-09-04, and it is a product stance
+        rather than a styling preference: the habit name IS the question, with
+        or without a question mark, so a separate question line adds nothing.
+        The `question` field is therefore REMOVED FROM THE PRODUCT, not merely
+        hidden from the notification. A habit keeps `name` plus `notes` as a
+        reference detail and nothing else. The notification carries the habit
+        name alone, and a long name must not be clipped.
+      blast_radius: >
+        Grepped 2026-09-04. Nine sites, two of them structural.
+        (1) domain/src/main/kotlin/com/jjrapps/constanza/domain/model/Model.kt:11
+        — `Habit.question`.
+        (2) core/data/entity/Entities.kt:17 — `HabitEntity.question` is a real
+        column, so this needs a Room migration. `AppDatabase` is at
+        `version = 2` (core/data/AppDatabase.kt:36), making this v2 to v3 with a
+        checked-in app/schemas/com.jjrapps.constanza.core.data.AppDatabase/3.json.
+        Dropping a column in SQLite is a table rebuild.
+        (3) core/data/mapper/Mappers.kt:34.
+        (4) Backup format — portability/BackupDto.kt:53 and
+        portability/BackupMapper.kt:23,40. Backups already exported carry it.
+        (5) reminding/NotificationPoster.kt:62,65,136,143 — the parameter and
+        the `setContentText`.
+        (6) scheduling/ReminderFireWorker.kt:52 — the only `postReminder` call
+        site.
+        (7) Editor UI — habit/HabitEditorFormState.kt:21,44 and
+        habit/HabitEditorScreen.kt:220,334 (`FIELD_QUESTION` and the
+        rotation-restore list).
+        (8) habit/HabitListScreen.kt:195 — the habit list renders
+        `habit.question` as `supportingContent`.
+        (9) Strings, in BOTH values/ and values-es/ or `StringResourceParityTest`
+        fails: `notification_default_question`, `habit_editor_question_label`,
+        and any sibling question copy.
+      open_questions_for_the_analysis: >
+        1. Old backups. Exports stop writing `question`, but importing a backup
+        that still carries it must keep working. Decide deliberately between
+        silent tolerance and a version bump handled through
+        `ImportFailure.UnsupportedVersion`. This is the sharpest decision in the
+        change, and it belongs to the maintainer, not the implementer.
+        2. SETTLED by the maintainer on 2026-09-04, no longer open, and note
+        this SUPERSEDES an earlier answer the same day of "show notes there
+        instead": the habit list row shows the habit NAME AND NOTHING ELSE.
+        `supportingContent` is removed from the `ListItem` at
+        habit/HabitListScreen.kt:195 rather than repointed at `notes`. The row
+        keeps its `leadingContent` colour dot, its `headlineContent` name, and
+        its `trailingContent` actions; only the supporting line goes. The
+        reasoning is the maintainer's and it is worth keeping: the habit list is
+        an index to scan, not a surface to read on, and `notes` is free text
+        that can run long enough to turn every row into a block. No `maxLines`
+        or overflow decision is needed for that row any more — there is no text
+        to bound.
+        2b. SETTLED with it: the notes field in the EDITOR is a taller
+        multi-line input, `minLines = 3` and `maxLines = 5`, so it opens looking
+        like a notes area and scrolls internally past five lines instead of
+        growing without bound. Today habit/HabitEditorScreen.kt:228-236 renders
+        it as an ordinary text field with no `minLines`, so it opens one line
+        tall and is indistinguishable from the name field beside it. With the
+        list row carrying no detail, the editor is now the ONLY place `notes` is
+        read, which is what makes the taller field worth having.
+        3. Notification shape. With the body line gone the notification has a
+        title and no text, and a collapsed title cannot be widened by any
+        builder call. `NotificationCompat.BigTextStyle` / `setBigContentTitle`
+        reveals the full name only once expanded; moving the name into the body
+        line wraps to two lines while collapsed but loses the bold title weight
+        AND directly contradicts removing that line. Resolve these as ONE
+        decision, never as two.
+        4. Whatever is chosen must keep the three actions (yes / no / snooze)
+        and must not change `REMINDER_CHANNEL_ID` or the notification id, which
+        `CoreFlowTestFixture.awaitPostedNotification` and the E2E flow depend on.
+      sizing: >
+        Domain model, Room migration, backup format, editor, list row,
+        notification and strings. This is an SDD-sized change, not a direct edit.
+      owner_condition: >
+        Deliberately deferred by the maintainer until the four app-localization
+        coverage items above are closed. Analyse it as its own change then;
+        do not fold it into that test-coverage pass.
 stack:
   status: ratified
   note: >
@@ -1712,6 +1987,48 @@ testing:
         run. The maintainer has accepted that residual risk knowingly. The
         carried-forward items `G.7-throttling-row` and `colour-dot-fold-unfold` stay
         exactly as open as they were.
+
+        A second thing the matrix cannot prove, added when
+        `cold-process-notification-test-is-not-real-process-death` was closed:
+        POST-PROCESS-DEATH COLD START. An instrumented test runs inside a live
+        instrumentation process and cannot kill the host that `AlarmManager` would have
+        to resurrect.
+        `app/src/androidTest/kotlin/com/jjrapps/constanza/localization/SpanishColdProcessNotificationInstrumentedTest.kt`
+        covers everything up to that line — the real
+        `ReminderFireReceiver` broadcast, the real `HiltWorkerFactory`, the production
+        `NotificationPoster`, and Spanish resolved from the persisted/system tag with no
+        `Activity` ever created — so what is left over is the process lifecycle, not the
+        localization logic. That remainder is a MANUAL `adb` check, and it is the only
+        one this section asks for.
+
+        The recipe, run against a device or emulator with the debug build installed
+        (`com.jjrapps.constanza` is both the applicationId and the namespace; there is no
+        debug suffix). 1. Put the app in Spanish without opening the picker, which is
+        also the surface Android Settings writes:
+        `adb shell cmd locale set-app-locales com.jjrapps.constanza --locales es`
+        (API 33+; below 33 pick Español in the app's Settings screen instead, since the
+        tag lives in the app's own DataStore there). 2. Create a habit with a reminder a
+        few minutes out and note its name. 3. Record the current pid —
+        `adb shell pidof com.jjrapps.constanza` — then genuinely kill it:
+        `adb shell am force-stop com.jjrapps.constanza`, and confirm the kill took by
+        re-running `pidof` and getting NOTHING back. This is the step the automated test
+        cannot perform. 4. Wait for the scheduled time and let `AlarmManager` deliver the
+        broadcast to `.scheduling.ReminderFireReceiver`, which is what restarts the
+        process. 5. Read the posted notification:
+        `adb shell dumpsys notification_manager --noredact | rg -A 25 com.jjrapps.constanza`.
+        It MUST show `android.title` as the habit name, `android.text` as
+        `¿Lo has hecho?` (or the habit's own Spanish question), and the three actions as
+        `Sí` / `No` / `Aplazar`. 6. Confirm the channel name was re-localized on this
+        very post:
+        `adb shell dumpsys notification_manager | rg -A 3 "reminders"`
+        must name the channel `Recordatorios de hábitos`, not `Habit reminders` — the
+        channel id is the literal string `reminders`. 7. Confirm no `Activity` was
+        created on the way: `adb shell pidof com.jjrapps.constanza` must now print a
+        DIFFERENT pid from step 3 (a genuinely new process), while
+        `adb shell dumpsys activity activities | rg constanza` shows no resumed activity
+        for the package. An English notification here, or a `Habit reminders` channel,
+        is the exact defect the whole localization change exists to prevent, and it is
+        the one thing a green matrix would not have caught.
     java_home: >
       REQUIRED for every `./gradlew` invocation — this machine has no system JDK and
       Gradle dies with "Unable to locate a Java Runtime" without it. Applies to all

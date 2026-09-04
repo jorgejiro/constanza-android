@@ -65,8 +65,14 @@ fun DataPortabilitySection(viewModel: DataPortabilityViewModel = hiltViewModel()
     }
 }
 
+/**
+ * `internal` rather than `private` so `ImportResultMessageComposeTest` can render it directly.
+ * Nothing outside this file calls it in production; the widened visibility exists solely so an
+ * instrumented test can drive each [ImportResult] case and assert which string resource the branch
+ * selected — see [importFailureMessage]'s KDoc for why that assertion is worth the visibility.
+ */
 @Composable
-private fun ImportResultMessage(result: ImportResult, onDismiss: () -> Unit) {
+internal fun ImportResultMessage(result: ImportResult, onDismiss: () -> Unit) {
     when (result) {
         ImportResult.Idle -> Unit
         ImportResult.Success -> Text(stringResource(R.string.portability_import_success))
@@ -82,9 +88,16 @@ private fun ImportResultMessage(result: ImportResult, onDismiss: () -> Unit) {
  * Android-free and has no `Context`, so it can only report *which* failure occurred and with what
  * arguments; the resource lookup belongs here, where `stringResource` follows the resolved language.
  * The `when` is exhaustive on purpose — a new failure case will not compile until it has copy.
+ *
+ * `internal` rather than `private`, and the reason is the limit of that exhaustiveness: the
+ * compiler proves every case is *handled*, never that a case picked the *right* resource. A
+ * copy-paste that maps `MalformedFile` to the unreadable-file wording, or that swaps `%1$d` and
+ * `%2$d` in the two-argument branch, compiles cleanly. `ImportResultMessageComposeTest` renders
+ * this composable directly and names the expected resource id independently for each branch, which
+ * is only possible if the declaration is visible from `androidTest`.
  */
 @Composable
-private fun importFailureMessage(failure: ImportFailure): String = when (failure) {
+internal fun importFailureMessage(failure: ImportFailure): String = when (failure) {
     ImportFailure.UnreadableFile -> stringResource(R.string.portability_import_error_unreadable_file)
     ImportFailure.MalformedFile -> stringResource(R.string.portability_import_error_malformed_file)
     is ImportFailure.UnsupportedVersion ->
