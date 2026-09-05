@@ -16,8 +16,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.MainActivity
-import com.jjrapps.constanza.tracking.TODAY_ADD_HABIT_EMPTY_TEST_TAG
-import com.jjrapps.constanza.tracking.TODAY_ADD_HABIT_TRAILING_TEST_TAG
+import com.jjrapps.constanza.tracking.TODAY_ADD_HABIT_FAB_TEST_TAG
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -29,8 +28,8 @@ private const val UI_TIMEOUT_MS = 15_000L
 private const val CREATED_HABIT = "Read"
 
 /**
- * today-add-habit, end to end: Today's add action really reaches the habit editor, and leaving that
- * editor really comes back to Today.
+ * today-add-habit, end to end: Today's add-habit FAB really reaches the habit editor, and leaving
+ * that editor really comes back to Today.
  *
  * The return leg is the half worth a real `MainActivity`. The editor's two exits — `onDone` and
  * `onBack` — both follow `ConstanzaRoute.HabitEditor.origin`, and the habit list this app hoists
@@ -51,7 +50,7 @@ class TodayAddHabitE2ETest {
     /** Empty rather than `createAndroidComposeRule<MainActivity>()`, for the reason
      *  [CoreFlowE2ETest] documents: a rule-launched Activity comes up before `@Before` can clear
      *  the previous test's habits, so Today's first emission would be built from them — and this
-     *  test's whole subject is which presentation an empty Today shows. */
+     *  test starts from an empty Today by design. */
     @get:Rule
     val compose = createEmptyComposeRule()
 
@@ -73,31 +72,32 @@ class TodayAddHabitE2ETest {
     }
 
     @Test
-    fun theCentredAddActionOpensTheEditorAndBackingOutReturnsToToday() {
+    fun theAddHabitFabOpensTheEditorAndBackingOutReturnsToToday() {
         launchOnboardedApp()
 
-        awaitTag(TODAY_ADD_HABIT_EMPTY_TEST_TAG)
-        compose.onNodeWithTag(TODAY_ADD_HABIT_EMPTY_TEST_TAG).performClick()
+        awaitTag(TODAY_ADD_HABIT_FAB_TEST_TAG)
+        compose.onNodeWithTag(TODAY_ADD_HABIT_FAB_TEST_TAG).performClick()
         awaitText(string(R.string.habit_editor_title_create))
 
         compose.onNodeWithContentDescription(string(R.string.action_back)).performClick()
 
         awaitText(string(R.string.today_title))
         compose.onNodeWithText(string(R.string.habit_list_title)).assertDoesNotExist()
-        compose.onNodeWithTag(TODAY_ADD_HABIT_EMPTY_TEST_TAG).assertExists()
+        compose.onNodeWithTag(TODAY_ADD_HABIT_FAB_TEST_TAG).assertExists()
     }
 
     /**
-     * The save leg, and with it the second presentation: a habit created from Today's empty state
-     * lands back on Today with that habit on the list, where the SAME action is now offered at the
-     * end of the list instead of centred in an empty one.
+     * The save leg: a habit created from Today's FAB lands back on Today with that habit on the
+     * list. today-add-habit-is-not-a-fab: the affordance does not change shape across that
+     * transition any more — the same FAB is still in the same corner, and what is gone is the
+     * `today_empty` sentence it was floating over.
      */
     @Test
-    fun savingFromTodaysAddActionReturnsToTodayWhereTheActionIsNowTrailing() {
+    fun savingFromTodaysAddHabitFabReturnsToTodayWithTheHabitAndTheSameFab() {
         launchOnboardedApp()
 
-        awaitTag(TODAY_ADD_HABIT_EMPTY_TEST_TAG)
-        compose.onNodeWithTag(TODAY_ADD_HABIT_EMPTY_TEST_TAG).performClick()
+        awaitTag(TODAY_ADD_HABIT_FAB_TEST_TAG)
+        compose.onNodeWithTag(TODAY_ADD_HABIT_FAB_TEST_TAG).performClick()
 
         awaitText(string(R.string.habit_editor_name_label))
         compose.onNodeWithText(string(R.string.habit_editor_name_label)).performTextInput(CREATED_HABIT)
@@ -110,9 +110,9 @@ class TodayAddHabitE2ETest {
         awaitText(string(R.string.today_title))
         compose.onNodeWithText(string(R.string.habit_list_title)).assertDoesNotExist()
 
-        awaitTag(TODAY_ADD_HABIT_TRAILING_TEST_TAG)
-        compose.onNodeWithTag(TODAY_ADD_HABIT_EMPTY_TEST_TAG).assertDoesNotExist()
-        compose.onNodeWithText(CREATED_HABIT).assertExists()
+        awaitText(CREATED_HABIT)
+        compose.onNodeWithTag(TODAY_ADD_HABIT_FAB_TEST_TAG).assertExists()
+        compose.onNodeWithText(string(R.string.today_empty)).assertDoesNotExist()
     }
 
     /** Seeds the onboarding flag durably before launch — `edit` does not return until the write

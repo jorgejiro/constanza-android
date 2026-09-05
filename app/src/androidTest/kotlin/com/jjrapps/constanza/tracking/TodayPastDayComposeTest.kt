@@ -129,8 +129,11 @@ class TodayPastDayComposeTest {
 
     /**
      * Task 5.2: the add-habit affordance is absent while viewing a past day, and returns once the
-     * user taps back to Today — both presentations of the SAME action (today-add-habit), so this
-     * addresses the trailing one by its own test tag rather than by the shared label.
+     * user taps back to Today. Since today-add-habit-is-not-a-fab there is one affordance rather
+     * than two presentations of it, so this addresses [TODAY_ADD_HABIT_FAB_TEST_TAG] in both
+     * branches. `assertDoesNotExist`, not `assertIsNotEnabled`: the FAB is left out of the
+     * `Scaffold` slot entirely on a past day, because the alternative — a greyed-out button — is
+     * exactly the shape `today-past-day-correction` decided against for unavailable actions.
      */
     @Test
     fun addHabitAffordanceIsAbsentOnAPastDayAndReturnsAfterToday(): Unit = runBlocking {
@@ -138,11 +141,11 @@ class TodayPastDayComposeTest {
         viewModel.awaitRows(1)
 
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
-        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_TRAILING_TEST_TAG).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_FAB_TEST_TAG).assertIsDisplayed()
 
         goToPreviousDay()
         viewModel.awaitState("viewing a past day") { it.isPastDay }
-        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_TRAILING_TEST_TAG).assertDoesNotExist()
+        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_FAB_TEST_TAG).assertDoesNotExist()
 
         goToToday()
         viewModel.awaitState("back at the live edge") { !it.isPastDay }
@@ -150,24 +153,23 @@ class TodayPastDayComposeTest {
         // would otherwise make this function's inferred return type non-`void`, which JUnit4 rejects
         // as an invalid test method at class-load time — found by the emulator matrix, not by
         // `compileDebugAndroidTestKotlin`, which does not check this.
-        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_TRAILING_TEST_TAG).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_FAB_TEST_TAG).assertIsDisplayed()
     }
 
     /**
      * Task 5.3: an empty past day — nothing seeded at all, so the live-today view is already empty
-     * — shows [R.string.today_empty_past] and no add-habit button of either shape.
+     * — shows [R.string.today_empty_past], with no add-habit affordance floating over it.
      */
     @Test
     fun anEmptyPastDayShowsThePastEmptyTextAndNoButton(): Unit = runBlocking {
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
-        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_EMPTY_TEST_TAG).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_FAB_TEST_TAG).assertIsDisplayed()
 
         goToPreviousDay()
         viewModel.awaitState("viewing an empty past day") { it.isPastDay }
 
         composeTestRule.onNodeWithText(text(R.string.today_empty_past)).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_EMPTY_TEST_TAG).assertDoesNotExist()
-        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_TRAILING_TEST_TAG).assertDoesNotExist()
+        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_FAB_TEST_TAG).assertDoesNotExist()
     }
 
     /**

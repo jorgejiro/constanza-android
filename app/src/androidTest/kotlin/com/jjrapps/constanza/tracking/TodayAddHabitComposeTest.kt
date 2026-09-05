@@ -3,8 +3,10 @@ package com.jjrapps.constanza.tracking
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -22,13 +24,17 @@ private const val MORNING_MINUTE = 8 * 60
 private const val HABIT_NAME = "Stretch"
 
 /**
- * today-add-habit: Today offers the same create action in two presentations, and which one is on
- * screen is decided by whether there is anything on the list.
+ * today-add-habit-is-not-a-fab: Today offers ONE create action, in one shape, whether or not there
+ * is anything on the list — a [androidx.compose.material3.FloatingActionButton] in the `Scaffold`
+ * slot, exactly as `HabitListScreen` does it.
  *
- * Both presentations render the same `today_add_habit` label, so every assertion here addresses
- * them by [TODAY_ADD_HABIT_EMPTY_TEST_TAG] / [TODAY_ADD_HABIT_TRAILING_TEST_TAG] rather than by
- * text — a text finder cannot tell one from the other, and "the empty presentation is gone once
- * habits exist" is precisely what needs proving.
+ * That is the claim these tests exist to hold. Before this change there were two centred `Button`s
+ * — one inside the empty state, one after the last habit row — and the tests here proved which of
+ * the two was on screen. What replaces that is the assertion that the SAME node survives the empty
+ * to populated transition and that no second add affordance appears beside it.
+ *
+ * The FAB carries an icon, so `today_add_habit` reaches the tree as a `contentDescription` and
+ * never as visible text; assertions address it by [TODAY_ADD_HABIT_FAB_TEST_TAG].
  *
  * Routing is asserted here only as far as "the callback the Activity binds actually fires". That
  * the callback reaches the habit editor, and that leaving the editor comes back to Today rather
@@ -59,23 +65,23 @@ class TodayAddHabitComposeTest {
     private fun text(resId: Int) = ApplicationProvider.getApplicationContext<Context>().getString(resId)
 
     @Test
-    fun anEmptyTodayShowsTheCentredAddActionAndNoTrailingOne() {
+    fun anEmptyTodayShowsTheAddHabitFabBesideTheEmptySentence() {
         var addHabitTaps = 0
         composeTestRule.setContent {
             TodayRoute(onManageHabits = {}, onAddHabit = { addHabitTaps++ }, viewModel = viewModel)
         }
 
-        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_EMPTY_TEST_TAG).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_TRAILING_TEST_TAG).assertDoesNotExist()
-        // The sentence stays: it says what the state IS, and the button says what to do about it.
+        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_FAB_TEST_TAG).assertIsDisplayed()
+        // The sentence stays and the button inside it is gone: the sentence says what the state IS,
+        // and the FAB — the one create affordance on the screen — says what to do about it.
         composeTestRule.onNodeWithText(text(R.string.today_empty)).assertIsDisplayed()
 
-        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_EMPTY_TEST_TAG).performClick()
-        assertTrue("tapping the centred action must invoke the route's onAddHabit", addHabitTaps == 1)
+        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_FAB_TEST_TAG).performClick()
+        assertTrue("tapping the add-habit FAB must invoke the route's onAddHabit", addHabitTaps == 1)
     }
 
     @Test
-    fun aPopulatedTodayShowsTheTrailingAddActionAndNoCentredOne() = runBlocking {
+    fun aPopulatedTodayShowsTheSameAddHabitFab() = runBlocking {
         fixture.seedHabitWithEnabledSlot(name = HABIT_NAME, minuteOfDay = MORNING_MINUTE)
         viewModel.awaitRows(1)
 
@@ -84,24 +90,35 @@ class TodayAddHabitComposeTest {
             TodayRoute(onManageHabits = {}, onAddHabit = { addHabitTaps++ }, viewModel = viewModel)
         }
 
-        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_TRAILING_TEST_TAG).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_EMPTY_TEST_TAG).assertDoesNotExist()
+        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_FAB_TEST_TAG).assertIsDisplayed()
         composeTestRule.onNodeWithText(text(R.string.today_empty)).assertDoesNotExist()
+        // One add affordance, not two. The deleted centred `Button`s rendered `today_add_habit` as
+        // visible text; the FAB carries it as a `contentDescription`. So exactly one node describes
+        // itself that way, and nothing on the screen spells it out in text any more.
+        val described = composeTestRule
+            .onAllNodesWithContentDescription(text(R.string.today_add_habit))
+            .fetchSemanticsNodes()
+        assertTrue(
+            "Today must offer exactly one add-habit affordance, found ${described.size}",
+            described.size == 1,
+        )
+        composeTestRule.onNodeWithText(text(R.string.today_add_habit)).assertDoesNotExist()
 
-        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_TRAILING_TEST_TAG).performClick()
-        assertTrue("tapping the trailing action must invoke the route's onAddHabit", addHabitTaps == 1)
+        composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_FAB_TEST_TAG).performClick()
+        assertTrue("tapping the add-habit FAB must invoke the route's onAddHabit", addHabitTaps == 1)
     }
 
     /**
-     * The trailing action is an action at the end of the list, not an extra habit row inside it.
+     * The FAB floats in the bottom-right corner, over the list rather than inside it.
      *
-     * Asserted geometrically rather than by eye: the action's top edge is below the last row's
-     * answer buttons, so nothing that belongs to a habit can be sitting beside or beneath it in the
-     * place a row would occupy. This is the assertion that fails if the item is ever moved above
-     * `items(state.rows)` or given a row's leading-dot layout.
+     * Asserted geometrically rather than by eye, for the reason the deleted trailing-action test
+     * gave: this is the assertion that fails if the button is ever put back into the `LazyColumn`
+     * as an item, where it would scroll away and could be misread as one more habit row. Its left
+     * edge past the horizontal midpoint and its bottom within a FAB's height of the viewport floor
+     * is a corner and nowhere else.
      */
     @Test
-    fun theTrailingAddActionSitsBelowEveryHabitRow() = runBlocking {
+    fun theAddHabitFabSitsInTheBottomRightCornerOverTheList() = runBlocking {
         fixture.seedHabitWithEnabledSlot(name = HABIT_NAME, minuteOfDay = MORNING_MINUTE)
         viewModel.awaitRows(1)
 
@@ -109,13 +126,22 @@ class TodayAddHabitComposeTest {
             TodayRoute(onManageHabits = {}, viewModel = viewModel)
         }
 
+        val root = composeTestRule.onRoot().fetchSemanticsNode().boundsInRoot
         val rowName = composeTestRule.onNodeWithText(HABIT_NAME).fetchSemanticsNode().boundsInRoot
-        val answerButton = composeTestRule.onNodeWithText(text(R.string.today_answer_yes))
-            .fetchSemanticsNode().boundsInRoot
-        val action = composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_TRAILING_TEST_TAG)
+        val fab = composeTestRule.onNodeWithTag(TODAY_ADD_HABIT_FAB_TEST_TAG)
             .fetchSemanticsNode().boundsInRoot
 
-        assertTrue("the add action must sit below the habit's name", rowName.bottom <= action.top)
-        assertTrue("the add action must sit below the habit's answer buttons", answerButton.bottom <= action.top)
+        assertTrue("the FAB must sit in the right half of the screen", fab.left >= root.center.x)
+        assertTrue(
+            "the FAB must sit in the bottom quarter of the screen",
+            fab.top >= root.top + root.height * BOTTOM_QUARTER,
+        )
+        assertTrue("the FAB must sit below the habit's name", rowName.bottom <= fab.top)
+    }
+
+    private companion object {
+        /** Three quarters down the viewport: anything below this is unambiguously the bottom edge,
+         *  and a FAB pushed back into the list would fail it the moment a second row existed. */
+        const val BOTTOM_QUARTER = 0.75f
     }
 }

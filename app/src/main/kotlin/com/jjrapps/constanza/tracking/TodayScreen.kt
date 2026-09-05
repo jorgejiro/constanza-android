@@ -5,6 +5,7 @@ package com.jjrapps.constanza.tracking
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -115,9 +116,6 @@ fun TodayScreen(
     val dateNavActions = remember(onPreviousDay, onNextDay, onToday) {
         DateNavActions(onPreviousDay, onNextDay, onToday)
     }
-    val contentActions = remember(onAddHabit, onNotificationPermissionRequested) {
-        TodayContentActions(onAddHabit, onNotificationPermissionRequested)
-    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -132,12 +130,28 @@ fun TodayScreen(
                 },
             )
         },
+        // today-add-habit-is-not-a-fab: the same slot, the same icon and the same corner
+        // `HabitListScreen` uses, so the two screens agree on what creating a habit looks like.
+        //
+        // today-past-day-correction, design.md decision 5: absent, not disabled, while a past day
+        // is on screen — a habit's schedule starts when it is created, so there is nothing a
+        // back-dated create could mean, and this change's convention is that an action that cannot
+        // apply is not rendered at all. The guard sits here rather than inside the composable so
+        // that `Scaffold` lays out with no floating action button at all, leaving nothing for the
+        // gesture navigation bar to reserve room around.
+        floatingActionButton = { if (!state.isPastDay) TodayAddHabitFab(onAddHabit) },
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
-            TodayContent(state, onToggleExpanded, actions, contentActions, dateNavActions)
+            TodayContent(state, onToggleExpanded, actions, onNotificationPermissionRequested, dateNavActions)
         }
     }
 }
+
+/** today-add-habit-is-not-a-fab: room left at the end of the habit list for the floating
+ *  add-habit button to sit over. A Material 3 [androidx.compose.material3.FloatingActionButton] is
+ *  56dp tall and `Scaffold` insets it by 16dp, so 88dp clears it with a row's worth of air to
+ *  spare. */
+private val FAB_SCROLL_CLEARANCE = 88.dp
 
 /** today-answered-slot-collapse, design.md decision 5: one holder instead of two extra parameters
  *  on both [HabitRollupRow] and [SlotRow], which would otherwise push each past detekt's
@@ -163,22 +177,18 @@ private data class DateNavActions(
     val onToday: () -> Unit,
 )
 
-/** today-past-day-correction: bundles the two callbacks [TodayContent] invokes directly, never
- *  threaded into [HabitRollupRow]/[SlotRow] — the identical arity reason [SlotActions] and
- *  [DateNavActions] exist. Without this, [TodayContent] would carry [DateNavActions] as a sixth
- *  loose parameter alongside these two, and detekt's unconfigured `LongParameterList` check fires
- *  at `parameterCount >= functionThreshold` (6), not only above it. */
-private data class TodayContentActions(
-    val onAddHabit: () -> Unit,
-    val onNotificationPermissionRequested: () -> Unit,
-)
-
+/** today-add-habit-is-not-a-fab: `TodayContentActions` used to bundle `onAddHabit` with
+ *  `onNotificationPermissionRequested`, because with [DateNavActions] alongside them
+ *  [TodayContent] would have carried six loose parameters and detekt's unconfigured
+ *  `LongParameterList` check fires at `parameterCount >= functionThreshold` (6), not only above it.
+ *  The FAB moved up to [TodayScreen]'s `Scaffold` slot, so the holder was down to a single field —
+ *  five parameters again, and a one-field holder is noise rather than a defence. */
 @Composable
 private fun TodayContent(
     state: TodayUiState,
     onToggleExpanded: (Long) -> Unit,
     actions: SlotActions,
-    contentActions: TodayContentActions,
+    onNotificationPermissionRequested: () -> Unit,
     dateNavActions: DateNavActions,
 ) {
     // Two layouts, chosen by whether there is a list at all, rather than one LazyColumn with an
@@ -186,7 +196,7 @@ private fun TodayContent(
     // knows nothing about the banners above it, so with both banners showing the "centred" action
     // was pushed into the bottom third of a real screen — seen on the emulator, not reasoned about.
     // A Column whose empty state takes `weight(1f)` centres in the space that is actually left.
-    // Nothing scrolls in that case anyway: at most two banners and one call to action.
+    // Nothing scrolls in that case anyway: at most two banners and one sentence.
     //
     // today-past-day-correction, design.md decision 4: [TodayDateBar] is hoisted above BOTH layouts
     // below rather than placed as the LazyColumn's first item, so it stays fixed on screen — its
@@ -200,11 +210,11 @@ private fun TodayContent(
                 dateNavActions.onNextDay,
                 dateNavActions.onToday,
             )
-            TodayPermissionBanners(state, contentActions.onNotificationPermissionRequested)
+            TodayPermissionBanners(state, onNotificationPermissionRequested)
             if (state.isPastDay) {
                 TodayPastDayEmptyState(modifier = Modifier.weight(1f))
             } else {
-                TodayEmptyState(contentActions.onAddHabit, modifier = Modifier.weight(1f))
+                TodayEmptyState(modifier = Modifier.weight(1f))
             }
         }
         return
@@ -217,14 +227,19 @@ private fun TodayContent(
             dateNavActions.onNextDay,
             dateNavActions.onToday,
         )
-        LazyColumn(modifier = Modifier.weight(1f)) {
-            item { TodayPermissionBanners(state, contentActions.onNotificationPermissionRequested) }
+        // today-add-habit-is-not-a-fab: the trailing add-habit item that used to close this list is
+        // gone, and with it the vertical padding it happened to leave at the end. The FAB floats
+        // over the list rather than scrolling with it, so without this the last habit's answer
+        // buttons sit underneath it once the list is scrolled to the bottom. Reserved in the
+        // scroll region, not as a fixed `Modifier.padding`, so a short list still starts at the top
+        // of the viewport.
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(bottom = FAB_SCROLL_CLEARANCE),
+        ) {
+            item { TodayPermissionBanners(state, onNotificationPermissionRequested) }
             items(state.rows, key = { it.habitId }) { row ->
                 HabitRollupRow(row, row.habitId in state.expandedHabitIds, state.zone, onToggleExpanded, actions)
-            }
-            // today-past-day-correction, design.md decision 5: no intake affordance on a past day.
-            if (!state.isPastDay) {
-                item { TrailingAddHabitAction(contentActions.onAddHabit) }
             }
         }
     }
