@@ -1863,18 +1863,33 @@ carried_forward_open_items:
         a reason D2 never weighed — row width. Residual risk carried: Archive
         and Delete are now adjacent overflow-menu items.
       residual_manual_verification: >
-        NOT closed by this resolution, and deliberately not hidden inside it:
-        task 4.3 of the change, the manual on-device check of the notification
-        template and the list row on One UI, has not been performed. Every
-        rendering measurement above came from an AOSP emulator, and per
-        `testing.instrumented.device_free_matrix` Samsung's shade metrics are
-        not reproducible there — a green matrix is not evidence about a real
-        S25. Two specific expectations remain unverified on hardware: that the
-        emulator's ONE-line collapsed body renders as TWO on One UI (the
-        maintainer measured two, which would fit the whole 56-character name
-        collapsed), and that the fixed title does not truncate at Samsung's
-        metrics rather than at the emulator's 527px ceiling. If either turns
-        out false on the device, reopen this item rather than filing a new one.
+        Task 4.3 of the change covered TWO surfaces on real One UI hardware.
+        The notification half is now CONFIRMED; the list-row half is still
+        outstanding. Recorded separately rather than as one tick, because
+        "4.3 done" would have claimed evidence that does not exist for the row.
+
+        CONFIRMED on the maintainer's S25 on 2026-09-05, from two shade
+        screenshots at 15:24 and 15:25 (One UI, Spanish, release build 0.1.2):
+
+        - The collapsed body renders TWO lines, not the emulator's one. The
+          habit "Hacer movilidad al sol en la primera hora tras levantarme" —
+          55 characters — renders WHOLE, with no ellipsis. The emulator's
+          44-character measurement was a lower bound, not the real ceiling, so
+          the change fully solves the reported clipping on this device.
+        - The fixed title `Seguimiento de hábitos` does NOT truncate at
+          Samsung's metrics.
+        - Expanded shows the full name plus the three actions
+          (Sí / No / Aplazar), and "Constanza" appears exactly ONCE, in the
+          system header row — which is why the `Constanza - ` prefix was
+          dropped from the title after the expanded emulator render showed it
+          twice. That decision is vindicated on hardware.
+
+        STILL OUTSTANDING: the habit list row on One UI. Every row measurement
+        (name column 509px to 723px, the two-line bound, the overflow menu)
+        came from an AOSP emulator, and per
+        `testing.instrumented.device_free_matrix` Samsung's metrics are not
+        reproducible there. If the row does not hold up on the device, reopen
+        this item rather than filing a new one.
     - id: "today-add-habit-is-not-a-fab"
       title: "Today's add-habit affordance disagrees with the habit list's"
       status: open
