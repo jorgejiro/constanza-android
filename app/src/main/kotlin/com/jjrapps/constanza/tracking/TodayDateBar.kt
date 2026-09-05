@@ -87,11 +87,12 @@ internal fun TodayDateBar(
 }
 
 /**
- * today-past-day-correction, design.md decision 5: the past-day counterpart of [TodayEmptyState] —
- * text only, `today_empty_past`, with no add-habit call to action at all. Lives alongside
- * [TodayDateBar] rather than in `TodayAddHabitAction.kt`, following the same per-concern split
- * that file and `TodayBanners.kt` already established, instead of misfiling past-day copy into the
- * add-habit file it deliberately does NOT offer.
+ * today-past-day-correction, design.md decision 5: the past-day counterpart of [TodayEmptyState],
+ * saying `today_empty_past` where that one says `today_empty`. Both are text only; what separates
+ * them is what floats above them, since [TodayAddHabitFab] is rendered on a live today and not on a
+ * past day. Lives alongside [TodayDateBar] rather than in `TodayAddHabitAction.kt`, following the
+ * same per-concern split that file and `TodayBanners.kt` already established, instead of misfiling
+ * past-day copy into the add-habit file it deliberately does NOT offer.
  */
 @Composable
 internal fun TodayPastDayEmptyState(modifier: Modifier = Modifier) {
