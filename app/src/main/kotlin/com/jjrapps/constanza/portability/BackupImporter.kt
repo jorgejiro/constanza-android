@@ -14,6 +14,23 @@ import javax.inject.Inject
 private val IMPORT_JSON = Json { ignoreUnknownKeys = true }
 
 /**
+ * weekday-only-schedule design.md decision 2: the six values `ScheduleEntity.kind`/
+ * `BackupSchedule.kind` may legitimately hold, duplicated here rather than importing
+ * `core/data/mapper/Mappers.kt`'s (deliberately `private`) `SCHEDULE_KIND_*` constants — this file
+ * already treats `kind` as a raw string throughout, matching `BackupSchedule.kind`'s own contract.
+ * A legacy `kind = "WEEKLY"` row is the whole reason this set exists: unvalidated, it would import
+ * cleanly and only crash later, at `ScheduleEntity.toDomain()`'s `else -> error(...)`.
+ */
+private val VALID_SCHEDULE_KINDS = setOf(
+    "DAILY",
+    "TIMES_PER_DAY",
+    "N_TIMES_PER_WEEK",
+    "DAYS_OF_WEEK",
+    "MONTHLY",
+    "EVERY_N_DAYS",
+)
+
+/**
  * app-localization: why an import was refused, as a value rather than as a sentence.
  *
  * This class and its exceptions are deliberately Android-free — no injected `Context`, testable
@@ -37,6 +54,12 @@ sealed interface ImportFailure {
 
     /** Structurally parseable, but an entry points at a slot absent from its own habit's slots. */
     data class UnknownSlotReference(val habitId: Long, val slotId: Long) : ImportFailure
+
+    /** weekday-only-schedule design.md decision 2: [kind] is not one of the six current
+     *  `ScheduleEntity.kind` values — a legacy `WEEKLY` file, most commonly. Rejected here, before
+     *  any database write, rather than tolerated: an unvalidated `kind` reaches `ScheduleEntity.kind`
+     *  unchanged and only crashes later, on the next read through `ScheduleEntity.toDomain()`. */
+    data class UnsupportedScheduleKind(val habitId: Long, val kind: String) : ImportFailure
 }
 
 /** data-portability: Malformed file leaves data intact. Thrown by [BackupImporter.parseAndValidate]
@@ -106,6 +129,11 @@ class BackupImporter @Inject constructor(
     }
 
     private fun validateHabit(habit: BackupHabit) {
+        if (habit.schedule.kind !in VALID_SCHEDULE_KINDS) {
+            throw MalformedBackupException(
+                ImportFailure.UnsupportedScheduleKind(habitId = habit.id, kind = habit.schedule.kind),
+            )
+        }
         val slotIds = habit.slots.map { it.id }.toSet()
         habit.entries.forEach { entry ->
             val slotId = entry.slotId

@@ -56,11 +56,10 @@
     <string name="schedule_kind_daily">Daily</string>
     <string name="schedule_kind_times_per_day">Multiple times a day</string>
     <string name="schedule_kind_n_times_per_week">Times per week</string>
-    <string name="schedule_kind_weekly">Weekly</string>
+    <string name="schedule_kind_days_of_week">Specific days of the week</string>
     <string name="schedule_kind_monthly">Monthly</string>
     <string name="schedule_kind_every_n_days">Every N days</string>
     <string name="habit_editor_times_per_week_label">Times per week</string>
-    <string name="habit_editor_day_of_week_label">Day of week</string>
     <string name="habit_editor_day_of_month_label">Day of month</string>
     <string name="habit_editor_every_n_days_label">Repeat every (days)</string>
     <string name="habit_editor_anchor_date_label">Start date (YYYY-MM-DD)</string>
@@ -177,6 +176,7 @@
     <string name="portability_import_error_malformed_file">This file is not a valid Constanza backup.</string>
     <string name="portability_import_error_unsupported_version">This backup was created with a newer version of Constanza (format %1$d) and can\'t be imported here.</string>
     <string name="portability_import_error_unknown_slot_reference">This backup refers to a reminder time that no longer exists (habit %1$d, slot %2$d).</string>
+    <string name="portability_import_error_unsupported_schedule_kind">This backup contains an unsupported schedule type for habit %1$d: %2$s.</string>
 
     <string name="action_back">Back</string>
     <string name="action_ok">OK</string>

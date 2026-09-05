@@ -164,14 +164,87 @@ class HabitEditorViewModelTest {
     // --- Task 6a.1, slice ii-a: schedule-kind picker and per-kind parameter editors ---
 
     @Test
-    fun `switching to WEEKLY seeds Monday and switching to N_TIMES_PER_WEEK seeds a default quota`() = runTest {
+    fun `switching to DAYS_OF_WEEK seeds Monday-Friday and switching to N_TIMES_PER_WEEK seeds a default quota`() =
+        runTest {
+            val viewModel = newViewModel()
+
+            viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.DAYS_OF_WEEK))
+            assertEquals(
+                setOf(
+                    DayOfWeek.MONDAY,
+                    DayOfWeek.TUESDAY,
+                    DayOfWeek.WEDNESDAY,
+                    DayOfWeek.THURSDAY,
+                    DayOfWeek.FRIDAY,
+                ),
+                (viewModel.uiState.value.schedule as Schedule.DaysOfWeek).days,
+            )
+
+            viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.N_TIMES_PER_WEEK))
+            assertEquals(3, (viewModel.uiState.value.schedule as Schedule.NTimesPerWeek).times)
+        }
+
+    // --- habit-scheduling: Day-Set Due Behavior for DAYS_OF_WEEK — toggle reducer ---
+    //
+    // Every assertion below checks the resulting DaysOfWeek.days set CONTENTS, never merely that
+    // nothing threw: the `as? … ?: return state` idiom `applyDayOfWeekToggle` shares with every
+    // other apply* function makes a wrong-kind dispatch a silent no-op, which a test that only
+    // checks for absence of an exception would not catch (design.md's own named residual risk).
+
+    @Test
+    fun `toggling an unselected day adds it to the set without disturbing the others`() = runTest {
         val viewModel = newViewModel()
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.DAYS_OF_WEEK))
 
-        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.WEEKLY))
-        assertEquals(Schedule.DaysOfWeek(setOf(DayOfWeek.MONDAY)), viewModel.uiState.value.schedule)
+        viewModel.onScheduleParamChange(ScheduleParamAction.ToggleDayOfWeek(DayOfWeek.SATURDAY))
 
-        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.N_TIMES_PER_WEEK))
-        assertEquals(3, (viewModel.uiState.value.schedule as Schedule.NTimesPerWeek).times)
+        assertEquals(
+            setOf(
+                DayOfWeek.MONDAY,
+                DayOfWeek.TUESDAY,
+                DayOfWeek.WEDNESDAY,
+                DayOfWeek.THURSDAY,
+                DayOfWeek.FRIDAY,
+                DayOfWeek.SATURDAY,
+            ),
+            (viewModel.uiState.value.schedule as Schedule.DaysOfWeek).days,
+        )
+    }
+
+    @Test
+    fun `toggling a selected day removes only that day when others remain selected`() = runTest {
+        val viewModel = newViewModel()
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.DAYS_OF_WEEK))
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.ToggleDayOfWeek(DayOfWeek.WEDNESDAY))
+
+        assertEquals(
+            setOf(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+            (viewModel.uiState.value.schedule as Schedule.DaysOfWeek).days,
+        )
+    }
+
+    @Test
+    fun `toggling the last remaining day is refused and the set stays exactly as it was`() = runTest {
+        val viewModel = newViewModel()
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.DAYS_OF_WEEK))
+        listOf(DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY).forEach {
+            viewModel.onScheduleParamChange(ScheduleParamAction.ToggleDayOfWeek(it))
+        }
+        assertEquals(setOf(DayOfWeek.MONDAY), (viewModel.uiState.value.schedule as Schedule.DaysOfWeek).days)
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.ToggleDayOfWeek(DayOfWeek.MONDAY))
+
+        assertEquals(setOf(DayOfWeek.MONDAY), (viewModel.uiState.value.schedule as Schedule.DaysOfWeek).days)
+    }
+
+    @Test
+    fun `a day toggle for a non-matching schedule kind leaves the current schedule untouched`() = runTest {
+        val viewModel = newViewModel() // starts as DAILY, not DaysOfWeek
+
+        viewModel.onScheduleParamChange(ScheduleParamAction.ToggleDayOfWeek(DayOfWeek.SATURDAY))
+
+        assertEquals(Schedule.Daily(DayOfWeek.MONDAY), viewModel.uiState.value.schedule)
     }
 
     @Test
@@ -357,7 +430,7 @@ class HabitEditorViewModelTest {
         val viewModel = newViewModel()
         viewModel.onSlotAction(SlotAction.Add)
 
-        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.WEEKLY))
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.DAYS_OF_WEEK))
 
         assertEquals(1, viewModel.uiState.value.slots.size)
     }
@@ -455,7 +528,7 @@ class HabitEditorViewModelTest {
     fun `switching the schedule kind makes the form dirty and switching back makes it clean again`() = runTest {
         val viewModel = newViewModel() // starts as DAILY
 
-        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.WEEKLY))
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.DAYS_OF_WEEK))
         assertTrue(viewModel.uiState.value.isDirty)
 
         viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.DAILY))
@@ -571,16 +644,20 @@ class HabitEditorViewModelTest {
     }
 
     @Test
-    fun `a loaded habit's own schedule is the baseline, so re-picking its kind is not an edit`() = runTest {
+    fun `a loaded habit's own schedule is the baseline, so rebuilding its exact day set is not an edit`() = runTest {
         stubExistingHabit()
         val viewModel = newViewModel()
-        viewModel.startEdit(EXISTING_HABIT_ID) // loaded as WEEKLY(TUESDAY)
+        viewModel.startEdit(EXISTING_HABIT_ID) // loaded as DAYS_OF_WEEK(TUESDAY)
 
         viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.DAILY))
         assertTrue(viewModel.uiState.value.isDirty)
 
-        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.WEEKLY))
-        viewModel.onScheduleParamChange(ScheduleParamAction.DayOfWeek(DayOfWeek.TUESDAY))
+        // Switching back in seeds the Mon-Fri default (design.md decision 4); toggling off every
+        // day but Tuesday rebuilds the loaded habit's exact original set, one chip tap at a time.
+        viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.DAYS_OF_WEEK))
+        listOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY).forEach {
+            viewModel.onScheduleParamChange(ScheduleParamAction.ToggleDayOfWeek(it))
+        }
         assertFalse(viewModel.uiState.value.isDirty)
     }
 
