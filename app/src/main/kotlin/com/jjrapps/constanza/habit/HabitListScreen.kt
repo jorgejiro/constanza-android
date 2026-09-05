@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jjrapps.constanza.R
@@ -227,11 +228,23 @@ private fun ShowArchivedRow(showArchived: Boolean, onToggleShowArchived: () -> U
 }
 
 /**
- * Design.md D2: Progress and Archive stay the row's inline [TextButton]s exactly as before; Delete
- * is the only action moved behind the trailing [IconButton]'s [DropdownMenu]. That split keeps an
- * irreversible action from sharing the reversible ones' one-tap visual weight, and it leaves the
- * "Archive"/"Un-archive" text nodes `CoreFlowE2ETest` and `HabitListArchiveComposeTest` already
- * locate by text untouched.
+ * Design.md D5 — this supersedes decision 2 of `archive/2026-09-03-habit-deletion/design.md`,
+ * which put Progress and Archive/Un-archive inline as always-visible [TextButton]s and moved only
+ * Delete behind the trailing [IconButton]'s [DropdownMenu]. That shape ran out of room once
+ * `question` stopped being displayed and the name column widened to use the freed space (habit
+ * name column measured at 509 px before, 723 px after, both at the row's unchanged 168 px height):
+ * three trailing controls plus a two-line name no longer fit one row. `trailingContent` is now the
+ * bare launcher; Progress, Archive/Un-archive and Delete are all [DropdownMenuItem]s, in that
+ * order — matching the `habit-management` spec scenario's order and leaving the irreversible item
+ * farthest from where the finger lands. Every item sets `menuExpanded = false` before invoking its
+ * action, mirroring Delete's [onRequestDelete] callback. The accepted residual risk is that Archive
+ * and Delete are now adjacent menu rows; that is bounded by [DeleteHabitDialog]'s confirmation and
+ * by Archive being reversible.
+ *
+ * `supportingContent` (the `question` line) is deleted outright, not merely emptied — Phase 3 of
+ * `remove-habit-question-field` removes the field itself, and this row is one of its call sites.
+ * `headlineContent` gains `maxLines = 2, overflow = TextOverflow.Ellipsis`: a name that needs a
+ * third line is capped and ellipsized rather than growing the row indefinitely.
  */
 @Composable
 private fun HabitRow(
@@ -244,36 +257,47 @@ private fun HabitRow(
     var menuExpanded by remember { mutableStateOf(false) }
     ListItem(
         leadingContent = { HabitColorDot(habit.colorArgb) },
-        headlineContent = { Text(habit.name) },
-        supportingContent = habit.question?.let { question -> { Text(question) } },
+        headlineContent = { Text(habit.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         trailingContent = {
-            Row {
-                TextButton(onClick = { onShowProgress(habit.id) }) {
-                    Text(stringResource(R.string.habit_list_progress))
-                }
-                TextButton(onClick = { onArchiveToggle(habit.id, !habit.archived) }) {
-                    Text(
-                        stringResource(
-                            if (habit.archived) R.string.habit_list_unarchive else R.string.habit_list_archive,
-                        ),
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(
+                        Icons.Filled.MoreVert,
+                        contentDescription = stringResource(R.string.habit_list_more_options),
                     )
                 }
-                Box {
-                    IconButton(onClick = { menuExpanded = true }) {
-                        Icon(
-                            Icons.Filled.MoreVert,
-                            contentDescription = stringResource(R.string.habit_list_more_options),
-                        )
-                    }
-                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.habit_list_delete)) },
-                            onClick = {
-                                menuExpanded = false
-                                onRequestDelete(habit.id)
-                            },
-                        )
-                    }
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.habit_list_progress)) },
+                        onClick = {
+                            menuExpanded = false
+                            onShowProgress(habit.id)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(
+                                    if (habit.archived) {
+                                        R.string.habit_list_unarchive
+                                    } else {
+                                        R.string.habit_list_archive
+                                    },
+                                ),
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onArchiveToggle(habit.id, !habit.archived)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.habit_list_delete)) },
+                        onClick = {
+                            menuExpanded = false
+                            onRequestDelete(habit.id)
+                        },
+                    )
                 }
             }
         },

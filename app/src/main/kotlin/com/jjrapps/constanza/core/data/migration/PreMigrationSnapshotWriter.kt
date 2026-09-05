@@ -11,8 +11,6 @@ import java.nio.file.StandardCopyOption
 
 private const val TAG = "PreMigrationSnapshot"
 private const val SNAPSHOT_SUBDIR = "pre-migration"
-private const val SNAPSHOT_FILE_NAME = "pre-migration-v1.sql"
-private const val SNAPSHOT_TEMP_FILE_NAME = "pre-migration-v1.sql.tmp"
 
 /** SQLite's own bookkeeping tables and Room's identity-hash table — replaying a stale
  *  `room_master_table` row would be actively harmful, not merely useless (design.md decision 4). */
@@ -41,10 +39,16 @@ private val SKIPPED_EXACT_TABLE_NAMES = setOf("android_metadata", "room_master_t
  * 3. **Streamed row by row** through a single [BufferedWriter] — nothing accumulates in memory, so
  *    a large database degrades in time, never in `OutOfMemoryError`. Every [Cursor] opened here is
  *    closed via [use].
- * 4. **Fixed filename, no clock.** No `System.currentTimeMillis()` — banned by `detekt.yml`'s
- *    `ForbiddenMethodCall` plus this project's `TimeProvider` convention — and unnecessary here: a
- *    migration runs at most once per install, so injecting a `TimeProvider` to name a file written
- *    exactly once would be ceremony, not correctness.
+ * 4. **Version-derived filename, no clock.** No `System.currentTimeMillis()` — banned by
+ *    `detekt.yml`'s `ForbiddenMethodCall` plus this project's `TimeProvider` convention — and
+ *    unnecessary here: a migration runs at most once per install, so injecting a `TimeProvider` to
+ *    name a file written exactly once would be ceremony, not correctness. The name itself is
+ *    `pre-migration-v${db.version}.sql` (design.md decision 3), not a hardcoded `v1` constant: on a
+ *    1→3 upgrade Room runs `migration1To2` then `migration2To3` against the SAME [db] handed to
+ *    `migrate()` in each step, and [SupportSQLiteDatabase.getVersion] keeps reporting the
+ *    PRE-migration version throughout that call — Room does not bump it until after `migrate()`
+ *    returns — so the 1→2 step still writes `pre-migration-v1.sql` byte-identically and the 2→3
+ *    step writes `pre-migration-v2.sql` instead of silently overwriting it under the same name.
  * 5. **Its result never surfaces as a migration failure.** [write] returns `false` instead of
  *    throwing; [AppMigrations.migration1To2] discards that result and adds no logging of its own.
  *    Success is silent — no log call at all. Failure logs once, at WARN, via [Log.w]. Neither path
@@ -61,11 +65,16 @@ internal class PreMigrationSnapshotWriter(private val targetDir: File) {
     /** Never throws for any recoverable cause. Returns `false` when no snapshot was written. */
     fun write(db: SupportSQLiteDatabase): Boolean {
         val snapshotDir = File(targetDir, SNAPSHOT_SUBDIR)
-        val tempFile = File(snapshotDir, SNAPSHOT_TEMP_FILE_NAME)
+        // Declared outside the try, but only ever ASSIGNED inside it: reading [db.version] itself
+        // is exactly the kind of recoverable database access point 1 below promises never escapes
+        // this method, so it must fail through the same catch as everything else, not before it.
+        var tempFile: File? = null
         return try {
+            val snapshotFileName = "pre-migration-v${db.version}.sql"
+            tempFile = File(snapshotDir, "$snapshotFileName.tmp")
             snapshotDir.mkdirs()
             BufferedWriter(FileWriter(tempFile)).use { writer -> dumpTables(db, writer) }
-            val finalFile = File(snapshotDir, SNAPSHOT_FILE_NAME)
+            val finalFile = File(snapshotDir, snapshotFileName)
             Files.move(
                 tempFile.toPath(),
                 finalFile.toPath(),
@@ -83,7 +92,7 @@ internal class PreMigrationSnapshotWriter(private val targetDir: File) {
             // caught here (SQLiteException, IOException, a stray RuntimeException) is anticipated,
             // recoverable, and deliberately NOT `Throwable` — see the class KDoc.
             Log.w(TAG, "pre-migration snapshot skipped", expectedFailure)
-            tempFile.delete()
+            tempFile?.delete()
             false
         }
     }

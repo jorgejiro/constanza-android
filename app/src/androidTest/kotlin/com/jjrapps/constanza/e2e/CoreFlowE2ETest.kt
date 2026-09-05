@@ -339,6 +339,9 @@ class CoreFlowE2ETest {
         )
 
         // Only one active habit exists — setUp() cleared the rest — so this label is unambiguous.
+        // habit-management: Habit List Row Actions And Name Display (design.md D5) moved Archive
+        // off the row's always-visible trailing controls into the overflow menu.
+        compose.onNodeWithContentDescription(string(R.string.habit_list_more_options)).performClick()
         compose.onNodeWithText(string(R.string.habit_list_archive)).performClick()
         awaitTextGone(ARCHIVED_HABIT)
 
