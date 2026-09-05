@@ -134,6 +134,26 @@ class ImportResultMessageComposeTest {
         )
     }
 
+    /** weekday-only-schedule: the same two-interchangeable-placeholders reasoning as
+     *  [unknownSlotReferenceSelectsItsResourceWithHabitIdBeforeSlotId] — `%1$d` is the habit id,
+     *  `%2$s` is the raw offending kind string, and swapping their positions must change the sentence. */
+    @Test
+    fun unsupportedScheduleKindSelectsItsResourceWithHabitIdBeforeKind() {
+        render(
+            ImportResult.Failed(
+                ImportFailure.UnsupportedScheduleKind(habitId = HABIT_ID, kind = LEGACY_KIND),
+            ),
+        )
+
+        assertMessageIs(
+            context.getString(
+                R.string.portability_import_error_unsupported_schedule_kind,
+                HABIT_ID,
+                LEGACY_KIND,
+            ),
+        )
+    }
+
     @Test
     fun successSelectsTheSuccessResource() {
         render(ImportResult.Success)
@@ -163,5 +183,6 @@ class ImportResultMessageComposeTest {
         const val FILE_VERSION = 99
         const val HABIT_ID = 71L
         const val SLOT_ID = 93L
+        const val LEGACY_KIND = "WEEKLY"
     }
 }

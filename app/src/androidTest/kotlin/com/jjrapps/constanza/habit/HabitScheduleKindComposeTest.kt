@@ -102,10 +102,10 @@ class HabitScheduleKindComposeTest {
     }
 
     @Test
-    fun weeklyKindIsPersisted() {
-        createHabit("Laundry", R.string.schedule_kind_weekly)
+    fun daysOfWeekKindIsPersisted() {
+        createHabit("Laundry", R.string.schedule_kind_days_of_week)
 
-        assertEquals(ScheduleKind.WEEKLY, persistedScheduleFor("Laundry")?.kind)
+        assertEquals(ScheduleKind.DAYS_OF_WEEK, persistedScheduleFor("Laundry")?.kind)
     }
 
     @Test

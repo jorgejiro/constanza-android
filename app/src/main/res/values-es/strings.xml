@@ -54,11 +54,10 @@
     <string name="schedule_kind_daily">Diaria</string>
     <string name="schedule_kind_times_per_day">Varias veces al día</string>
     <string name="schedule_kind_n_times_per_week">Veces por semana</string>
-    <string name="schedule_kind_weekly">Semanal</string>
+    <string name="schedule_kind_days_of_week">Días concretos de la semana</string>
     <string name="schedule_kind_monthly">Mensual</string>
     <string name="schedule_kind_every_n_days">Cada N días</string>
     <string name="habit_editor_times_per_week_label">Veces por semana</string>
-    <string name="habit_editor_day_of_week_label">Día de la semana</string>
     <string name="habit_editor_day_of_month_label">Día del mes</string>
     <string name="habit_editor_every_n_days_label">Repetir cada (días)</string>
     <string name="habit_editor_anchor_date_label">Fecha de inicio (AAAA-MM-DD)</string>
@@ -164,6 +163,7 @@
     <string name="portability_import_error_malformed_file">Este archivo no es una copia de seguridad válida de Constanza.</string>
     <string name="portability_import_error_unsupported_version">Esta copia de seguridad se creó con una versión más reciente de Constanza (formato %1$d) y no se puede importar aquí.</string>
     <string name="portability_import_error_unknown_slot_reference">Esta copia de seguridad hace referencia a una hora de recordatorio que ya no existe (hábito %1$d, franja %2$d).</string>
+    <string name="portability_import_error_unsupported_schedule_kind">Esta copia de seguridad contiene un tipo de programación no compatible para el hábito %1$d: %2$s.</string>
 
     <string name="action_back">Atrás</string>
     <string name="action_ok">Aceptar</string>

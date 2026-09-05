@@ -30,6 +30,17 @@ private const val DEFAULT_EVERY_N_DAYS = 2
 private const val DEFAULT_MINUTE_OF_DAY = 480 // 08:00
 private const val MINUTES_PER_DAY = 24 * 60
 
+/** weekday-only-schedule design.md decision 4: literal Monday-through-Friday, deliberately NOT
+ *  derived from [Schedule.weekStart] or any locale setting — a `WEEKDAYS` concept belongs here, in
+ *  the editor's own default, not in `:domain`, which must never learn a workweek notion exists. */
+private val DEFAULT_DAYS_OF_WEEK = setOf(
+    DayOfWeek.MONDAY,
+    DayOfWeek.TUESDAY,
+    DayOfWeek.WEDNESDAY,
+    DayOfWeek.THURSDAY,
+    DayOfWeek.FRIDAY,
+)
+
 /**
  * Task 6a.1/6a.2/6a.3 (habit-management: Habit Creation, Habit Editing; habit-scheduling: Six
  * Frequency Kinds, Reminder Slots for TIMES_PER_DAY). Slice i fixed every new habit's [Schedule]
@@ -122,7 +133,7 @@ class HabitEditorViewModel @Inject constructor(
 
     fun onNotesChange(value: String) = updateState { it.copy(notes = value) }
 
-    /** habit-scheduling: Six Frequency Kinds/N_TIMES_PER_WEEK/WEEKLY/MONTHLY/EVERY_N_DAYS —
+    /** habit-scheduling: Six Frequency Kinds/N_TIMES_PER_WEEK/DAYS_OF_WEEK/MONTHLY/EVERY_N_DAYS —
      *  dispatches on [ScheduleParamAction]'s variant. An action whose variant does not match the
      *  current [Schedule] subtype (a stale UI event after a kind switch mid-flight) is a no-op. */
     fun onScheduleParamChange(action: ScheduleParamAction) {
@@ -130,7 +141,7 @@ class HabitEditorViewModel @Inject constructor(
             when (action) {
                 is ScheduleParamAction.Kind -> applyKindChange(state, action.kind, timeProvider.today())
                 is ScheduleParamAction.TimesPerWeek -> applyTimesPerWeek(state, action.times)
-                is ScheduleParamAction.DayOfWeek -> applyDayOfWeek(state, action.dayOfWeek)
+                is ScheduleParamAction.ToggleDayOfWeek -> applyDayOfWeekToggle(state, action.dayOfWeek)
                 is ScheduleParamAction.DayOfMonth -> applyDayOfMonth(state, action.dayOfMonth)
                 is ScheduleParamAction.EveryNDays -> applyEveryNDays(state, action.n)
                 is ScheduleParamAction.AnchorDate -> applyAnchorDate(state, action.text)
@@ -218,9 +229,9 @@ private fun defaultScheduleFor(kind: ScheduleKind, weekStart: DayOfWeek, today: 
     ScheduleKind.DAILY -> Schedule.Daily(weekStart)
     ScheduleKind.TIMES_PER_DAY -> Schedule.TimesPerDay(weekStart)
     ScheduleKind.N_TIMES_PER_WEEK -> Schedule.NTimesPerWeek(DEFAULT_TIMES_PER_WEEK, weekStart)
-    // weekday-only-schedule WU1: mechanical repoint onto the new type only. ScheduleKind.WEEKLY,
-    // its label, and single-day behavior are unchanged here — WU2 turns this into real multi-select.
-    ScheduleKind.WEEKLY -> Schedule.DaysOfWeek(setOf(DayOfWeek.MONDAY), weekStart)
+    // weekday-only-schedule: defaults to Monday-Friday so the common weekday habit costs zero
+    // extra taps — there is deliberately no separate "weekdays" preset control (design.md decision 4).
+    ScheduleKind.DAYS_OF_WEEK -> Schedule.DaysOfWeek(DEFAULT_DAYS_OF_WEEK, weekStart)
     ScheduleKind.MONTHLY -> Schedule.Monthly(MIN_DAY_OF_MONTH, weekStart)
     ScheduleKind.EVERY_N_DAYS -> Schedule.EveryNDays(DEFAULT_EVERY_N_DAYS, today, weekStart)
 }
@@ -229,7 +240,7 @@ private fun defaultScheduleFor(kind: ScheduleKind, weekStart: DayOfWeek, today: 
  *  each of these six carries its own branch's cyclomatic cost instead of piling it all into one
  *  function (top-level, not a class member, so it does not count toward `TooManyFunctions` either).
  *  Task 6a.8: the single reminder time carries over across a switch between two non-`TIMES_PER_DAY`
- *  kinds (e.g. DAILY to WEEKLY) — it is the same concept in both. It is cleared entering or leaving
+ *  kinds (e.g. DAILY to DAYS_OF_WEEK) — it is the same concept in both. It is cleared entering or leaving
  *  `TIMES_PER_DAY`, whose multi-slot editor has different semantics the single time cannot represent. */
 private fun applyKindChange(state: HabitEditorUiState, kind: ScheduleKind, today: LocalDate): HabitEditorUiState {
     val newSchedule = defaultScheduleFor(kind, state.schedule.weekStart, today)
@@ -248,12 +259,17 @@ private fun applyTimesPerWeek(state: HabitEditorUiState, times: Int): HabitEdito
     return state.copy(schedule = schedule.copy(times = times.coerceAtLeast(MIN_POSITIVE)))
 }
 
-/** weekday-only-schedule WU1: mechanical repoint onto [Schedule.DaysOfWeek] as a single-day set —
- *  still exactly one day in and out, matching the prior [Schedule.Weekly] behavior. WU2 replaces
- *  this with a real multi-select toggle reducer. */
-private fun applyDayOfWeek(state: HabitEditorUiState, dayOfWeek: DayOfWeek): HabitEditorUiState {
+/** habit-scheduling: Day-Set Due Behavior for DAYS_OF_WEEK — toggles [dayOfWeek]'s membership in
+ *  the current set. **Refuses to remove the last remaining day**: when [dayOfWeek] is the sole
+ *  selected day, this is a plain no-op, so the empty set stays unrepresentable in the reducer as
+ *  well as in [Schedule.DaysOfWeek]'s own `require` (design.md decision 4 — reducer-owned refusal,
+ *  not a disabled chip or an error message). A stale toggle for a schedule that is not currently
+ *  `DaysOfWeek` (a switch mid-flight) is the same no-op every other `apply*` function here uses. */
+private fun applyDayOfWeekToggle(state: HabitEditorUiState, dayOfWeek: DayOfWeek): HabitEditorUiState {
     val schedule = state.schedule as? Schedule.DaysOfWeek ?: return state
-    return state.copy(schedule = schedule.copy(days = setOf(dayOfWeek)))
+    if (schedule.days == setOf(dayOfWeek)) return state
+    val nextDays = if (dayOfWeek in schedule.days) schedule.days - dayOfWeek else schedule.days + dayOfWeek
+    return state.copy(schedule = schedule.copy(days = nextDays))
 }
 
 private fun applyDayOfMonth(state: HabitEditorUiState, dayOfMonth: Int): HabitEditorUiState {
@@ -284,7 +300,7 @@ enum class ScheduleKind {
     DAILY,
     TIMES_PER_DAY,
     N_TIMES_PER_WEEK,
-    WEEKLY,
+    DAYS_OF_WEEK,
     MONTHLY,
     EVERY_N_DAYS,
 }
@@ -294,7 +310,7 @@ val Schedule.kind: ScheduleKind
         is Schedule.Daily -> ScheduleKind.DAILY
         is Schedule.TimesPerDay -> ScheduleKind.TIMES_PER_DAY
         is Schedule.NTimesPerWeek -> ScheduleKind.N_TIMES_PER_WEEK
-        is Schedule.DaysOfWeek -> ScheduleKind.WEEKLY
+        is Schedule.DaysOfWeek -> ScheduleKind.DAYS_OF_WEEK
         is Schedule.Monthly -> ScheduleKind.MONTHLY
         is Schedule.EveryNDays -> ScheduleKind.EVERY_N_DAYS
     }
@@ -304,7 +320,10 @@ val Schedule.kind: ScheduleKind
 sealed interface ScheduleParamAction {
     data class Kind(val kind: ScheduleKind) : ScheduleParamAction
     data class TimesPerWeek(val times: Int) : ScheduleParamAction
-    data class DayOfWeek(val dayOfWeek: java.time.DayOfWeek) : ScheduleParamAction
+
+    /** habit-scheduling: Day-Set Due Behavior for DAYS_OF_WEEK — one chip tap toggles [dayOfWeek]'s
+     *  membership in the current set; see [applyDayOfWeekToggle]. */
+    data class ToggleDayOfWeek(val dayOfWeek: java.time.DayOfWeek) : ScheduleParamAction
     data class DayOfMonth(val dayOfMonth: Int) : ScheduleParamAction
     data class EveryNDays(val n: Int) : ScheduleParamAction
     data class AnchorDate(val text: String) : ScheduleParamAction

@@ -6,7 +6,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jjrapps.constanza.core.data.entity.EntryEntity
 import com.jjrapps.constanza.core.data.entity.ReminderSlotEntity
 import com.jjrapps.constanza.core.data.entity.ScheduleEntity
+import com.jjrapps.constanza.core.data.mapper.toDomain
+import com.jjrapps.constanza.core.data.mapper.toMask
+import com.jjrapps.constanza.domain.model.Schedule
 import com.jjrapps.constanza.reminding.SnoozeDuration
+import java.time.DayOfWeek
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -147,9 +151,36 @@ class BackupRoundTripTest {
 
         assertEquals(before, fixture.database.habitDao().findAllSnapshot())
     }
+
+    /** weekday-only-schedule (habit-scheduling: Day-Set Due Behavior for DAYS_OF_WEEK). Proves the
+     *  day set survives the full export -> JSON -> import round trip as [BackupSchedule.daysOfWeek]
+     *  day NAMES, not as the raw bitmask — the backup file format design.md decision 2 chose,
+     *  Mirroring `Mappers.kt`'s own encoding/decoding via [toMask]/`ScheduleEntity.toDomain`. */
+    @Test
+    fun multiDayHabitRoundTripsThroughDayNamesNotTheRawMask() = runBlocking {
+        val habitId = fixture.database.habitDao().insert(habitEntity(name = "Laundry"))
+        val monWedFriMask = setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY).toMask()
+        fixture.database.scheduleDao().upsert(
+            scheduleEntity(habitId, kind = "DAYS_OF_WEEK", daysOfWeekMask = monWedFriMask),
+        )
+
+        val json = fixture.exporter.serialize(fixture.exporter.buildBackup())
+        fixture.database.habitDao().deleteAll()
+
+        fixture.importer.replaceAll(fixture.importer.parseAndValidate(json))
+
+        val restored = fixture.database.habitDao().findAllSnapshot().single { it.name == "Laundry" }
+        val restoredSchedule = requireNotNull(fixture.database.scheduleDao().findByHabitId(restored.id))
+        assertEquals("DAYS_OF_WEEK", restoredSchedule.kind)
+        assertEquals(monWedFriMask, restoredSchedule.daysOfWeekMask)
+        assertEquals(
+            setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY),
+            (restoredSchedule.toDomain() as Schedule.DaysOfWeek).days,
+        )
+    }
 }
 
-private fun scheduleEntity(habitId: Long, kind: String) = ScheduleEntity(
+private fun scheduleEntity(habitId: Long, kind: String, daysOfWeekMask: Int? = null) = ScheduleEntity(
     habitId = habitId,
     kind = kind,
     timesPerWeek = null,
@@ -158,4 +189,5 @@ private fun scheduleEntity(habitId: Long, kind: String) = ScheduleEntity(
     intervalDays = null,
     anchorDate = null,
     weekStart = 1,
+    daysOfWeekMask = daysOfWeekMask,
 )

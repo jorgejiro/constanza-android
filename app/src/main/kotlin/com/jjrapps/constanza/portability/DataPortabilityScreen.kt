@@ -108,6 +108,13 @@ internal fun importFailureMessage(failure: ImportFailure): String = when (failur
             failure.habitId,
             failure.slotId,
         )
+
+    is ImportFailure.UnsupportedScheduleKind ->
+        stringResource(
+            R.string.portability_import_error_unsupported_schedule_kind,
+            failure.habitId,
+            failure.kind,
+        )
 }
 
 /** data-portability: Import MUST be preceded by an explicit confirmation stating the action is

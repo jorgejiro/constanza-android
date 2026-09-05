@@ -50,19 +50,19 @@ Verify (both units): `JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/C
 Note: WU1's task 2.4 already repointed the mechanical call sites onto `Schedule.DaysOfWeek` as a
 single-day set (`ScheduleKind.WEEKLY` name and label unchanged). WU2 converts that single-day
 plumbing into the real multi-select feature.
-- [ ] 4.1 `HabitEditorViewModel.kt`: `:278-285` rename `ScheduleKind.WEEKLY`→`DAYS_OF_WEEK`; `:217` `defaultScheduleFor`→`DEFAULT_DAYS_OF_WEEK`(Mon–Fri); `:288` `Schedule.kind` branch; `applyDayOfWeek`(WU1's task 2.4 repoint) → `applyDayOfWeekToggle(state,day)` — no-op when `days==setOf(day)`.
-- [ ] 4.2 `HabitEditorViewModelTest.kt` (10 sites, already on `Schedule.DaysOfWeek` since WU1's 2.4): default Mon–Fri; toggle asserts set **contents**; last-chip removal unchanged — via 4.1. [R2/no-reminder;R3]
-- [ ] 4.3 `ScheduleEditors.kt:60` `when` branch (already on `Schedule.DaysOfWeek` since WU1's 2.4); `:144` `labelRes`→`schedule_kind_days_of_week`; `DayOfWeekPicker(selectedDays:Set<DayOfWeek>,onToggleDay)` — keep `LocalConfiguration.current.locales[0]` KDoc verbatim. `HabitScheduleKindComposeTest.kt:105-109` renamed `weeklyKindIsPersisted`→`daysOfWeekKindIsPersisted`.
+- [x] 4.1 `HabitEditorViewModel.kt`: `:278-285` rename `ScheduleKind.WEEKLY`→`DAYS_OF_WEEK`; `:217` `defaultScheduleFor`→`DEFAULT_DAYS_OF_WEEK`(Mon–Fri); `:288` `Schedule.kind` branch; `applyDayOfWeek`(WU1's task 2.4 repoint) → `applyDayOfWeekToggle(state,day)` — no-op when `days==setOf(day)`.
+- [x] 4.2 `HabitEditorViewModelTest.kt` (10 sites, already on `Schedule.DaysOfWeek` since WU1's 2.4): default Mon–Fri; toggle asserts set **contents**; last-chip removal unchanged — via 4.1. [R2/no-reminder;R3]
+- [x] 4.3 `ScheduleEditors.kt:60` `when` branch (already on `Schedule.DaysOfWeek` since WU1's 2.4); `:144` `labelRes`→`schedule_kind_days_of_week`; `DayOfWeekPicker(selectedDays:Set<DayOfWeek>,onToggleDay)` — keep `LocalConfiguration.current.locales[0]` KDoc verbatim. `HabitScheduleKindComposeTest.kt:105-109` renamed `weeklyKindIsPersisted`→`daysOfWeekKindIsPersisted`.
 
 ### Phase 5: Backup
-- [ ] 5.1 `BackupDto.kt:67` `-dayOfWeek:String?`→`+daysOfWeek:List<String>?`; `BackupMapper.kt:47-66` both directions; `BackupImporter.kt` adds `ImportFailure.UnsupportedScheduleKind(habitId,kind)`, `validateHabit` rejects `kind` outside six constants (no DB I/O); `DataPortabilityScreen.kt` maps to `portability_import_error_*`, both locales.
-- [ ] 5.2 `BackupImporterTest.kt`, `BackupImporterNormalizationTest.kt`: `kind='WEEKLY'` file rejected, writes nothing. `BackupRoundTripTest.kt:156`: multi-day habit round trips.
+- [x] 5.1 `BackupDto.kt:67` `-dayOfWeek:String?`→`+daysOfWeek:List<String>?`; `BackupMapper.kt:47-66` both directions; `BackupImporter.kt` adds `ImportFailure.UnsupportedScheduleKind(habitId,kind)`, `validateHabit` rejects `kind` outside six constants (no DB I/O); `DataPortabilityScreen.kt` maps to `portability_import_error_*`, both locales.
+- [x] 5.2 `BackupImporterTest.kt`, `BackupImporterNormalizationTest.kt`: `kind='WEEKLY'` file rejected, writes nothing. `BackupRoundTripTest.kt:156`: multi-day habit round trips.
 
 Exit if over budget: split the importer guard (≈60 lines) into stacked Work Unit 3.
 
 ### Phase 6: Strings + Verification
-- [ ] 6.1 Both `strings.xml`: add `schedule_kind_days_of_week`,`habit_editor_days_of_week_label`,`portability_import_error_*`; drop `schedule_kind_weekly`,`habit_editor_day_of_week_label` — `StringResourceParityTest` enforces parity.
-- [ ] 6.2 Run verify command + emulator matrix (API31+37) — proves add-habit, chip toggle, reminder flow via `CoreFlowE2ETest`. [R2;pre-existing]
+- [x] 6.1 Both `strings.xml`: add `schedule_kind_days_of_week`,`habit_editor_days_of_week_label`,`portability_import_error_*`; drop `schedule_kind_weekly`,`habit_editor_day_of_week_label` — `StringResourceParityTest` enforces parity.
+- [x] 6.2 Run verify command + emulator matrix (API31+37) — proves add-habit, chip toggle, reminder flow via `CoreFlowE2ETest`. [R2;pre-existing]
 
 ## Phase 7: Manual (device-free matrix cannot prove this)
 - [ ] 7.1 On a real One UI device, render the multi-select chip row; confirm layout/selection.
