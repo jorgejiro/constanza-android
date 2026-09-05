@@ -2030,15 +2030,30 @@ carried_forward_open_items:
         anyway. Before opening any slice's PR, run `:app:compileDebugKotlin` on
         that branch rather than trusting the plan's boundary.
       residual_manual_verification: >
-        NOT closed by this resolution: the multi-select chip row has never been
-        seen on real One UI hardware. Every layout measurement came from an
-        AOSP emulator, and per `testing.instrumented.device_free_matrix`
-        Samsung's metrics are not reproducible there. Task 7.1 of the change is
-        deliberately left unchecked in its archived tasks.md.
+        CLOSED. Confirmed on the maintainer's S25 on 2026-09-05 from a habit
+        editor screenshot at 22:14 (One UI, Spanish, release build 0.1.3).
+        Task 7.1 of the change was the last thing outstanding and is now
+        satisfied; the archived tasks.md keeps it unchecked as the record of
+        what was true at archive time.
 
-        Note the contrast with the sibling item above, whose notification half
-        WAS confirmed on device on the same day — that confirmation says
-        nothing about this chip row.
+        What the device showed, all three points the release notes asked to be
+        checked:
+
+        - The chip row fits. `lun mar mié jue vie` occupy the first line and
+          `sáb dom` wrap to the second, so the FlowRow's break lands exactly
+          between Friday and Saturday. That was not designed — it falls out of
+          the chip widths — but the visual grouping ends up matching the
+          semantic one: working days on one line, the weekend on the next.
+        - Selected and unselected chips are distinguishable at a glance:
+          Monday-Friday render with an amber border and fill, Saturday and
+          Sunday dimmed. This does NOT resolve the separate open item
+          `fab-and-selected-chip-fills-below-the-non-text-floor` — that is
+          about measured contrast ratios, and one look on one device is not a
+          measurement.
+        - The last remaining day refuses to deselect, as designed.
+
+        The Monday-Friday default arrived correctly, so the request that
+        started this item costs zero taps on real hardware, not just in theory.
 stack:
   status: ratified
   note: >
