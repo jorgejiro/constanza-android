@@ -34,12 +34,12 @@ seed) are both applied below; with both, Slice 3 lands under 400 lines. Prerequi
 
 Satisfies `reminder-response` → Notification Actions (3 scenarios).
 
-- [ ] 1.1 RED: rewrite `app/src/androidTest/kotlin/com/jjrapps/constanza/localization/SpanishColdProcessNotificationInstrumentedTest.kt:99,117-123` — assert `EXTRA_TITLE == "Seguimiento de hábitos"`, `EXTRA_TEXT`/`EXTRA_BIG_TEXT` == the Spanish habit name; keep the action/channel assertions.
-- [ ] 1.2 `app/src/main/res/values/strings.xml`, `values-es/strings.xml`: add `notification_reminder_title` (EN "Habit tracker", ES "Seguimiento de hábitos"); remove `notification_default_question`.
-- [ ] 1.3 `reminding/NotificationPoster.kt`: drop the `question` param from `postReminder`/`buildNotification`; `.setContentTitle(R.string.notification_reminder_title)`, `.setContentText(habitName)`, `.setStyle(BigTextStyle().bigText(habitName))`; update the KDoc.
-- [ ] 1.4 `scheduling/ReminderFireWorker.kt:52`: drop the `habit.question` argument.
-- [ ] 1.5 Fix `postReminder` arity at every call site: `NotificationPosterTest.kt:101`, `NotificationPosterInstrumentedTest.kt:90,119`, `NotificationActionWiringInstrumentedTest.kt:109`, `ReminderFireWorkerTest.kt:71,90`, `ReminderWorkerTestFixtures.kt:26,29`.
-- [ ] 1.6 GREEN: run 1.1 plus the full instrumented matrix (Unit 1).
+- [x] 1.1 RED: rewrite `app/src/androidTest/kotlin/com/jjrapps/constanza/localization/SpanishColdProcessNotificationInstrumentedTest.kt:99,117-123` — assert `EXTRA_TITLE == "Seguimiento de hábitos"`, `EXTRA_TEXT`/`EXTRA_BIG_TEXT` == the Spanish habit name; keep the action/channel assertions.
+- [x] 1.2 `app/src/main/res/values/strings.xml`, `values-es/strings.xml`: add `notification_reminder_title` (EN "Habit tracker", ES "Seguimiento de hábitos"); remove `notification_default_question`.
+- [x] 1.3 `reminding/NotificationPoster.kt`: drop the `question` param from `postReminder`/`buildNotification`; `.setContentTitle(R.string.notification_reminder_title)`, `.setContentText(habitName)`, `.setStyle(BigTextStyle().bigText(habitName))`; update the KDoc.
+- [x] 1.4 `scheduling/ReminderFireWorker.kt:52`: drop the `habit.question` argument.
+- [x] 1.5 Fix `postReminder` arity at every call site: `NotificationPosterTest.kt:101`, `NotificationPosterInstrumentedTest.kt:90,119`, `NotificationActionWiringInstrumentedTest.kt:109`, `ReminderFireWorkerTest.kt:71,90`, `ReminderWorkerTestFixtures.kt:26,29`. (`ReminderWorkerTestFixtures.kt:26,29` is `insertHabitWithSchedule`'s `question` param on `HabitEntity`, unrelated to `postReminder`'s arity and out of Phase 1 scope — left untouched; the field itself is removed in Phase 3.)
+- [x] 1.6 GREEN: run 1.1 plus the full instrumented matrix (Unit 1). Also required an unlisted fix: `e2e/CoreFlowE2ETest.kt:290-298` (`creatingAHabitThroughTheUiDeliversItsReminderAndRecordsTheAnswerTappedOnIt`) asserted `EXTRA_TITLE == REMINDED_HABIT`, which broke by the same construction as the headline test; repointed to assert `EXTRA_TITLE == notification_reminder_title` and added an `EXTRA_TEXT == REMINDED_HABIT` assertion. `:app:testDebugUnitTest` (221 tests), `:domain:test` (52 tests), `:app:detektMain`, and `:app:compileDebugAndroidTestKotlin` all green; `:app:emulatorMatrixGroupDebugAndroidTest` (api31 143 tests/3 skipped/0 failed, api37 143 tests/6 skipped/0 failed) green after the `CoreFlowE2ETest` fix — see apply-progress for the first, stale-build run that caught it.
 
 ## Phase 2: Habit Row + Editor + Snapshot Filename (PR 2)
 

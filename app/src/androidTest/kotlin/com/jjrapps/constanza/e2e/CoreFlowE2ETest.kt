@@ -287,9 +287,15 @@ class CoreFlowE2ETest {
 
         fixture.fireArmedAlarmFor(occurrence)
         val posted = fixture.awaitPostedNotification(occurrence.id.toInt())
+        // reminder-response (MODIFIED): the title is the fixed, localized string; the habit name
+        // now lives in the body, verbatim and never localized.
+        assertEquals(
+            string(R.string.notification_reminder_title),
+            posted.notification.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString(),
+        )
         assertEquals(
             REMINDED_HABIT,
-            posted.notification.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString(),
+            posted.notification.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
         )
 
         val yes = posted.notification.actions.first { it.title == string(R.string.notification_action_yes) }

@@ -87,7 +87,7 @@ class NotificationPosterInstrumentedTest {
         // mockable-jar unit test — so `true` is asserted on the same call whose visibility is awaited.
         assertTrue(
             "postReminder must report a real post when notifications are enabled",
-            poster.postReminder(OCCURRENCE_ID, "Meditate", "Did you meditate today?", HABIT_COLOR_ARGB),
+            poster.postReminder(OCCURRENCE_ID, "Meditate", HABIT_COLOR_ARGB),
         )
 
         val posted = awaitPosted(OCCURRENCE_ID)
@@ -116,7 +116,7 @@ class NotificationPosterInstrumentedTest {
         val expectedColor = HabitColor.TEAL.argb
         assertTrue(
             "postReminder must report a real post when notifications are enabled",
-            poster.postReminder(ACCENT_OCCURRENCE_ID, "Stretch", "Did you stretch today?", expectedColor),
+            poster.postReminder(ACCENT_OCCURRENCE_ID, "Stretch", expectedColor),
         )
 
         val posted = awaitPosted(ACCENT_OCCURRENCE_ID)

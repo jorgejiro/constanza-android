@@ -49,7 +49,7 @@ class ReminderFireHandler @Inject constructor(
             return
         }
 
-        val posted = notificationPoster.postReminder(occ.id, habit.name, habit.question, habit.colorArgb)
+        val posted = notificationPoster.postReminder(occ.id, habit.name, habit.colorArgb)
         // design.md §13.4 finding 1 (task G.3): `notifiedAtEpochMs` records that the user was
         // actually told, so a gated post leaves it null rather than claiming a delivery that never
         // happened. The state still becomes FIRED and NOT STATE_SUPPRESSED — that one is D8's quota

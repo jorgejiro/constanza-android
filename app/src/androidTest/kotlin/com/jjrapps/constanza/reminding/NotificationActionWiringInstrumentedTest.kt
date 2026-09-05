@@ -106,7 +106,7 @@ class NotificationActionWiringInstrumentedTest {
     }
 
     private fun postAndFindAction(occurrenceId: Long, labelRes: Int): Notification.Action {
-        runBlocking { poster.postReminder(occurrenceId, "Meditate", "Did you meditate today?", HABIT_COLOR_ARGB) }
+        runBlocking { poster.postReminder(occurrenceId, "Meditate", HABIT_COLOR_ARGB) }
         val posted = awaitPosted(occurrenceId)
         val label = context.getString(labelRes)
         return posted.notification.actions.first { it.title == label }

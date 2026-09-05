@@ -4,12 +4,14 @@
          (D9, StringResourceParityTest honours this attribute). -->
     <string name="app_name" translatable="false">Constanza</string>
 
-    <!-- reminder-response: Notification Actions (task 5.1). -->
+    <!-- reminder-response: Notification Actions (task 5.1). notification_reminder_title is the
+         fixed, localized title; the body carries the user's own habit name verbatim and is never
+         localized (design.md D4). -->
     <string name="notification_channel_reminders_name">Habit reminders</string>
+    <string name="notification_reminder_title">Habit tracker</string>
     <string name="notification_action_yes">Yes</string>
     <string name="notification_action_no">No</string>
     <string name="notification_action_snooze">Snooze</string>
-    <string name="notification_default_question">Did you do it?</string>
 
     <!-- habit-management: Habit list (task 6a.4). -->
     <string name="habit_list_title">Habits</string>

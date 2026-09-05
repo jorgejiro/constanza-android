@@ -55,14 +55,16 @@ class NotificationPoster @Inject constructor(
      *
      * app-localization (design.md D4): resolves one localized [Context] per post via
      * [AppLocaleController.localizedApplicationContext] and uses it for the channel name, the
-     * question, and all three action labels — the whole reason this function is now `suspend`.
+     * title, and all three action labels — the whole reason this function is now `suspend`.
      * `Every User-Visible String Renders In The Resolved Language`, including a notification fired
-     * by a cold process with no Activity ever created.
+     * by a cold process with no Activity ever created. The body is [habitName] itself, the user's
+     * own content, and is deliberately NOT resolved through [localizedContext] or any string
+     * resource (reminder-response: the notification body is never localized).
      */
-    suspend fun postReminder(occurrenceId: Long, habitName: String, question: String?, colorArgb: Int): Boolean {
+    suspend fun postReminder(occurrenceId: Long, habitName: String, colorArgb: Int): Boolean {
         val localizedContext = appLocaleController.localizedApplicationContext()
         if (!canPost(localizedContext)) return false
-        postToSystem(occurrenceId, buildNotification(localizedContext, occurrenceId, habitName, question, colorArgb))
+        postToSystem(occurrenceId, buildNotification(localizedContext, occurrenceId, habitName, colorArgb))
         return true
     }
 
@@ -133,14 +135,14 @@ class NotificationPoster @Inject constructor(
         ctx: Context,
         occurrenceId: Long,
         habitName: String,
-        question: String?,
         colorArgb: Int,
     ): Notification =
         NotificationCompat.Builder(ctx, REMINDER_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_reminder)
             .setColor(colorArgb)
-            .setContentTitle(habitName)
-            .setContentText(question ?: ctx.getString(R.string.notification_default_question))
+            .setContentTitle(ctx.getString(R.string.notification_reminder_title))
+            .setContentText(habitName)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(habitName))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(false)
             .addAction(action(ctx, occurrenceId, ActionIntentContract.ACTION_YES, R.string.notification_action_yes))
