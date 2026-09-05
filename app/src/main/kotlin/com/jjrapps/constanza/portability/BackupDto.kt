@@ -68,7 +68,10 @@ data class BackupSchedule(
     val kind: String,
     val weekStart: String,
     val timesPerWeek: Int? = null,
-    val dayOfWeek: String? = null,
+    /** weekday-only-schedule: day names, mirroring the single-value convention this field replaced
+     *  (`dayOfWeek: String?`) — one name per member of `Schedule.DaysOfWeek.days`, `null` for every
+     *  other kind. */
+    val daysOfWeek: List<String>? = null,
     val dayOfMonth: Int? = null,
     val intervalDays: Int? = null,
     val anchorDate: String? = null,

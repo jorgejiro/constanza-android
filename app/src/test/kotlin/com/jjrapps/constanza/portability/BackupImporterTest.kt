@@ -73,6 +73,33 @@ class BackupImporterTest {
         assertEquals(ImportFailure.MalformedFile, error.failure)
     }
 
+    // weekday-only-schedule design.md decision 2: a legacy kind='WEEKLY' file is the exact
+    // compiler-blind site — validateHabit is the only guard between it and a read crash at
+    // ScheduleEntity.toDomain()'s `else -> error(...)`. parseAndValidate does no database I/O
+    // (this test's own setUp — every dependency is an untouched mockk()), so "rejected" here already
+    // proves nothing was ever written.
+
+    @Test
+    fun `a legacy kind of WEEKLY is rejected as an unsupported schedule kind, before any write`() {
+        val json = validBackupJson().replace(""""kind": "TIMES_PER_DAY"""", """"kind": "WEEKLY"""")
+
+        val error = assertFailsWith<MalformedBackupException> { importer.parseAndValidate(json) }
+
+        assertEquals(ImportFailure.UnsupportedScheduleKind(habitId = 1L, kind = "WEEKLY"), error.failure)
+    }
+
+    @Test
+    fun `each of the six current schedule kinds is accepted`() {
+        listOf("DAILY", "TIMES_PER_DAY", "N_TIMES_PER_WEEK", "DAYS_OF_WEEK", "MONTHLY", "EVERY_N_DAYS")
+            .forEach { kind ->
+                val json = validBackupJson().replace(""""kind": "TIMES_PER_DAY"""", """"kind": "$kind"""")
+
+                val backup = importer.parseAndValidate(json)
+
+                assertEquals(kind, backup.habits.single().schedule.kind)
+            }
+    }
+
     @Test
     fun `an entry with a null slot id is valid regardless of the habit's own slots`() {
         val json = validBackupJson().replace(""""slotId": 10""", "\"slotId\": null")

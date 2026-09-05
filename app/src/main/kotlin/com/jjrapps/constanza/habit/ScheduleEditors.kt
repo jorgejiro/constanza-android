@@ -73,11 +73,9 @@ fun ScheduleSection(
                 modifier = Modifier.padding(top = 8.dp),
             )
 
-            // weekday-only-schedule WU1: mechanical repoint, single-day selection unchanged.
-            // WU2 replaces this branch with a real multi-select DayOfWeekPicker(selectedDays, ...).
             is Schedule.DaysOfWeek -> DayOfWeekPicker(
-                selected = schedule.days.first(),
-                onDayOfWeekChange = { onScheduleParamChange(ScheduleParamAction.DayOfWeek(it)) },
+                selectedDays = schedule.days,
+                onToggleDay = { onScheduleParamChange(ScheduleParamAction.ToggleDayOfWeek(it)) },
                 modifier = Modifier.padding(top = 8.dp),
             )
 
@@ -147,7 +145,7 @@ private val ScheduleKind.labelRes: Int
         ScheduleKind.DAILY -> R.string.schedule_kind_daily
         ScheduleKind.TIMES_PER_DAY -> R.string.schedule_kind_times_per_day
         ScheduleKind.N_TIMES_PER_WEEK -> R.string.schedule_kind_n_times_per_week
-        ScheduleKind.WEEKLY -> R.string.schedule_kind_weekly
+        ScheduleKind.DAYS_OF_WEEK -> R.string.schedule_kind_days_of_week
         ScheduleKind.MONTHLY -> R.string.schedule_kind_monthly
         ScheduleKind.EVERY_N_DAYS -> R.string.schedule_kind_every_n_days
     }
@@ -230,20 +228,27 @@ private fun NumberStepper(
  *
  * [LocalConfiguration] is the only Compose-root-overridable locale source here, and it is the same
  * one `TimeOfDayFormat` reads, so the two formatters now agree.
+ *
+ * Real multi-select (habit-scheduling: Day-Set Due Behavior for DAYS_OF_WEEK): every chip's
+ * `onClick` calls [onToggleDay] regardless of [selectedDays]' current size. **Refusing to remove
+ * the last remaining day is NOT this composable's job** — it lives in
+ * [HabitEditorViewModel.applyDayOfWeekToggle] (design.md decision 4), so the chip for the sole
+ * selected day stays `enabled = true` and visually selected, and its tap is simply a no-op one
+ * layer up. There is no disabled state and no error message here on purpose.
  */
 @Composable
 private fun DayOfWeekPicker(
-    selected: DayOfWeek,
-    onDayOfWeekChange: (DayOfWeek) -> Unit,
+    selectedDays: Set<DayOfWeek>,
+    onToggleDay: (DayOfWeek) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val locale = LocalConfiguration.current.locales[0]
     FlowRow(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         DayOfWeek.entries.forEach { day ->
-            val isSelected = day == selected
+            val isSelected = day in selectedDays
             FilterChip(
                 selected = isSelected,
-                onClick = { onDayOfWeekChange(day) },
+                onClick = { onToggleDay(day) },
                 label = { Text(day.getDisplayName(TextStyle.SHORT, locale)) },
                 border = ConstanzaControlDefaults.filterChipBorder(selected = isSelected),
             )

@@ -4,6 +4,8 @@ import com.jjrapps.constanza.core.data.entity.EntryEntity
 import com.jjrapps.constanza.core.data.entity.HabitEntity
 import com.jjrapps.constanza.core.data.entity.ReminderSlotEntity
 import com.jjrapps.constanza.core.data.entity.ScheduleEntity
+import com.jjrapps.constanza.core.data.mapper.toDaySet
+import com.jjrapps.constanza.core.data.mapper.toMask
 import java.time.DayOfWeek
 
 /**
@@ -48,21 +50,24 @@ fun ScheduleEntity.toBackup(): BackupSchedule = BackupSchedule(
     kind = kind,
     weekStart = DayOfWeek.of(weekStart).name,
     timesPerWeek = timesPerWeek,
-    dayOfWeek = dayOfWeek?.let { DayOfWeek.of(it).name },
+    daysOfWeek = daysOfWeekMask?.toDaySet()?.map { it.name },
     dayOfMonth = dayOfMonth,
     intervalDays = intervalDays,
     anchorDate = anchorDate,
 )
 
+/** `dayOfWeek` is always written `null` — the column is dead since v4 (weekday-only-schedule
+ *  design.md decision 1) and the day set now round-trips only through [daysOfWeek]/[toMask]. */
 fun BackupSchedule.toEntity(habitId: Long): ScheduleEntity = ScheduleEntity(
     habitId = habitId,
     kind = kind,
     timesPerWeek = timesPerWeek,
-    dayOfWeek = dayOfWeek?.let { DayOfWeek.valueOf(it).value },
+    dayOfWeek = null,
     dayOfMonth = dayOfMonth,
     intervalDays = intervalDays,
     anchorDate = anchorDate,
     weekStart = DayOfWeek.valueOf(weekStart).value,
+    daysOfWeekMask = daysOfWeek?.map { DayOfWeek.valueOf(it) }?.toSet()?.toMask(),
 )
 
 fun ReminderSlotEntity.toBackup(): BackupSlot = BackupSlot(id = id, minuteOfDay = minuteOfDay, enabled = enabled)
