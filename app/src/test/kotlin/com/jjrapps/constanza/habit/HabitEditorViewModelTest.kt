@@ -121,7 +121,7 @@ class HabitEditorViewModelTest {
             sortOrder = 0,
         )
         coEvery { habitRepository.findById(EXISTING_HABIT_ID) } returns existing
-        coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns Schedule.Weekly(DayOfWeek.TUESDAY)
+        coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns Schedule.DaysOfWeek(setOf(DayOfWeek.TUESDAY))
         coEvery { habitRepository.findSlotsFor(EXISTING_HABIT_ID) } returns emptyList()
         val viewModel = newViewModel()
 
@@ -130,7 +130,7 @@ class HabitEditorViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(EXISTING_HABIT_ID, state.habitId)
         assertEquals("Read", state.name)
-        assertEquals(Schedule.Weekly(DayOfWeek.TUESDAY), state.schedule)
+        assertEquals(Schedule.DaysOfWeek(setOf(DayOfWeek.TUESDAY)), state.schedule)
     }
 
     @Test
@@ -146,7 +146,7 @@ class HabitEditorViewModelTest {
             sortOrder = 0,
         )
         coEvery { habitRepository.findById(EXISTING_HABIT_ID) } returns existing
-        coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns Schedule.Weekly(DayOfWeek.TUESDAY)
+        coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns Schedule.DaysOfWeek(setOf(DayOfWeek.TUESDAY))
         coEvery { habitRepository.findSlotsFor(EXISTING_HABIT_ID) } returns emptyList()
         coEvery { habitRepository.update(any(), any(), any()) } returns Unit
         val viewModel = newViewModel()
@@ -156,7 +156,7 @@ class HabitEditorViewModelTest {
         viewModel.save()
 
         coVerify(exactly = 1) {
-            habitRepository.update(match { it.name == "Read daily" }, Schedule.Weekly(DayOfWeek.TUESDAY), emptyList())
+            habitRepository.update(match { it.name == "Read daily" }, Schedule.DaysOfWeek(setOf(DayOfWeek.TUESDAY)), emptyList())
         }
         coVerify(exactly = 0) { habitRepository.create(any(), any(), any()) }
     }
@@ -168,7 +168,7 @@ class HabitEditorViewModelTest {
         val viewModel = newViewModel()
 
         viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.WEEKLY))
-        assertEquals(Schedule.Weekly(DayOfWeek.MONDAY), viewModel.uiState.value.schedule)
+        assertEquals(Schedule.DaysOfWeek(setOf(DayOfWeek.MONDAY)), viewModel.uiState.value.schedule)
 
         viewModel.onScheduleParamChange(ScheduleParamAction.Kind(ScheduleKind.N_TIMES_PER_WEEK))
         assertEquals(3, (viewModel.uiState.value.schedule as Schedule.NTimesPerWeek).times)
@@ -596,7 +596,7 @@ class HabitEditorViewModelTest {
             sortOrder = 0,
         )
         coEvery { habitRepository.findById(EXISTING_HABIT_ID) } returns existing
-        coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns Schedule.Weekly(DayOfWeek.TUESDAY)
+        coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns Schedule.DaysOfWeek(setOf(DayOfWeek.TUESDAY))
         coEvery { habitRepository.findSlotsFor(EXISTING_HABIT_ID) } returns slots
     }
 }

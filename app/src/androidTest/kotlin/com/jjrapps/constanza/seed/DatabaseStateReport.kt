@@ -211,7 +211,8 @@ class DatabaseStateReport {
         "habitId=${schedule.habitId} kind=${schedule.kind} " +
             "timesPerWeek=${schedule.timesPerWeek ?: NO_VALUE} dayOfWeek=${schedule.dayOfWeek ?: NO_VALUE} " +
             "dayOfMonth=${schedule.dayOfMonth ?: NO_VALUE} intervalDays=${schedule.intervalDays ?: NO_VALUE} " +
-            "anchorDate=${schedule.anchorDate ?: NO_VALUE} weekStart=${schedule.weekStart}"
+            "anchorDate=${schedule.anchorDate ?: NO_VALUE} weekStart=${schedule.weekStart} " +
+            "daysOfWeekMask=${schedule.daysOfWeekMask ?: NO_VALUE}"
 
     private fun slotLine(slot: ReminderSlotEntity): String =
         "habitId=${slot.habitId} slotId=${slot.id} minuteOfDay=${slot.minuteOfDay} " +

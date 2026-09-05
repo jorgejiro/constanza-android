@@ -11,14 +11,17 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * unchanged — asserted by `AppDatabaseMigrationTest.runMigrationsAndValidate(..., 2, true, ...)`.
  *
  * **Rollback recipe**, written here because this is the file someone reverting will open first
- * (design.md decision 5): ship `Migration(3, 4)` inverting [HabitColorRemap.LEGACY_TO_CURRENT] (a
- * bijection, so the inverse is exact) and revert the palette the picker offers. Unmapped ints were
- * never written by this migration (see the `WHERE colorArgb IN (...)` guard below), so they need no
- * inverse. Never revert [com.jjrapps.constanza.core.data.AppDatabase]'s `version` back to 1, 2, or
- * 3 — Room refuses to open an already-upgraded file at a lower version, making the user's data
- * unreachable. (`Migration(2, 3)`, the slot this note used to reserve, is now consumed by
- * [migration2To3] — the removal of `HabitEntity.question` — so any future rollback recipe starts
- * from version 4 onward.)
+ * (design.md decision 5): revert the palette the picker offers, inverting
+ * [HabitColorRemap.LEGACY_TO_CURRENT] (a bijection, so the inverse is exact) if a colour rollback
+ * is ever needed. Unmapped ints were never written by this migration (see the `WHERE colorArgb IN
+ * (...)` guard below), so they need no inverse. Never revert
+ * [com.jjrapps.constanza.core.data.AppDatabase]'s `version` back to 1, 2, 3, or 4 — Room refuses to
+ * open an already-upgraded file at a lower version, making the user's data unreachable.
+ * (`Migration(2, 3)`, the slot this note used to reserve, was consumed by [migration2To3] — the
+ * removal of `HabitEntity.question`. `Migration(3, 4)`, the slot that note then reserved, is now
+ * consumed by [migration3To4] — the `schedules.daysOfWeekMask` column
+ * (weekday-only-schedule design.md decision 3) — so any future rollback recipe starts from version
+ * 5 onward.)
  *
  * **Deviation, flagged loudly (same class of issue as unit 1's `Color.kt` -> `ConstanzaColors.kt`
  * rename).** Declared as an `object`, not a `class`: detekt's default `VariableNaming` rule (active
@@ -45,6 +48,9 @@ internal object AppMigrations {
      *  [migration2To3]'s `Migration(2, 3)` needs a named constant the same way task 3.5's own
      *  `@Suppress` was rejected for this exact rule (see this object's own KDoc, second deviation). */
     private const val SCHEMA_VERSION_3 = 3
+
+    /** Same `MagicNumber` reasoning as [SCHEMA_VERSION_3] — `4` needs a named constant too. */
+    private const val SCHEMA_VERSION_4 = 4
 
     /**
      * **The sign trap.** `0xFF8E24AA.toInt()` is a *negative* `Int` once stored in the `colorArgb`
@@ -124,6 +130,50 @@ internal object AppMigrations {
                 val after = childRowCounts(db)
                 check(before == after) { "migration2To3 lost child rows: before=$before after=$after" }
             }
+        }
+
+    /**
+     * Task 3.1 (weekday-only-schedule design.md decision 1/3). Additive `ALTER TABLE ADD COLUMN`
+     * plus a data-only rewrite of the legacy `WEEKLY` rows — no table rebuild, unlike
+     * [migration2To3], because a nullable column addition needs none.
+     *
+     * `dayOfWeek: Int?` (`Entities.kt`) is left dead and still declared: SQLite on `minSdk = 31`
+     * (3.32.2) is below the 3.35 floor `ALTER TABLE ... DROP COLUMN` requires, and reusing the
+     * column instead would silently widen its domain from `1..7` to `1..127` — an unmigrated row
+     * would then be misread as a valid mask rather than failing loudly. See design.md decision 1
+     * for the full rationale.
+     *
+     * [writer]`.write(db)` runs first, exactly as [migration1To2] and [migration2To3] do, for the
+     * same reason: a recoverable snapshot failure must never fail the migration itself.
+     *
+     * **The straggler guard.** `dayOfWeek` is nullable and `kind` carries no `CHECK` constraint, so
+     * a `WEEKLY` row with a `NULL` day is representable and would silently survive the `UPDATE`
+     * below, then crash the next time `ScheduleEntity.toDomain()` reads it (`Mappers.kt`'s
+     * `requireNotNull(daysOfWeekMask)`). Counting rows still carrying `kind = 'WEEKLY'` after the
+     * rewrite and throwing on any survivor turns that into a loud migration failure with an intact,
+     * rolled-back database and a surviving snapshot — fail loud beats fail silent.
+     */
+    fun migration3To4(writer: PreMigrationSnapshotWriter): Migration =
+        object : Migration(SCHEMA_VERSION_3, SCHEMA_VERSION_4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                writer.write(db)
+
+                db.execSQL("ALTER TABLE `schedules` ADD COLUMN `daysOfWeekMask` INTEGER")
+                db.execSQL(
+                    "UPDATE schedules SET daysOfWeekMask = 1 << (dayOfWeek - 1), " +
+                        "kind = 'DAYS_OF_WEEK' WHERE kind = 'WEEKLY' AND dayOfWeek IS NOT NULL",
+                )
+                val stragglers = weeklyStragglerCount(db)
+                check(stragglers == 0) { "migration3To4 left $stragglers un-rewritten WEEKLY rows" }
+            }
+        }
+
+    /** Rows still carrying `kind = 'WEEKLY'` after [migration3To4]'s rewrite — every one is a row
+     *  the `UPDATE` could not touch because `dayOfWeek` was `NULL`. */
+    private fun weeklyStragglerCount(db: SupportSQLiteDatabase): Int =
+        db.query("SELECT COUNT(*) FROM schedules WHERE kind = 'WEEKLY'").use {
+            it.moveToFirst()
+            it.getInt(0)
         }
 
     /**

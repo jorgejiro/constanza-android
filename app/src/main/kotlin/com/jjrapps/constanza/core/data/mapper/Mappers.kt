@@ -24,7 +24,7 @@ private const val ENTRY_STATUS_UNKNOWN_MESSAGE =
 private const val SCHEDULE_KIND_DAILY = "DAILY"
 private const val SCHEDULE_KIND_TIMES_PER_DAY = "TIMES_PER_DAY"
 private const val SCHEDULE_KIND_N_TIMES_PER_WEEK = "N_TIMES_PER_WEEK"
-private const val SCHEDULE_KIND_WEEKLY = "WEEKLY"
+private const val SCHEDULE_KIND_DAYS_OF_WEEK = "DAYS_OF_WEEK"
 private const val SCHEDULE_KIND_MONTHLY = "MONTHLY"
 private const val SCHEDULE_KIND_EVERY_N_DAYS = "EVERY_N_DAYS"
 
@@ -58,8 +58,8 @@ fun ScheduleEntity.toDomain(): Schedule {
         SCHEDULE_KIND_N_TIMES_PER_WEEK ->
             Schedule.NTimesPerWeek(times = requireNotNull(timesPerWeek), weekStart = weekStartDay)
 
-        SCHEDULE_KIND_WEEKLY ->
-            Schedule.Weekly(dayOfWeek = DayOfWeek.of(requireNotNull(dayOfWeek)), weekStart = weekStartDay)
+        SCHEDULE_KIND_DAYS_OF_WEEK ->
+            Schedule.DaysOfWeek(days = requireNotNull(daysOfWeekMask).toDaySet(), weekStart = weekStartDay)
 
         SCHEDULE_KIND_MONTHLY ->
             Schedule.Monthly(dayOfMonth = requireNotNull(dayOfMonth), weekStart = weekStartDay)
@@ -81,8 +81,8 @@ fun Schedule.toEntity(habitId: Long): ScheduleEntity = when (this) {
     is Schedule.NTimesPerWeek ->
         emptyScheduleEntity(habitId, SCHEDULE_KIND_N_TIMES_PER_WEEK, weekStart).copy(timesPerWeek = times)
 
-    is Schedule.Weekly ->
-        emptyScheduleEntity(habitId, SCHEDULE_KIND_WEEKLY, weekStart).copy(dayOfWeek = dayOfWeek.value)
+    is Schedule.DaysOfWeek ->
+        emptyScheduleEntity(habitId, SCHEDULE_KIND_DAYS_OF_WEEK, weekStart).copy(daysOfWeekMask = days.toMask())
 
     is Schedule.Monthly ->
         emptyScheduleEntity(habitId, SCHEDULE_KIND_MONTHLY, weekStart).copy(dayOfMonth = dayOfMonth)
@@ -101,6 +101,7 @@ private fun emptyScheduleEntity(habitId: Long, kind: String, weekStart: DayOfWee
     intervalDays = null,
     anchorDate = null,
     weekStart = weekStart.value,
+    daysOfWeekMask = null,
 )
 
 fun ReminderSlotEntity.toDomain(): ReminderSlot =

@@ -229,7 +229,7 @@ class TodayViewModelTest {
         val notToday = TODAY.dayOfWeek.plus(1)
         val snapshot = TodaySnapshot(emptyList(), emptyList(), TODAY)
 
-        assertNull(buildTodayHabitRow(habit(), Schedule.Weekly(notToday), emptyList(), snapshot))
+        assertNull(buildTodayHabitRow(habit(), Schedule.DaysOfWeek(days = setOf(notToday)), emptyList(), snapshot))
     }
 
     @Test

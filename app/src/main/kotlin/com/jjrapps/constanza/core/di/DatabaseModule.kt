@@ -36,7 +36,11 @@ object DatabaseModule {
         // `db.version` (design.md D3), so they never collide.
         val writer = PreMigrationSnapshotWriter(context.filesDir)
         return Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.DATABASE_NAME)
-            .addMigrations(AppMigrations.migration1To2(writer), AppMigrations.migration2To3(writer))
+            .addMigrations(
+                AppMigrations.migration1To2(writer),
+                AppMigrations.migration2To3(writer),
+                AppMigrations.migration3To4(writer),
+            )
             .build()
     }
 

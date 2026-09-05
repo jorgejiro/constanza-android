@@ -43,14 +43,14 @@ class HabitRepositoryCrudTest {
     fun creatingAHabitPersistsItAndItsScheduleUnderTheReturnedId() = runBlocking {
         val weeklyDay = fixture.timeProvider.today().plusDays(WEEKLY_DAY_OFFSET).dayOfWeek
 
-        val id = repository.create(newHabit(name = "Read"), Schedule.Weekly(weeklyDay))
+        val id = repository.create(newHabit(name = "Read"), Schedule.DaysOfWeek(days = setOf(weeklyDay)))
 
         assertTrue("create must return the real row id, not the 0 sentinel", id > 0)
         val stored = requireNotNull(repository.findById(id)) { "created habit must be findable by id" }
         assertEquals(id, stored.id)
         assertEquals("Read", stored.name)
         assertFalse(stored.archived)
-        assertEquals(Schedule.Weekly(weeklyDay), repository.findScheduleFor(id))
+        assertEquals(Schedule.DaysOfWeek(days = setOf(weeklyDay)), repository.findScheduleFor(id))
         assertEquals(listOf(id), repository.observeAll().first().map { it.id })
     }
 
@@ -83,7 +83,7 @@ class HabitRepositoryCrudTest {
         val today = fixture.timeProvider.today()
         val id = repository.create(
             newHabit(name = "Read"),
-            Schedule.Weekly(today.plusDays(WEEKLY_DAY_OFFSET).dayOfWeek),
+            Schedule.DaysOfWeek(days = setOf(today.plusDays(WEEKLY_DAY_OFFSET).dayOfWeek)),
         )
         val stored = requireNotNull(repository.findById(id))
         val slotId = fixture.insertEnabledSlot(id)

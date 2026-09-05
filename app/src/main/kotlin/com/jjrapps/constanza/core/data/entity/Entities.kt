@@ -38,11 +38,18 @@ data class ScheduleEntity(
     @PrimaryKey val habitId: Long,
     val kind: String,
     val timesPerWeek: Int?,
+    /**
+     * Dead since v4 (weekday-only-schedule design D1) — left declared, never written, so Room's
+     * `identityHash` keeps matching the v4/v5 schema without a table rebuild. The day set now
+     * lives in [daysOfWeekMask]; a `WEEKLY` row's `dayOfWeek` is only ever read by `migration3To4`.
+     */
     val dayOfWeek: Int?,
     val dayOfMonth: Int?,
     val intervalDays: Int?,
     val anchorDate: String?,
     val weekStart: Int = 1,
+    /** Bit `n` = `DayOfWeek.value - 1`; e.g. Mon–Fri = `0b0011111` = 31. Added in v4. */
+    val daysOfWeekMask: Int? = null,
 )
 
 /** design.md §8.1's `reminder_slots` table. `UNIQUE(habitId, minuteOfDay)` as written. */

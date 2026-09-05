@@ -31,11 +31,54 @@ class DueOnTest {
     }
 
     @Test
-    fun `WEEKLY is Required only on the configured day of week`() {
-        val schedule = Schedule.Weekly(dayOfWeek = DayOfWeek.WEDNESDAY)
+    fun `DAYS_OF_WEEK single-day set behaves like the former WEEKLY kind`() {
+        val schedule = Schedule.DaysOfWeek(days = setOf(DayOfWeek.WEDNESDAY))
         // 2026-03-04 is a Wednesday.
         assertIs<Due.Required>(dueOn(schedule, LocalDate.of(2026, 3, 4), noProgress))
         assertIs<Due.NotDue>(dueOn(schedule, LocalDate.of(2026, 3, 5), noProgress))
+    }
+
+    @Test
+    fun `DAYS_OF_WEEK Monday-to-Friday set is due only on weekdays`() {
+        val schedule = Schedule.DaysOfWeek(
+            days = setOf(
+                DayOfWeek.MONDAY,
+                DayOfWeek.TUESDAY,
+                DayOfWeek.WEDNESDAY,
+                DayOfWeek.THURSDAY,
+                DayOfWeek.FRIDAY,
+            ),
+        )
+        // 2026-03-02 is a Monday; the week runs through 2026-03-08 (Sunday).
+        val week = (0..6).map { LocalDate.of(2026, 3, 2).plusDays(it.toLong()) }
+        val dueDays = week.filter { dueOn(schedule, it, noProgress) is Due.Required }
+        assertEquals(week.take(5), dueDays)
+    }
+
+    @Test
+    fun `DAYS_OF_WEEK is NotDue on a day outside the set, never treated as missed`() {
+        val schedule = Schedule.DaysOfWeek(
+            days = setOf(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+        )
+        // 2026-03-07 is a Saturday.
+        assertIs<Due.NotDue>(dueOn(schedule, LocalDate.of(2026, 3, 7), noProgress))
+    }
+
+    @Test
+    fun `DAYS_OF_WEEK non-contiguous set is due only on its member days`() {
+        val schedule = Schedule.DaysOfWeek(
+            days = setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY),
+        )
+        val week = (0..6).map { LocalDate.of(2026, 3, 2).plusDays(it.toLong()) }
+        val dueDays = week.filter { dueOn(schedule, it, noProgress) is Due.Required }
+        assertEquals(
+            listOf(
+                LocalDate.of(2026, 3, 2),
+                LocalDate.of(2026, 3, 4),
+                LocalDate.of(2026, 3, 6),
+            ),
+            dueDays,
+        )
     }
 
     @Test

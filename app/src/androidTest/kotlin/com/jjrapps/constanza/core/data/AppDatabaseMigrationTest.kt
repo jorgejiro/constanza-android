@@ -4,12 +4,17 @@ import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.test.platform.app.InstrumentationRegistry
+import com.jjrapps.constanza.core.data.entity.ScheduleEntity
+import com.jjrapps.constanza.core.data.mapper.toDomain
 import com.jjrapps.constanza.core.data.migration.AppMigrations
 import com.jjrapps.constanza.core.data.migration.HabitColorRemap
 import com.jjrapps.constanza.core.data.migration.PreMigrationSnapshotWriter
+import com.jjrapps.constanza.domain.model.Schedule
 import java.io.File
+import java.time.DayOfWeek
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -43,6 +48,9 @@ class AppDatabaseMigrationTest {
 
     /** Same reasoning as [migration1To2]: a fresh instance per test. */
     private fun migration2To3() = AppMigrations.migration2To3(PreMigrationSnapshotWriter(targetFilesDir))
+
+    /** Same reasoning as [migration1To2]: a fresh instance per test. */
+    private fun migration3To4() = AppMigrations.migration3To4(PreMigrationSnapshotWriter(targetFilesDir))
 
     @Test
     fun version1SchemaCreatesFromTheCheckedInExport() {
@@ -210,5 +218,80 @@ class AppDatabaseMigrationTest {
             cursor.moveToFirst()
             assertEquals("$sql ${args.toList()}", 1, cursor.getInt(0))
         }
+    }
+
+    /**
+     * Task 3.2 (weekday-only-schedule design.md decision 3). Seeds a real `version = 3` database
+     * with a legacy `kind = 'WEEKLY', dayOfWeek = 3` (Wednesday) row, runs the real
+     * `migration3To4`, and asserts the rewritten row's actual `kind`/`daysOfWeekMask` VALUES, that
+     * the pre-migration snapshot fired, and that the row reads back through `ScheduleEntity.toDomain()`
+     * as `Schedule.DaysOfWeek(setOf(WEDNESDAY))` — not merely that the migration completed.
+     */
+    @Test
+    fun migration3To4RewritesALegacyWeeklyRowIntoADaysOfWeekBitmask() {
+        val habitId = 1L
+
+        migrationTestHelper.createDatabase(TEST_DB_NAME, version = 3).use { db ->
+            seedHabitV3(db, id = habitId)
+            db.execSQL(
+                "INSERT INTO schedules (habitId, kind, timesPerWeek, dayOfWeek, dayOfMonth, " +
+                    "intervalDays, anchorDate, weekStart) VALUES (?, 'WEEKLY', NULL, 3, NULL, NULL, NULL, 1)",
+                arrayOf<Any>(habitId),
+            )
+        }
+
+        val migratedDb = migrationTestHelper.runMigrationsAndValidate(TEST_DB_NAME, 4, true, migration3To4())
+
+        migratedDb.query(
+            SimpleSQLiteQuery("SELECT kind, daysOfWeekMask FROM schedules WHERE habitId = ?", arrayOf(habitId)),
+        ).use { cursor ->
+            assertTrue(cursor.moveToNext())
+            assertEquals("DAYS_OF_WEEK", cursor.getString(0))
+            // Wednesday.value == 3, bit n == value - 1, so 1 shl 2 == 4.
+            assertEquals(4, cursor.getInt(1))
+        }
+
+        val snapshotFile = File(targetFilesDir, "pre-migration/pre-migration-v3.sql")
+        assertTrue("expected the v3 pre-migration snapshot file to exist at $snapshotFile", snapshotFile.exists())
+
+        val rewrittenEntity = ScheduleEntity(
+            habitId = habitId, kind = "DAYS_OF_WEEK", timesPerWeek = null, dayOfWeek = 3,
+            dayOfMonth = null, intervalDays = null, anchorDate = null, weekStart = 1, daysOfWeekMask = 4,
+        )
+        assertEquals(Schedule.DaysOfWeek(days = setOf(DayOfWeek.WEDNESDAY)), rewrittenEntity.toDomain())
+    }
+
+    /**
+     * Task 3.3 (weekday-only-schedule design.md decision 3). `dayOfWeek` is nullable and `kind`
+     * carries no `CHECK` constraint, so a `WEEKLY` row with a `NULL` day is representable and would
+     * otherwise silently survive the `UPDATE`, only to crash on the next real read. Asserts the
+     * migration itself throws — the guard lives in `migration3To4`, not only in this test.
+     */
+    @Test
+    fun migration3To4FailsClosedWhenAWeeklyRowHasNoDayOfWeek() {
+        val habitId = 1L
+
+        migrationTestHelper.createDatabase(TEST_DB_NAME, version = 3).use { db ->
+            seedHabitV3(db, id = habitId)
+            db.execSQL(
+                "INSERT INTO schedules (habitId, kind, timesPerWeek, dayOfWeek, dayOfMonth, " +
+                    "intervalDays, anchorDate, weekStart) VALUES (?, 'WEEKLY', NULL, NULL, NULL, NULL, NULL, 1)",
+                arrayOf<Any>(habitId),
+            )
+        }
+
+        assertThrows(IllegalStateException::class.java) {
+            migrationTestHelper.runMigrationsAndValidate(TEST_DB_NAME, 4, true, migration3To4())
+        }
+    }
+
+    /** A `version = 3` `habits` row — `question` is already gone by this version, unlike
+     *  [seedHabitWithChildRows]'s `version = 2` shape. */
+    private fun seedHabitV3(db: SupportSQLiteDatabase, id: Long) {
+        db.execSQL(
+            "INSERT INTO habits (id, name, colorArgb, notes, archived, archivedAt, createdAt, sortOrder) " +
+                "VALUES (?, ?, 0, NULL, 0, NULL, ?, 0)",
+            arrayOf<Any>(id, "Habit $id", "2026-01-01T08:00:00Z"),
+        )
     }
 }

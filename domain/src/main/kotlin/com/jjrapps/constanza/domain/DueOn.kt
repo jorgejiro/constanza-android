@@ -16,8 +16,8 @@ fun dueOn(schedule: Schedule, date: LocalDate, progress: PeriodProgress): Due =
     when (schedule) {
         is Schedule.Daily, is Schedule.TimesPerDay -> Due.Required
 
-        is Schedule.Weekly ->
-            if (date.dayOfWeek == schedule.dayOfWeek) Due.Required else Due.NotDue
+        is Schedule.DaysOfWeek ->
+            if (date.dayOfWeek in schedule.days) Due.Required else Due.NotDue
 
         is Schedule.Monthly -> {
             val effectiveDay = minOf(schedule.dayOfMonth, date.lengthOfMonth())
