@@ -85,8 +85,12 @@ private sealed interface ConstanzaRoute : java.io.Serializable {
 
     /** first-run-onboarding design.md §5.1: the editor is reachable from places that must leave to
      *  DIFFERENT screens — the habit list, which is its own caller, and the end of onboarding,
-     *  whose user has never seen the list and cannot reach Today from it, since [HabitList] has no
-     *  back route at all.
+     *  whose user has never seen the list and has no reason to be dropped onto it.
+     *
+     *  [HabitList] does now have its own way back to [Today] (habit-list-back-navigation), so
+     *  landing an onboarding user there would no longer strand them; it would merely put them
+     *  somewhere they never asked to go, one extra tap from the screen they wanted. That is why
+     *  this enum survives the fix rather than collapsing into a single exit.
      *
      *  [Today] (today-add-habit) is a third caller with the SAME exit as [Onboarding] and is
      *  deliberately not folded into it: they leave to the same screen today, but they are different
@@ -116,8 +120,10 @@ private fun ConstanzaApp(startRoute: ConstanzaRoute = ConstanzaRoute.Today) {
         is ConstanzaRoute.Today -> TodayRoute(
             onManageHabits = { route = ConstanzaRoute.HabitList },
             // today-add-habit: tagged Today, never HabitList — the editor's exits both follow
-            // `origin`, and a HabitList-tagged entry would leave a user who never asked for the
-            // list stranded on it, since HabitListRoute takes no onBack.
+            // `origin`, so a HabitList-tagged entry would drop a user who never asked for the list
+            // onto it. That used to strand them outright; since habit-list-back-navigation gave the
+            // list its own exit it only costs them an extra tap, but the tag is still wrong for the
+            // same reason it always was: this journey started on Today and ends on Today.
             onAddHabit = {
                 route = ConstanzaRoute.HabitEditor(
                     habitId = null,
@@ -128,15 +134,22 @@ private fun ConstanzaApp(startRoute: ConstanzaRoute = ConstanzaRoute.Today) {
         )
 
         is ConstanzaRoute.HabitList -> HabitListRoute(
+            // habit-list-back-navigation: the list is reached from Today's "Manage habits" and
+            // returns there, by the top bar's arrow or the system back gesture alike. Before this,
+            // it had neither, so back fell through to the Activity default and closed the app.
+            onBack = { route = ConstanzaRoute.Today },
             onCreateHabit = { route = ConstanzaRoute.HabitEditor(habitId = null) },
             onEditHabit = { habitId -> route = ConstanzaRoute.HabitEditor(habitId) },
             onShowProgress = { habitId -> route = ConstanzaRoute.Progress(habitId) },
         )
 
         // leaveTo branches on origin (first-run-onboarding design.md §5.1): the habit-list entry
-        // returns to the list as before, but the onboarding-seeded entry has never seen the list
-        // and HabitList has no route back to Today at all — leaving it there would strand a
-        // brand-new user. onBack mirrors onDone deliberately: both land on the same destination,
+        // returns to the list as before, but the onboarding-seeded entry has never seen the list,
+        // so leaving it there would answer "I finished setting up" with a screen the user never
+        // asked for. That used to be a dead end as well — the list had no route back to Today at
+        // all — and habit-list-back-navigation has since fixed the dead end, not the mismatch:
+        // finishing onboarding still belongs on Today. onBack mirrors onDone deliberately: both
+        // land on the same destination,
         // and the editor itself owns whether backing out with unsaved edits confirms first
         // (design.md §2.1 — that decision belongs to the editor change, not this one).
         is ConstanzaRoute.HabitEditor -> {

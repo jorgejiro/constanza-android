@@ -102,13 +102,18 @@ fun HabitEditorRoute(
     var showDiscardDialog by rememberSaveable { mutableStateOf(false) }
     val requestBack = { if (state.isDirty) showDiscardDialog = true else onBack() }
 
-    // The first BackHandler in this codebase, and the reason the rest of the app does not need one:
-    // every other screen is either the Activity's start destination (Today, where the platform
-    // default of finishing the Activity IS the right behaviour) or a leaf whose only unsaved state
-    // is nothing at all. This editor is the one screen holding work the user can lose, so it is the
-    // one screen that has to intercept the gesture instead of letting it reach the Activity. Kept
-    // here, in the container, so HabitEditorScreen stays presentational and the icon and the
-    // gesture provably share one code path: both call requestBack.
+    // The first BackHandler in this codebase, though not the last: HabitListScreen has one too
+    // (habit-list-back-navigation), because "a leaf holding no unsaved state can let the gesture
+    // through" was only ever true of leaves reachable from the start destination in one hop. The
+    // habit list is not one — it is a screen a user walks INTO, so the platform default of
+    // finishing the Activity closed the app on them. Today, the Activity's start destination, is
+    // still the one screen where that default IS the right behaviour.
+    //
+    // What is specific to this editor is not having a handler but what the handler decides: it is
+    // the one screen holding work the user can lose, so backing out of it may have to ask first.
+    // Kept here, in the container, because that decision is the container's; HabitListScreen keeps
+    // its own handler inline precisely because it has no such decision to make. Either way the icon
+    // and the gesture provably share one code path: here, both call requestBack.
     //
     // Disabled while the dialog is up so the two do not stack. The dialog is its own window and
     // handles back through onDismissRequest; leaving this enabled would be a second handler

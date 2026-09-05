@@ -2,6 +2,7 @@
 
 package com.jjrapps.constanza.habit
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
@@ -48,11 +50,20 @@ import com.jjrapps.constanza.domain.model.Habit
 /**
  * Task 6a.4 (habit-management: Habit Archiving) — container. No navigation library is used
  * (design.md §14 defers that to a future work unit once a second stack of screens exists);
- * [onCreateHabit]/[onEditHabit] are hoisted callbacks the single-Activity host wires to its own
- * in-memory route state.
+ * [onBack]/[onCreateHabit]/[onEditHabit] are hoisted callbacks the single-Activity host wires to its
+ * own in-memory route state.
+ *
+ * **[onBack] (habit-list-back-navigation).** This screen used to have no exit of any kind: no
+ * navigation icon, no `BackHandler`, and a host that hoists a one-way route — so the system back
+ * gesture reached the Activity default and closed the whole app on a user who had only come here to
+ * manage a habit. [onBack] is deliberately required rather than defaulted to `{}`, for the same
+ * reason [com.jjrapps.constanza.progress.ProgressRoute] and [HabitEditorRoute] require theirs: a
+ * caller that forgets it is exactly the defect this parameter exists to make impossible, and a
+ * default would let it come back silently.
  */
 @Composable
 fun HabitListRoute(
+    onBack: () -> Unit,
     onCreateHabit: () -> Unit,
     onEditHabit: (Long) -> Unit,
     onShowProgress: (Long) -> Unit = {},
@@ -62,6 +73,7 @@ fun HabitListRoute(
     HabitListScreen(
         state = state,
         actions = HabitListActions(
+            onBack = onBack,
             onToggleShowArchived = viewModel::toggleShowArchived,
             onArchiveToggle = viewModel::setArchived,
             onCreateHabit = onCreateHabit,
@@ -76,6 +88,11 @@ fun HabitListRoute(
  *  threshold — same reasoning as [HabitEditorActions]. [onDeleteHabit] (habit-management: Habit
  *  Deletion) is called only after [DeleteHabitDialog] is confirmed — nothing runs before that. */
 data class HabitListActions(
+    /** The way out of the list, shared by the top bar's back arrow and the system back gesture —
+     *  see [HabitListScreen]. Bundled here rather than being its own [HabitListScreen] parameter so
+     *  that "callbacks out" stays one thing in this file, matching [HabitEditorActions.onBackRequest]
+     *  rather than [com.jjrapps.constanza.progress.ProgressScreen]'s loose parameter. */
+    val onBack: () -> Unit,
     val onToggleShowArchived: () -> Unit,
     val onArchiveToggle: (Long, Boolean) -> Unit,
     val onCreateHabit: () -> Unit,
@@ -85,7 +102,8 @@ data class HabitListActions(
 )
 
 /**
- * Presentational: state in, callbacks out, no dependencies of its own.
+ * Presentational: state in, callbacks out, no dependencies of its own beyond the back gesture
+ * itself.
  *
  * [pendingDeleteId] (task 3.3, design.md D4) is `rememberSaveable` local state, not
  * ViewModel-held, matching [HabitEditorScreen]'s `DiscardChangesDialog` precedent and surviving
@@ -93,11 +111,23 @@ data class HabitListActions(
  * [state]'s own list on every recomposition, rather than captured once: a habit that leaves the
  * list (for instance because it was archived, filtering it out of the current view) dismisses its
  * own dialog instead of rendering a stale name against a habit id that no longer resolves.
+ *
+ * **The [BackHandler] lives here, not in [HabitListRoute]** (habit-list-back-navigation), which is
+ * the opposite of where [HabitEditorRoute] keeps its own. That is not an inconsistency: the editor's
+ * handler exists to make a DECISION — leave, or ask about unsaved edits first — and a decision is
+ * the container's job. This list holds nothing the user can lose, so there is no decision to make
+ * and nothing for a container to own; keeping the handler beside the back arrow is what makes it
+ * self-evident that the gesture and the icon call the one same `actions.onBack` rather than merely
+ * looking like they should. It is disabled while [DeleteHabitDialog] is up for the reason the
+ * editor's is: the dialog is its own window and answers back through its own `onDismissRequest`, so
+ * an enabled handler behind it would be a second claimant on the same gesture the moment that stops
+ * being true — and here the consequence would be leaving the screen instead of cancelling a delete.
  */
 @Composable
 fun HabitListScreen(state: HabitListUiState, actions: HabitListActions) {
     var pendingDeleteId by rememberSaveable { mutableStateOf<Long?>(null) }
     val pendingDeleteHabit = state.habits.firstOrNull { it.id == pendingDeleteId }
+    BackHandler(enabled = pendingDeleteHabit == null, onBack = actions.onBack)
     if (pendingDeleteHabit != null) {
         DeleteHabitDialog(
             habitName = pendingDeleteHabit.name,
@@ -110,7 +140,7 @@ fun HabitListScreen(state: HabitListUiState, actions: HabitListActions) {
         )
     }
     Scaffold(
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.habit_list_title)) }) },
+        topBar = { HabitListTopBar(actions.onBack) },
         floatingActionButton = {
             FloatingActionButton(onClick = actions.onCreateHabit) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.habit_list_add_habit))
@@ -121,6 +151,29 @@ fun HabitListScreen(state: HabitListUiState, actions: HabitListActions) {
             HabitListContent(state, actions, onRequestDelete = { pendingDeleteId = it })
         }
     }
+}
+
+/** habit-list-back-navigation. Deliberately the same shape as `HabitEditorScreen`'s
+ *  `HabitEditorTopBar`: an [Icons.AutoMirrored.Filled.ArrowBack] in the leading navigation slot,
+ *  not the `actions`-slot "Back" text button `ProgressScreen`/`SnoozeSettingsScreen` use. Those two
+ *  are read-only leaves a user glances at; this screen is somewhere a user does work and must be
+ *  able to walk out of, and the leading slot is where every Android user already looks for that. The
+ *  icon ships in `material-icons-core` — already this project's only icon artifact — and its
+ *  auto-mirrored variant flips itself in right-to-left locales. `contentDescription` reuses the
+ *  existing `action_back` string rather than adding a second resource with the same word in it. */
+@Composable
+private fun HabitListTopBar(onBack: () -> Unit) {
+    TopAppBar(
+        title = { Text(stringResource(R.string.habit_list_title)) },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.action_back),
+                )
+            }
+        },
+    )
 }
 
 @Composable
