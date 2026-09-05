@@ -1892,7 +1892,7 @@ carried_forward_open_items:
         this item rather than filing a new one.
     - id: "today-add-habit-is-not-a-fab"
       title: "Today's add-habit affordance disagrees with the habit list's"
-      status: open
+      status: resolved
       severity: >
         Cosmetic. Nothing is unreachable and nothing is mis-recorded; the two
         screens simply offer one action in two shapes.
@@ -1935,6 +1935,58 @@ carried_forward_open_items:
       sizing: >
         One screen, one extracted composable, and its compose tests. Small
         enough for a direct change once the two questions above are answered.
+      resolution: >
+        Closed 2026-09-05 by PR #92, shipped as a DIRECT change rather than an
+        SDD one — one screen and its tests did not warrant proposal, spec,
+        design and tasks, and the sizing note above said so.
+
+        Today's add-habit is now a `FloatingActionButton` in `Scaffold`'s slot,
+        the same shape and icon as `HabitListScreen`'s. `TrailingAddHabitAction`
+        is deleted outright.
+
+        Open question 1 answered: the empty state KEEPS its `today_empty`
+        sentence and LOSES its centred button. Two add affordances on one
+        screen is worse rather than better, and the FAB is the standard Android
+        create affordance — which was the maintainer's own argument for the
+        change.
+
+        Open question 2 honoured: the FAB is ABSENT, not disabled, while a past
+        day is viewed, following the convention `today-past-day-correction`
+        established that unavailable navigation is structurally missing rather
+        than greyed out.
+
+        The `supersedes` note above turned out to be right on the merits. The
+        old resolution's stated reason did not parse — it rejected a FAB to
+        stop the two screens disagreeing, when the habit list already had one
+        and the centred Button WAS the disagreement — and its second argument,
+        that a trailing list item risks reading as a habit row, actively
+        supported the reversal. Both KDoc blocks carrying that reasoning were
+        rewritten rather than deleted, so a future reader sees the current
+        shape is a decision.
+      bug_caught_in_flight: >
+        Worth keeping because a functional test would never have found it.
+        Deleting the trailing list item also deleted the `LazyColumn`'s end
+        padding, which would have left the last habit row's Yes/No/Skip buttons
+        sitting underneath the floating FAB — visible and untappable. Every
+        assertion would still have passed. Explicit bottom clearance was added,
+        and the compose test now asserts the FAB's POSITION (right half, bottom
+        quarter, below the habit name) rather than merely its presence, so
+        putting the button back inside the list fails loudly.
+      spec_wording_corrected: >
+        `openspec/specs/habit-entry-tracking/spec.md` said past-day text stands
+        "in its place" and "where the affordance would otherwise be". That was
+        literal while the button lived inside the empty state; the FAB is in the
+        corner and the text is centred, so nothing stands in its place now.
+        Reworded IN PLACE, not through a delta spec, because there is no
+        behavioural delta — requirement and scenario counts are unchanged at
+        7/36. Recorded here because it edits a ratified spec outside an SDD
+        change, which is a deviation from this repo's usual route.
+      residual_manual_verification: >
+        NOT closed: the FAB has never been seen on real One UI hardware. It was
+        rendered on an AOSP API 37 emulator, and FAB size, corner inset and
+        gesture-bar clearance are all Samsung-tunable. The specific thing to
+        check on the S25 is whether the FAB crowds the navigation pill. If it
+        does, reopen this item rather than filing a new one.
     - id: "no-weekday-only-schedule-kind"
       title: "A habit cannot be scheduled for weekdays only"
       status: resolved
