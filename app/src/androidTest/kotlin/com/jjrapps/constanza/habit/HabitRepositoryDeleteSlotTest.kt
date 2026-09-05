@@ -38,7 +38,6 @@ class HabitRepositoryDeleteSlotTest {
         val habitId = database.habitDao().insert(
             HabitEntity(
                 name = "Read",
-                question = null,
                 colorArgb = 0,
                 notes = null,
                 archivedAt = null,
@@ -71,7 +70,6 @@ class HabitRepositoryDeleteSlotTest {
         val habitId = database.habitDao().insert(
             HabitEntity(
                 name = "Read",
-                question = null,
                 colorArgb = 0,
                 notes = null,
                 archivedAt = null,

@@ -20,7 +20,6 @@ fun HabitEntity.toBackup(schedule: BackupSchedule, slots: List<BackupSlot>, entr
     BackupHabit(
         id = id,
         name = name,
-        question = question,
         colorArgb = colorArgb,
         notes = notes,
         archived = archived,
@@ -37,7 +36,6 @@ fun HabitEntity.toBackup(schedule: BackupSchedule, slots: List<BackupSlot>, entr
 fun BackupHabit.toEntity(): HabitEntity = HabitEntity(
     id = 0,
     name = name,
-    question = question,
     colorArgb = colorArgb,
     notes = notes,
     archived = archived,

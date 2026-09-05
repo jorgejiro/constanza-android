@@ -68,7 +68,7 @@ class ReminderFireWorkerTest {
     }
 
     private suspend fun insertHabit(kind: String, timesPerWeek: Int? = null): Long =
-        database.insertHabitWithSchedule(kind = kind, timesPerWeek = timesPerWeek, name = "Exercise", question = "Did you exercise?")
+        database.insertHabitWithSchedule(kind = kind, timesPerWeek = timesPerWeek, name = "Exercise")
 
     private suspend fun insertArmedOccurrence(habitId: Long, scheduledDate: String, scheduledAt: Instant): Long =
         database.reminderOccurrenceDao().upsert(

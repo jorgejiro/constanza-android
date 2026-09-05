@@ -60,14 +60,16 @@ class HabitRepositoryCrudTest {
         val stored = requireNotNull(repository.findById(id))
 
         repository.update(
-            stored.copy(name = "Read at night", question = "Did you read?", notes = "20 pages"),
+            stored.copy(name = "Read at night", notes = "20 pages", colorArgb = UPDATED_COLOR_ARGB),
             Schedule.Daily(),
         )
 
         val updated = requireNotNull(repository.findById(id))
         assertEquals("Read at night", updated.name)
-        assertEquals("Did you read?", updated.question)
         assertEquals("20 pages", updated.notes)
+        // Two TEXT columns (name, notes) cannot catch a column-order or type regression in a
+        // rebuilt `habits` table (design.md D6) — colorArgb is the non-null INTEGER witness.
+        assertEquals(UPDATED_COLOR_ARGB, updated.colorArgb)
     }
 
     /**
@@ -139,3 +141,4 @@ class HabitRepositoryCrudTest {
 }
 
 private const val MORNING_MINUTE_OF_DAY = 480
+private const val UPDATED_COLOR_ARGB = 0xFFE53935.toInt()

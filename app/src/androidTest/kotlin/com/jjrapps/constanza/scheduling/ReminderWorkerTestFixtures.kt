@@ -23,10 +23,9 @@ suspend fun AppDatabase.insertHabitWithSchedule(
     kind: String = "DAILY",
     timesPerWeek: Int? = null,
     name: String = "Meditate",
-    question: String? = null,
 ): Long = withTransaction {
     val habitId = habitDao().insert(
-        HabitEntity(name = name, question = question, colorArgb = 0, notes = null, archivedAt = null, createdAt = "2026-01-01T00:00:00Z"),
+        HabitEntity(name = name, colorArgb = 0, notes = null, archivedAt = null, createdAt = "2026-01-01T00:00:00Z"),
     )
     scheduleDao().upsert(
         ScheduleEntity(

@@ -39,9 +39,6 @@ private const val SEED_LEAD_MINUTES = 3
  *  never collides with, deletes, or re-plans the habits that other on-device runs already seeded. */
 private const val SEED_HABIT_NAME = "Stretch"
 
-/** The habit's question, so a posted notification carries recognisable body text too. */
-private const val SEED_HABIT_QUESTION = "Did you stretch today?"
-
 /**
  * The state this fixture persists. The production vocabulary lives in `private const val STATE_*`
  * declarations that are not visible outside their files; this exact string is `STATE_SNOOZED` in
@@ -214,7 +211,6 @@ class LiveSnoozeAcrossMidnightSeed {
         val habitId = daos.habitDao.insert(
             HabitEntity(
                 name = SEED_HABIT_NAME,
-                question = SEED_HABIT_QUESTION,
                 colorArgb = SEED_COLOR_ARGB,
                 notes = null,
                 archived = false,

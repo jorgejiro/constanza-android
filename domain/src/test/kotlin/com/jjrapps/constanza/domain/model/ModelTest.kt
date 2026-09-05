@@ -14,11 +14,10 @@ import org.junit.Test
 class ModelTest {
 
     @Test
-    fun `Habit carries all fields including nullable question, notes and archivedAt`() {
+    fun `Habit carries all fields including nullable notes and archivedAt`() {
         val habit = Habit(
             id = 1L,
             name = "Drink water",
-            question = "Did you drink water?",
             colorArgb = 0xFF00FF00.toInt(),
             notes = null,
             archived = false,

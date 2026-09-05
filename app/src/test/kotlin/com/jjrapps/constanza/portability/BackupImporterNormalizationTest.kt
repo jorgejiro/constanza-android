@@ -47,7 +47,6 @@ class BackupImporterNormalizationTest {
 private fun habitWithColor(colorArgb: Int): BackupHabit = BackupHabit(
     id = 1,
     name = "Meditate",
-    question = null,
     colorArgb = colorArgb,
     notes = null,
     archived = false,

@@ -18,7 +18,6 @@ import java.time.LocalDate
 data class HabitEditorUiState(
     val habitId: Long? = null,
     val name: String = "",
-    val question: String = "",
     val colorArgb: Int = HabitPalette.DEFAULT,
     val notes: String = "",
     val schedule: Schedule = Schedule.Daily(),
@@ -41,9 +40,9 @@ data class HabitEditorUiState(
  * The exclusion list is deliberately the short one. Validation flags and [HabitEditorUiState.isSaving]
  * are the editor's own transient bookkeeping, and [HabitEditorUiState.isDirty] is the answer being
  * computed, so including it would make the comparison self-referential. Everything else — `name`,
- * `question`, `colorArgb`, `notes`, `schedule`, `slots`, `anchorDateText`, and any field added
- * after this was written — counts as content by default. That is the point: a seventh form field
- * is covered the moment it is declared, without anyone remembering to update this function.
+ * `colorArgb`, `notes`, `schedule`, `slots`, `anchorDateText`, and any field added after this was
+ * written — counts as content by default. That is the point: a seventh form field is covered the
+ * moment it is declared, without anyone remembering to update this function.
  */
 internal fun HabitEditorUiState.formSignature(): HabitEditorUiState = copy(
     nameError = false,

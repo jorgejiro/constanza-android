@@ -59,7 +59,7 @@ private const val STATE_ARMED = "ARMED"
 private const val STATE_SNOOZED = "SNOOZED"
 
 private fun habit(id: Long = HABIT_ID, name: String = "Read", colorArgb: Int = HABIT_COLOR_ARGB) = Habit(
-    id = id, name = name, question = null, colorArgb = colorArgb, notes = null,
+    id = id, name = name, colorArgb = colorArgb, notes = null,
     archived = false, archivedAt = null, createdAt = FIXED_INSTANT, sortOrder = 0,
 )
 

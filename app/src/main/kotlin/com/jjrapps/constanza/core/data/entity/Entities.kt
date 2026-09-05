@@ -14,7 +14,6 @@ import androidx.room.PrimaryKey
 data class HabitEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
-    val question: String?,
     val colorArgb: Int,
     val notes: String?,
     val archived: Boolean = false,

@@ -105,7 +105,6 @@ class HabitEditorViewModel @Inject constructor(
             val loaded = HabitEditorUiState(
                 habitId = habit.id,
                 name = habit.name,
-                question = habit.question.orEmpty(),
                 colorArgb = habit.colorArgb,
                 notes = habit.notes.orEmpty(),
                 schedule = schedule,
@@ -118,8 +117,6 @@ class HabitEditorViewModel @Inject constructor(
     }
 
     fun onNameChange(value: String) = updateState { it.copy(name = value, nameError = false) }
-
-    fun onQuestionChange(value: String) = updateState { it.copy(question = value) }
 
     fun onColorChange(colorArgb: Int) = updateState { it.copy(colorArgb = colorArgb) }
 
@@ -178,7 +175,6 @@ class HabitEditorViewModel @Inject constructor(
             val habit = Habit(
                 id = state.habitId ?: 0L,
                 name = state.name.trim(),
-                question = state.question.trim().ifBlank { null },
                 colorArgb = state.colorArgb,
                 notes = state.notes.trim().ifBlank { null },
                 archived = false,

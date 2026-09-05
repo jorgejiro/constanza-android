@@ -38,7 +38,6 @@ class EntryDaoUniqueConstraintTest {
         val habitId = database.habitDao().insert(
             HabitEntity(
                 name = "Drink water",
-                question = null,
                 colorArgb = 0,
                 notes = null,
                 archivedAt = null,
@@ -74,7 +73,6 @@ class EntryDaoUniqueConstraintTest {
         val habitId = database.habitDao().insert(
             HabitEntity(
                 name = "Drink water",
-                question = null,
                 colorArgb = 0,
                 notes = null,
                 archivedAt = null,

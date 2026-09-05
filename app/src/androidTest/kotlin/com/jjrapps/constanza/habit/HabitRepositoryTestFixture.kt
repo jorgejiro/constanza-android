@@ -209,7 +209,6 @@ data class SeededHabit(val habitId: Long, val slotId: Long)
 fun newHabit(name: String = "Read"): Habit = Habit(
     id = 0,
     name = name,
-    question = null,
     colorArgb = 0,
     notes = null,
     archived = false,

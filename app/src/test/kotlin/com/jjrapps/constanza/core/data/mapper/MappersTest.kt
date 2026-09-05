@@ -27,7 +27,6 @@ class MappersTest {
         val habit = Habit(
             id = 7,
             name = "Meditate",
-            question = "Did you meditate today?",
             colorArgb = -1,
             notes = null,
             archived = true,
@@ -44,7 +43,6 @@ class MappersTest {
         val entity = HabitEntity(
             id = 1,
             name = "Drink water",
-            question = null,
             colorArgb = 0,
             notes = null,
             archived = false,

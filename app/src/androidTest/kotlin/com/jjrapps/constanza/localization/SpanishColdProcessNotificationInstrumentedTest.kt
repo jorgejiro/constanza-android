@@ -97,7 +97,7 @@ class SpanishColdProcessNotificationInstrumentedTest {
     @Test
     fun aReminderFiredWithNoActivityEverCreatedPostsInSpanish() = runBlocking {
         val habitName = "Meditar"
-        val habitId = fixture.database.insertHabitWithSchedule(kind = "DAILY", name = habitName, question = null)
+        val habitId = fixture.database.insertHabitWithSchedule(kind = "DAILY", name = habitName)
         val now = Instant.now()
         val occurrenceId = fixture.database.reminderOccurrenceDao().upsert(
             ReminderOccurrenceEntity(

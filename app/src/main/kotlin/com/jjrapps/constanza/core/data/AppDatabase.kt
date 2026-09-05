@@ -24,6 +24,13 @@ import com.jjrapps.constanza.core.data.entity.ScheduleEntity
  * `AppMigrations.MIGRATION_1_2`, registered in `DatabaseModule`. No column, table, or index
  * changed, so `2.json`'s `identityHash` is unchanged from `1.json` — asserted by
  * `AppDatabaseMigrationTest`, not merely expected.
+ *
+ * `version = 3` (remove-habit-question-field): drops `HabitEntity.question`. Since SQLite cannot
+ * drop a column in place, `AppMigrations.migration2To3` rebuilds `habits` via CREATE / INSERT /
+ * DROP / RENAME (design.md D1), so `3.json`'s `identityHash` genuinely differs from `2.json`'s.
+ * The rebuild runs while Room's own foreign-keys enforcement is still off (design.md D1's
+ * rationale), and a runtime child-row count guard (design.md D2) throws if any row in `schedules`,
+ * `reminder_slots`, `entries`, or `reminder_occurrences` is lost across the rebuild.
  */
 @Database(
     entities = [
@@ -33,7 +40,7 @@ import com.jjrapps.constanza.core.data.entity.ScheduleEntity
         EntryEntity::class,
         ReminderOccurrenceEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
