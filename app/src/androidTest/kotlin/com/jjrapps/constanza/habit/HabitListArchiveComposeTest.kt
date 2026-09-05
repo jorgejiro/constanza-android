@@ -78,7 +78,7 @@ class HabitListArchiveComposeTest {
     fun archivingAndUnArchivingRoundTripsTheHabitThroughTheListsFilter() {
         val viewModel = fixture.habitListViewModel()
         composeTestRule.setContent {
-            HabitListRoute(onCreateHabit = {}, onEditHabit = {}, viewModel = viewModel)
+            HabitListRoute(onBack = {}, onCreateHabit = {}, onEditHabit = {}, viewModel = viewModel)
         }
         val archiveLabel = text(R.string.habit_list_archive)
         val unarchiveLabel = text(R.string.habit_list_unarchive)

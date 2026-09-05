@@ -75,7 +75,7 @@ class HabitColorDotComposeTest {
         val viewModel = fixture.habitListViewModel()
 
         composeTestRule.setContent {
-            HabitListRoute(onCreateHabit = {}, onEditHabit = {}, viewModel = viewModel)
+            HabitListRoute(onBack = {}, onCreateHabit = {}, onEditHabit = {}, viewModel = viewModel)
         }
         awaitNodeWithText("Read")
 

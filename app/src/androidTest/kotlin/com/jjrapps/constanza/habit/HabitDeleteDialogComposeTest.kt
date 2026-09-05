@@ -56,7 +56,9 @@ class HabitDeleteDialogComposeTest {
 
     private fun showContentFor(habitId: Long) {
         val viewModel = fixture.habitListViewModel()
-        composeTestRule.setContent { HabitListRoute(onCreateHabit = {}, onEditHabit = {}, viewModel = viewModel) }
+        composeTestRule.setContent {
+            HabitListRoute(onBack = {}, onCreateHabit = {}, onEditHabit = {}, viewModel = viewModel)
+        }
         waitForNodeWithText(requireNotNull(runBlocking { fixture.habitRepository.findById(habitId) }).name)
     }
 

@@ -336,6 +336,14 @@ class CoreFlowE2ETest {
         compose.onNodeWithText(string(R.string.habit_list_archive)).performClick()
         awaitTextGone(ARCHIVED_HABIT)
 
+        // habit-list-back-navigation, proven with the REAL gesture on the real Activity, which is
+        // the only place it can be: before this, back here reached MainActivity's default and
+        // finished it, so a user who came to manage a habit had the app close on them instead of
+        // returning to Today. This test is already standing on the list with an onboarded app, so
+        // the proof costs one keypress rather than another launch.
+        device.pressBack()
+        awaitText(string(R.string.today_title))
+
         relaunchOnboardedApp()
         compose.onNodeWithText(ARCHIVED_HABIT).assertDoesNotExist()
         awaitText(string(R.string.today_empty))
@@ -444,10 +452,13 @@ class CoreFlowE2ETest {
         awaitText(string(R.string.today_title))
     }
 
-    /** The habit list has no route back to Today — `MainActivity` hoists a one-way `ConstanzaRoute`
-     *  and registers no `BackHandler` of its own — so re-opening the app is how a person gets back
-     *  there after creating a habit, and it is what this does. Onboarding is already done in every
-     *  caller of this helper, so relaunching goes straight to the post-onboarding app. */
+    /** Re-opens the app on Today, which is where every caller needs to be next. The habit list can
+     *  now be walked out of directly (habit-list-back-navigation, exercised in
+     *  [removingAHabitThroughTheUiTakesItOffTodayAndOutOfTheSchedule]), so this is no longer the
+     *  only way back — but a relaunch proves something the back arrow cannot: that what the UI just
+     *  did survived the process, rather than only the composition. That is why these tests keep
+     *  relaunching. Onboarding is already done in every caller, so it goes straight to the
+     *  post-onboarding app. */
     private fun relaunchOnboardedApp() {
         scenario?.close()
         launchOnboardedApp()
