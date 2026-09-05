@@ -50,7 +50,6 @@ data class BackupSettings(val defaultSnoozeMinutes: Int)
 data class BackupHabit(
     val id: Long,
     val name: String,
-    val question: String?,
     val colorArgb: Int,
     val notes: String?,
     val archived: Boolean,

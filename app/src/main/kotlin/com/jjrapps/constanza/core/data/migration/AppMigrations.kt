@@ -11,11 +11,14 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * unchanged — asserted by `AppDatabaseMigrationTest.runMigrationsAndValidate(..., 2, true, ...)`.
  *
  * **Rollback recipe**, written here because this is the file someone reverting will open first
- * (design.md decision 5): ship `Migration(2, 3)` inverting [HabitColorRemap.LEGACY_TO_CURRENT] (a
+ * (design.md decision 5): ship `Migration(3, 4)` inverting [HabitColorRemap.LEGACY_TO_CURRENT] (a
  * bijection, so the inverse is exact) and revert the palette the picker offers. Unmapped ints were
  * never written by this migration (see the `WHERE colorArgb IN (...)` guard below), so they need no
- * inverse. Never revert [com.jjrapps.constanza.core.data.AppDatabase]'s `version` back to 1 — Room
- * refuses to open an already-upgraded file at a lower version, making the user's data unreachable.
+ * inverse. Never revert [com.jjrapps.constanza.core.data.AppDatabase]'s `version` back to 1, 2, or
+ * 3 — Room refuses to open an already-upgraded file at a lower version, making the user's data
+ * unreachable. (`Migration(2, 3)`, the slot this note used to reserve, is now consumed by
+ * [migration2To3] — the removal of `HabitEntity.question` — so any future rollback recipe starts
+ * from version 4 onward.)
  *
  * **Deviation, flagged loudly (same class of issue as unit 1's `Color.kt` -> `ConstanzaColors.kt`
  * rename).** Declared as an `object`, not a `class`: detekt's default `VariableNaming` rule (active
@@ -36,6 +39,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * it — no `@Suppress` needed here either.
  */
 internal object AppMigrations {
+
+    /** detekt's `MagicNumber` ignores `-1, 0, 1, 2` by default (unconfigured here, same as every
+     *  other rule this file already leans on the defaults for) — `3` is not in that list, so
+     *  [migration2To3]'s `Migration(2, 3)` needs a named constant the same way task 3.5's own
+     *  `@Suppress` was rejected for this exact rule (see this object's own KDoc, second deviation). */
+    private const val SCHEMA_VERSION_3 = 3
 
     /**
      * **The sign trap.** `0xFF8E24AA.toInt()` is a *negative* `Int` once stored in the `colorArgb`
@@ -68,4 +77,65 @@ internal object AppMigrations {
                 )
             }
         }
+
+    /**
+     * Task 3.5 (design.md D1/D2). SQLite on `minSdk = 31` ships 3.32.2, below the 3.35 floor
+     * `ALTER TABLE ... DROP COLUMN` requires, so `habits` is rebuilt instead: `CREATE TABLE
+     * _new_habits` (the generated `createAllTables` DDL for `habits`, minus `question`, with the
+     * name substituted) -> `INSERT ... SELECT` the remaining columns -> `DROP TABLE habits` ->
+     * `RENAME TO habits`. No `PRAGMA` of any kind (design.md D1's rejected-alternatives table):
+     * Room's own generated delegate turns foreign keys on only in `onOpen`, which runs after
+     * `migrate()`, so the cascade is not armed while this rebuild runs — a checked fact, not an
+     * assumption about Room's internal ordering.
+     *
+     * [writer]`.write(db)` runs first, exactly as [migration1To2] does and for the same reason:
+     * its `Boolean` result is discarded because a recoverable snapshot failure must never fail the
+     * migration itself.
+     *
+     * **The child-row guard (design.md D2).** `habits` is the parent of four
+     * `ForeignKey(onDelete = CASCADE)` tables (`Entities.kt`) — `schedules`, `reminder_slots`,
+     * `entries`, `reminder_occurrences`. A rebuild that ran with foreign keys enforced would
+     * cascade-delete every row in all four the instant `DROP TABLE habits` ran. Counting all four
+     * before the drop and again after the rename, and throwing on any mismatch, turns that failure
+     * mode into a loud crash with an intact, rolled-back database and a surviving snapshot, rather
+     * than a silent, successful wipe — the `data-portability` requirement *Child Records Survive A
+     * Schema Migration* enforced on the device, mechanism-independent exactly as that requirement
+     * is written.
+     */
+    fun migration2To3(writer: PreMigrationSnapshotWriter): Migration =
+        object : Migration(2, SCHEMA_VERSION_3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                writer.write(db)
+
+                val before = childRowCounts(db)
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `_new_habits` (`id` INTEGER PRIMARY KEY " +
+                        "AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `colorArgb` INTEGER NOT " +
+                        "NULL, `notes` TEXT, `archived` INTEGER NOT NULL, `archivedAt` TEXT, " +
+                        "`createdAt` TEXT NOT NULL, `sortOrder` INTEGER NOT NULL)",
+                )
+                db.execSQL(
+                    "INSERT INTO `_new_habits` (`id`, `name`, `colorArgb`, `notes`, `archived`, " +
+                        "`archivedAt`, `createdAt`, `sortOrder`) SELECT `id`, `name`, `colorArgb`, " +
+                        "`notes`, `archived`, `archivedAt`, `createdAt`, `sortOrder` FROM `habits`",
+                )
+                db.execSQL("DROP TABLE `habits`")
+                db.execSQL("ALTER TABLE `_new_habits` RENAME TO `habits`")
+                val after = childRowCounts(db)
+                check(before == after) { "migration2To3 lost child rows: before=$before after=$after" }
+            }
+        }
+
+    /**
+     * design.md D2 — one query, four scalar subselects, in the fixed order `schedules`,
+     * `reminder_slots`, `entries`, `reminder_occurrences`, matching every CASCADE child of
+     * `habits` (`Entities.kt`).
+     */
+    private fun childRowCounts(db: SupportSQLiteDatabase): List<Int> = db.query(
+        "SELECT (SELECT COUNT(*) FROM schedules), (SELECT COUNT(*) FROM reminder_slots), " +
+            "(SELECT COUNT(*) FROM entries), (SELECT COUNT(*) FROM reminder_occurrences)",
+    ).use {
+        it.moveToFirst()
+        List(it.columnCount) { i -> it.getInt(i) }
+    }
 }

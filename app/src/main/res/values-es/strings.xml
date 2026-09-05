@@ -40,7 +40,6 @@
     <string name="habit_editor_title_edit">Editar hábito</string>
     <string name="habit_editor_name_label">Nombre</string>
     <string name="habit_editor_name_error">El nombre es obligatorio</string>
-    <string name="habit_editor_question_label">Pregunta guía (opcional)</string>
     <string name="habit_editor_notes_label">Notas (opcional)</string>
     <string name="habit_editor_color_label">Color</string>
     <string name="habit_editor_save">Guardar</string>

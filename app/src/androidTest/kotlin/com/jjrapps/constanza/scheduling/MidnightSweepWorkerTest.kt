@@ -74,7 +74,7 @@ class MidnightSweepWorkerTest {
 
     private suspend fun insertHabitWithSchedule(kind: String, timesPerWeek: Int? = null): Long {
         val habitId = database.habitDao().insert(
-            HabitEntity(name = "Read", question = null, colorArgb = 0, notes = null, archivedAt = null, createdAt = now.toString()),
+            HabitEntity(name = "Read", colorArgb = 0, notes = null, archivedAt = null, createdAt = now.toString()),
         )
         database.scheduleDao().upsert(
             ScheduleEntity(

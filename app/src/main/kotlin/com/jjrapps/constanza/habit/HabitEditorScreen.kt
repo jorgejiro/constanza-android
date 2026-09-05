@@ -124,7 +124,6 @@ fun HabitEditorRoute(
         state = state,
         actions = HabitEditorActions(
             onNameChange = viewModel::onNameChange,
-            onQuestionChange = viewModel::onQuestionChange,
             onColorChange = viewModel::onColorChange,
             onNotesChange = viewModel::onNotesChange,
             onSave = viewModel::save,
@@ -145,7 +144,6 @@ fun HabitEditorRoute(
  *  `LongParameterList` threshold — same reasoning as `scheduling.SchedulingDaos`/`habit.HabitDaos`. */
 data class HabitEditorActions(
     val onNameChange: (String) -> Unit,
-    val onQuestionChange: (String) -> Unit,
     val onColorChange: (Int) -> Unit,
     val onNotesChange: (String) -> Unit,
     val onSave: () -> Unit,
@@ -220,15 +218,6 @@ private fun HabitEditorForm(
             onNameChange = actions.onNameChange,
             nameError = state.nameError,
             focusedFieldId = focusedFieldId,
-        )
-        OutlinedTextField(
-            value = state.question,
-            onValueChange = actions.onQuestionChange,
-            label = { Text(stringResource(R.string.habit_editor_question_label)) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp)
-                .then(focusRestoring(FIELD_QUESTION, focusedFieldId)),
         )
         OutlinedTextField(
             value = state.notes,
@@ -338,7 +327,6 @@ private fun DiscardChangesDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 /** Field ids for task 6a.9's focus latch. Stable strings rather than an enum so the
  *  `rememberSaveable` holding one needs no custom Saver. */
 private const val FIELD_NAME = "name"
-private const val FIELD_QUESTION = "question"
 private const val FIELD_NOTES = "notes"
 
 /** Notes grows from a single-line field into a small multi-line one: `minLines` reserves the room

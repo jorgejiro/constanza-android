@@ -45,7 +45,6 @@ class HabitListArchiveComposeTest {
                 Habit(
                     id = 0,
                     name = HABIT_NAME,
-                    question = null,
                     colorArgb = 0,
                     notes = null,
                     archived = false,

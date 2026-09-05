@@ -8,7 +8,6 @@ import java.time.LocalDate
 data class Habit(
     val id: Long,
     val name: String,
-    val question: String?,
     val colorArgb: Int,
     val notes: String?,
     val archived: Boolean,

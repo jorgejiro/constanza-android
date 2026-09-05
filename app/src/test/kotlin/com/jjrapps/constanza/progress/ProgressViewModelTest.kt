@@ -63,7 +63,6 @@ class ProgressViewModelTest {
     private fun habit(archived: Boolean, archivedAt: LocalDate?) = Habit(
         id = HABIT_ID,
         name = "Read",
-        question = null,
         colorArgb = 0,
         notes = null,
         archived = archived,

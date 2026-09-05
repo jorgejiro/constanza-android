@@ -112,7 +112,6 @@ private fun validBackupJson(): String = """
         {
           "id": 1,
           "name": "Meditate",
-          "question": "Did you meditate today?",
           "colorArgb": -14575885,
           "notes": null,
           "archived": false,

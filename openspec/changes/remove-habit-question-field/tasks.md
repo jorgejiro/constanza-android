@@ -57,23 +57,23 @@ Satisfies `habit-management` → Habit List Row Actions And Name Display (4 scen
 Satisfies `habit-management` → Habit Creation (2 scenarios, regression-only) and `data-portability` →
 Child Records Survive A Schema Migration (2 scenarios). Least reversible slice — lands last.
 
-- [ ] 3.1 RED: extend `app/src/androidTest/kotlin/com/jjrapps/constanza/core/data/AppDatabaseMigrationTest.kt` with a table-driven 2→3 case (one seed helper + four child-table inserts, exit 2) — two habits, each with a schedule, reminder slot, entry, and reminder occurrence. Assert `question` gone from `PRAGMA table_info(habits)`, `pre-migration-v2.sql` written, and all four child rows survive per habit, unmixed. Keep the 1→2 case and the v1 seed SQL at line 114 as-is.
-- [ ] 3.2 `domain/src/main/kotlin/com/jjrapps/constanza/domain/model/Model.kt`: drop `Habit.question`.
-- [ ] 3.3 `core/data/entity/Entities.kt`: drop `HabitEntity.question`.
-- [ ] 3.4 `core/data/mapper/Mappers.kt`: drop both `question = question` lines.
-- [ ] 3.5 `core/data/migration/AppMigrations.kt`: add `migration2To3(writer)` — `CREATE TABLE _new_habits` (CREATE string copied verbatim from generated `app/build/generated/ksp/.../AppDatabase_Impl.kt` (read-only), name substituted) → `INSERT…SELECT` → `DROP TABLE habits` → `RENAME`; `writer.write(db)` runs first, its `Boolean` discarded. Add the child-row count guard: query all four child tables before the DROP and again after the RENAME, throw on mismatch (design D2). Re-point the rollback KDoc from `Migration(2,3)` to `Migration(3,4)` (design D7).
-- [ ] 3.6 `core/data/AppDatabase.kt`: `version = 3`; KDoc gains the v3 rebuild note.
-- [ ] 3.7 `core/di/DatabaseModule.kt:36`: `.addMigrations(migration1To2(writer), migration2To3(writer))`, one shared `PreMigrationSnapshotWriter`.
-- [ ] 3.8 `portability/BackupDto.kt`, `BackupMapper.kt`: drop `BackupHabit.question` and both mapping lines.
-- [ ] 3.9 `habit/HabitEditorScreen.kt`, `HabitEditorFormState.kt`, `HabitEditorViewModel.kt`: delete the question `OutlinedTextField`, `FIELD_QUESTION`, `onQuestionChange`, and both `question = ...` mapping lines.
-- [ ] 3.10 `res/values/strings.xml`, `res/values-es/strings.xml`: remove `habit_editor_question_label` from both.
-- [ ] 3.11 `habit/HabitRepositoryCrudTest.kt`: delete lines 63/69 (`question` clauses); add a `colorArgb` (non-null INTEGER) assertion to `updatingAHabitChangesItsStoredFields` (design D6) — `notes` at line 70 already carries the "field actually changed" proof.
-- [ ] 3.12 DELETE `HabitEditorViewModelTest.kt:434-443` (`onQuestionChange`-only test); repoint lines 101,107,118,144,606 to drop the `onQuestionChange` call and every `.question`/`question = ...` line.
-- [ ] 3.13 Mechanical `question` fixture drops across the remaining unit/instrumented test and seed files named in `exploration.md`'s test blast radius (`ModelTest`, `MappersTest`, `HabitListViewModelTest`, `ProgressViewModelTest`, `OccurrencePlannerTest`, `TodayViewModelTest`, `BackupImporterTest`, `BackupImporterNormalizationTest`, `HabitRepositoryDeleteSlotTest`, `HabitListArchiveComposeTest:47`, `HabitRepositoryTestFixture`, `EntryDaoUniqueConstraintTest`, `HabitColorDotComposeTest`, `ReconcileWorkerTest`, `MidnightSweepWorkerTest`, `PortabilityTestFixture`, `LiveSnoozeAcrossMidnightSeed`, `ImminentReminderSeed`).
-- [ ] 3.14 GREEN: run `./gradlew check`, `:app:compileDebugAndroidTestKotlin`, and the full instrumented matrix (Unit 3); confirm `AppMigrations.kt`'s KDoc names `Migration(3,4)` and `3.json` is committed.
+- [x] 3.1 RED: extend `app/src/androidTest/kotlin/com/jjrapps/constanza/core/data/AppDatabaseMigrationTest.kt` with a table-driven 2→3 case (one seed helper + four child-table inserts, exit 2) — two habits, each with a schedule, reminder slot, entry, and reminder occurrence. Assert `question` gone from `PRAGMA table_info(habits)`, `pre-migration-v2.sql` written, and all four child rows survive per habit, unmixed. Keep the 1→2 case and the v1 seed SQL at line 114 as-is.
+- [x] 3.2 `domain/src/main/kotlin/com/jjrapps/constanza/domain/model/Model.kt`: drop `Habit.question`.
+- [x] 3.3 `core/data/entity/Entities.kt`: drop `HabitEntity.question`.
+- [x] 3.4 `core/data/mapper/Mappers.kt`: drop both `question = question` lines.
+- [x] 3.5 `core/data/migration/AppMigrations.kt`: add `migration2To3(writer)` — `CREATE TABLE _new_habits` (CREATE string copied verbatim from generated `app/build/generated/ksp/.../AppDatabase_Impl.kt` (read-only), name substituted) → `INSERT…SELECT` → `DROP TABLE habits` → `RENAME`; `writer.write(db)` runs first, its `Boolean` discarded. Add the child-row count guard: query all four child tables before the DROP and again after the RENAME, throw on mismatch (design D2). Re-point the rollback KDoc from `Migration(2,3)` to `Migration(3,4)` (design D7).
+- [x] 3.6 `core/data/AppDatabase.kt`: `version = 3`; KDoc gains the v3 rebuild note.
+- [x] 3.7 `core/di/DatabaseModule.kt:36`: `.addMigrations(migration1To2(writer), migration2To3(writer))`, one shared `PreMigrationSnapshotWriter`.
+- [x] 3.8 `portability/BackupDto.kt`, `BackupMapper.kt`: drop `BackupHabit.question` and both mapping lines.
+- [x] 3.9 `habit/HabitEditorScreen.kt`, `HabitEditorFormState.kt`, `HabitEditorViewModel.kt`: delete the question `OutlinedTextField`, `FIELD_QUESTION`, `onQuestionChange`, and both `question = ...` mapping lines.
+- [x] 3.10 `res/values/strings.xml`, `res/values-es/strings.xml`: remove `habit_editor_question_label` from both.
+- [x] 3.11 `habit/HabitRepositoryCrudTest.kt`: delete lines 63/69 (`question` clauses); add a `colorArgb` (non-null INTEGER) assertion to `updatingAHabitChangesItsStoredFields` (design D6) — `notes` at line 70 already carries the "field actually changed" proof.
+- [x] 3.12 DELETE `HabitEditorViewModelTest.kt:434-443` (`onQuestionChange`-only test); repoint lines 101,107,118,144,606 to drop the `onQuestionChange` call and every `.question`/`question = ...` line.
+- [x] 3.13 Mechanical `question` fixture drops across the remaining unit/instrumented test and seed files named in `exploration.md`'s test blast radius (`ModelTest`, `MappersTest`, `HabitListViewModelTest`, `ProgressViewModelTest`, `OccurrencePlannerTest`, `TodayViewModelTest`, `BackupImporterTest`, `BackupImporterNormalizationTest`, `HabitRepositoryDeleteSlotTest`, `HabitListArchiveComposeTest:47`, `HabitRepositoryTestFixture`, `EntryDaoUniqueConstraintTest`, `HabitColorDotComposeTest`, `ReconcileWorkerTest`, `MidnightSweepWorkerTest`, `PortabilityTestFixture`, `LiveSnoozeAcrossMidnightSeed`, `ImminentReminderSeed`).
+- [x] 3.14 GREEN: run `./gradlew check`, `:app:compileDebugAndroidTestKotlin`, and the full instrumented matrix (Unit 3); confirm `AppMigrations.kt`'s KDoc names `Migration(3,4)` and `3.json` is committed.
 
 ## Phase 4: Cleanup / Final Verification
 
-- [ ] 4.1 Confirm no `question` identifier remains in `domain/`, `app/src/main`, `app/src/test`, or `app/src/androidTest`, except the v1 seed SQL at `AppDatabaseMigrationTest.kt:114`.
-- [ ] 4.2 Run `:app:detektMain` (not the full `:app:detekt`, already red on unmodified `main` `TodayViewModelTest.kt`, unrelated to this change).
+- [x] 4.1 Confirm no `question` identifier remains in `domain/`, `app/src/main`, `app/src/test`, or `app/src/androidTest`, except the v1 seed SQL at `AppDatabaseMigrationTest.kt:114`.
+- [x] 4.2 Run `:app:detektMain` (not the full `:app:detekt`, already red on unmodified `main` `TodayViewModelTest.kt`, unrelated to this change).
 - [ ] 4.3 Manual, non-matrix step: notification template and list-row rendering on a real device under One UI (`testing.instrumented.device_free_matrix.limits`).

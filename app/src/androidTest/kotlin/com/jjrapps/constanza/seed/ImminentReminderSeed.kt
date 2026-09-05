@@ -32,9 +32,6 @@ private const val SEED_LEAD_MINUTES = 4
  *  and matching the name this project's other on-device checks already use. */
 private const val SEED_HABIT_NAME = "Meditate"
 
-/** The habit's question, so a posted notification carries recognisable body text too. */
-private const val SEED_HABIT_QUESTION = "Did you meditate today?"
-
 /**
  * Mirrors `WorkerConstantsModule`'s private `RESOLVE_DEADLINE_HOURS`, which Hilt injects into the
  * production [OccurrencePlanner] but which is not visible outside that module. It only widens the
@@ -183,7 +180,6 @@ class ImminentReminderSeed {
         val habitId = daos.habitDao.insert(
             HabitEntity(
                 name = SEED_HABIT_NAME,
-                question = SEED_HABIT_QUESTION,
                 colorArgb = SEED_COLOR_ARGB,
                 notes = null,
                 archived = false,

@@ -53,7 +53,6 @@ class OccurrencePlannerTest {
     private fun habit(archived: Boolean = false) = HabitEntity(
         id = HABIT_ID,
         name = "H",
-        question = null,
         colorArgb = 0,
         notes = null,
         archived = archived,

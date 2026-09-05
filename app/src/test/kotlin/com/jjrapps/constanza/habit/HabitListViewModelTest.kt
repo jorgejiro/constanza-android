@@ -32,7 +32,6 @@ class HabitListViewModelTest {
     private fun habit(id: Long, name: String, archived: Boolean) = Habit(
         id = id,
         name = name,
-        question = null,
         colorArgb = 0,
         notes = null,
         archived = archived,

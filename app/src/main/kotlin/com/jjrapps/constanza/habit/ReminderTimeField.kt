@@ -59,7 +59,7 @@ const val REMINDER_TIME_MODE_TOGGLE_TEST_TAG = "reminder_time_mode_toggle"
  *
  * **Why a bordered, tappable row rather than a `readOnly` `OutlinedTextField`.** Visually the two
  * are the same thing: [Dimens.FieldBorder] and `shapes.extraSmall` are exactly what M3 draws around
- * an unfocused outlined field, so this lines up with the name/question/notes fields and with
+ * an unfocused outlined field, so this lines up with the name/notes fields and with
  * `ScheduleKindPicker` directly above it. Structurally they are not. A `readOnly` text field still
  * consumes the tap to place a caret, so making one open a dialog needs either an invisible overlay
  * (two nodes, one of them unlabelled, for one control) or `enabled = false` (which leaks a

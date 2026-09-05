@@ -1,6 +1,7 @@
 package com.jjrapps.constanza.core.data
 
 import androidx.room.testing.MigrationTestHelper
+import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.test.platform.app.InstrumentationRegistry
 import com.jjrapps.constanza.core.data.migration.AppMigrations
@@ -8,6 +9,7 @@ import com.jjrapps.constanza.core.data.migration.HabitColorRemap
 import com.jjrapps.constanza.core.data.migration.PreMigrationSnapshotWriter
 import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -38,6 +40,9 @@ class AppDatabaseMigrationTest {
     /** Builds a fresh migration instance per test — mirrors `DatabaseModule.provideAppDatabase`'s
      *  real call shape (task 3.3), rather than reusing a single instance across tests. */
     private fun migration1To2() = AppMigrations.migration1To2(PreMigrationSnapshotWriter(targetFilesDir))
+
+    /** Same reasoning as [migration1To2]: a fresh instance per test. */
+    private fun migration2To3() = AppMigrations.migration2To3(PreMigrationSnapshotWriter(targetFilesDir))
 
     @Test
     fun version1SchemaCreatesFromTheCheckedInExport() {
@@ -115,5 +120,95 @@ class AppDatabaseMigrationTest {
                 "VALUES (?, ?, NULL, ?, NULL, 0, NULL, ?, 0)",
             arrayOf<Any>(id, "Habit $id", colorArgb, "2026-01-01T08:00:00Z"),
         )
+    }
+
+    /**
+     * Task 3.1 (design.md D1/D2, `data-portability`: Child Records Survive A Schema Migration).
+     * Seeds a real `version = 2` database (still carrying `question`, hence its own literal INSERT
+     * rather than reusing [seedHabit]'s v1-shaped one) with two habits, each carrying exactly one
+     * row in every CASCADE-child table of `habits` (`schedules`, `reminder_slots`, `entries`,
+     * `reminder_occurrences` — `Entities.kt`), runs the real `migration2To3`, and asserts three
+     * things: `question` is gone from `habits`, the pre-migration snapshot fired, and every child
+     * row survived, unmixed between the two habits. That last assertion is what actually catches
+     * the CASCADE trap design.md D1/D2 exist to prevent — a naive rebuild would pass every other
+     * check here while silently emptying all four tables.
+     */
+    @Test
+    fun migration2To3DropsTheQuestionColumnAndEveryHabitsChildRowsSurviveUnmixed() {
+        val habitOneId = 1L
+        val habitTwoId = 2L
+        val slotOneId = 10L
+        val slotTwoId = 20L
+
+        migrationTestHelper.createDatabase(TEST_DB_NAME, version = 2).use { db ->
+            seedHabitWithChildRows(db, habitId = habitOneId, slotId = slotOneId, occurrenceId = 100L)
+            seedHabitWithChildRows(db, habitId = habitTwoId, slotId = slotTwoId, occurrenceId = 200L)
+        }
+
+        val migratedDb = migrationTestHelper.runMigrationsAndValidate(TEST_DB_NAME, 3, true, migration2To3())
+
+        migratedDb.query("PRAGMA table_info(habits)").use { cursor ->
+            val columnNames = generateSequence { if (cursor.moveToNext()) cursor.getString(1) else null }.toList()
+            assertFalse("question must be dropped from habits by the v2 to v3 rebuild", "question" in columnNames)
+        }
+        migratedDb.query("SELECT id FROM habits ORDER BY id").use { cursor ->
+            assertTrue(cursor.moveToNext())
+            assertEquals("the first habit row must survive the rebuild", habitOneId, cursor.getLong(0))
+            assertTrue(cursor.moveToNext())
+            assertEquals("the second habit row must survive the rebuild", habitTwoId, cursor.getLong(0))
+        }
+        assertEveryChildRowSurvives(migratedDb, habitId = habitOneId, slotId = slotOneId)
+        assertEveryChildRowSurvives(migratedDb, habitId = habitTwoId, slotId = slotTwoId)
+
+        val snapshotFile = File(targetFilesDir, "pre-migration/pre-migration-v2.sql")
+        assertTrue("expected the v2 pre-migration snapshot file to exist at $snapshotFile", snapshotFile.exists())
+    }
+
+    /** One habit plus exactly one row in each of `habits`' four CASCADE-child tables, table-driven
+     *  so a second habit (needed to prove records survive independently) costs one extra call
+     *  rather than a second copy of this SQL. */
+    private fun seedHabitWithChildRows(db: SupportSQLiteDatabase, habitId: Long, slotId: Long, occurrenceId: Long) {
+        db.execSQL(
+            "INSERT INTO habits (id, name, question, colorArgb, notes, archived, archivedAt, createdAt, sortOrder) " +
+                "VALUES (?, ?, NULL, 0, NULL, 0, NULL, ?, 0)",
+            arrayOf<Any>(habitId, "Habit $habitId", "2026-01-01T08:00:00Z"),
+        )
+        db.execSQL(
+            "INSERT INTO schedules (habitId, kind, timesPerWeek, dayOfWeek, dayOfMonth, intervalDays, " +
+                "anchorDate, weekStart) VALUES (?, 'DAILY', NULL, NULL, NULL, NULL, NULL, 1)",
+            arrayOf<Any>(habitId),
+        )
+        db.execSQL(
+            "INSERT INTO reminder_slots (id, habitId, minuteOfDay, enabled) VALUES (?, ?, 480, 1)",
+            arrayOf<Any>(slotId, habitId),
+        )
+        db.execSQL(
+            "INSERT INTO entries (habitId, date, slotId, status, value, answeredAt, source) " +
+                "VALUES (?, '2026-09-01', ?, 'COMPLETED', NULL, '2026-09-01T08:00:00Z', 'IN_APP')",
+            arrayOf<Any>(habitId, slotId),
+        )
+        db.execSQL(
+            "INSERT INTO reminder_occurrences (id, habitId, slotId, scheduledDate, scheduledAtEpochMs, " +
+                "state, exact, snoozeUntilEpochMs, snoozeCount, notifiedAtEpochMs, resolveDeadlineMs) " +
+                "VALUES (?, ?, ?, '2026-09-01', 0, 'ARMED', 1, NULL, 0, NULL, 0)",
+            arrayOf<Any>(occurrenceId, habitId, slotId),
+        )
+    }
+
+    /** Exactly one row per CASCADE-child table, scoped to [habitId] — proves survival AND that
+     *  nothing bled between the two seeded habits (`data-portability`'s "each habit's records
+     *  survive independently" scenario). */
+    private fun assertEveryChildRowSurvives(db: SupportSQLiteDatabase, habitId: Long, slotId: Long) {
+        assertRowCount(db, "SELECT COUNT(*) FROM schedules WHERE habitId = ?", habitId)
+        assertRowCount(db, "SELECT COUNT(*) FROM reminder_slots WHERE habitId = ? AND id = ?", habitId, slotId)
+        assertRowCount(db, "SELECT COUNT(*) FROM entries WHERE habitId = ? AND slotId = ?", habitId, slotId)
+        assertRowCount(db, "SELECT COUNT(*) FROM reminder_occurrences WHERE habitId = ? AND slotId = ?", habitId, slotId)
+    }
+
+    private fun assertRowCount(db: SupportSQLiteDatabase, sql: String, vararg args: Long) {
+        db.query(SimpleSQLiteQuery(sql, args.map { it as Any }.toTypedArray())).use { cursor ->
+            cursor.moveToFirst()
+            assertEquals("$sql ${args.toList()}", 1, cursor.getInt(0))
+        }
     }
 }

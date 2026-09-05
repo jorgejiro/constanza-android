@@ -24,17 +24,21 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.DATABASE_NAME)
-            // Task 2.4 (design.md decision 3, hard blocker C4): without this, Room throws
-            // `IllegalStateException: A migration from 1 to 2 was required but not found` at
-            // first open on every existing install.
-            //
-            // Task 3.3: `AppMigrations` stays an `object` (see its KDoc), so `filesDir` cannot be
-            // a constructor parameter on it — the writer is built here, at the one call site that
-            // has a `Context`, and handed into the factory function instead.
-            .addMigrations(AppMigrations.migration1To2(PreMigrationSnapshotWriter(context.filesDir)))
+    fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
+        // Task 2.4/3.7 (design.md decision 3, hard blocker C4): without every migration in this
+        // chain, Room throws `IllegalStateException: A migration from N to N+1 was required but
+        // not found` at first open on any install stuck at that version.
+        //
+        // Task 3.3: `AppMigrations` stays an `object` (see its KDoc), so `filesDir` cannot be a
+        // constructor parameter on it — the writer is built here, at the one call site that has a
+        // `Context`, and handed into both factory functions. One shared instance: both migrations
+        // write to the same `files/pre-migration/` directory, and each names its snapshot from
+        // `db.version` (design.md D3), so they never collide.
+        val writer = PreMigrationSnapshotWriter(context.filesDir)
+        return Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.DATABASE_NAME)
+            .addMigrations(AppMigrations.migration1To2(writer), AppMigrations.migration2To3(writer))
             .build()
+    }
 
     @Provides
     fun provideHabitDao(database: AppDatabase): HabitDao = database.habitDao()

@@ -98,13 +98,11 @@ class HabitEditorViewModelTest {
         coEvery { habitRepository.create(capture(habitSlot), capture(scheduleSlot)) } returns 42L
         val viewModel = newViewModel()
         viewModel.onNameChange("  Drink water  ")
-        viewModel.onQuestionChange("Did you drink water?")
         viewModel.onNotesChange("  ")
 
         viewModel.save()
 
         assertEquals("Drink water", habitSlot.captured.name)
-        assertEquals("Did you drink water?", habitSlot.captured.question)
         assertNull(habitSlot.captured.notes)
         assertEquals(Schedule.Daily(DayOfWeek.MONDAY), scheduleSlot.captured)
         assertFalse(viewModel.uiState.value.isSaving)
@@ -115,7 +113,6 @@ class HabitEditorViewModelTest {
         val existing = Habit(
             id = EXISTING_HABIT_ID,
             name = "Read",
-            question = "Did you read?",
             colorArgb = 0xFF1E88E5.toInt(),
             notes = "Any book counts",
             archived = false,
@@ -141,7 +138,6 @@ class HabitEditorViewModelTest {
         val existing = Habit(
             id = EXISTING_HABIT_ID,
             name = "Read",
-            question = null,
             colorArgb = 0,
             notes = null,
             archived = false,
@@ -432,17 +428,6 @@ class HabitEditorViewModelTest {
     }
 
     @Test
-    fun `editing the guiding question makes the form dirty and undoing it makes it clean again`() = runTest {
-        val viewModel = newViewModel()
-
-        viewModel.onQuestionChange("Did you?")
-        assertTrue(viewModel.uiState.value.isDirty)
-
-        viewModel.onQuestionChange("")
-        assertFalse(viewModel.uiState.value.isDirty)
-    }
-
-    @Test
     fun `editing the notes makes the form dirty and undoing it makes it clean again`() = runTest {
         val viewModel = newViewModel()
 
@@ -603,7 +588,6 @@ class HabitEditorViewModelTest {
         val existing = Habit(
             id = EXISTING_HABIT_ID,
             name = "Read",
-            question = "Did you read?",
             colorArgb = HabitPalette.DEFAULT,
             notes = "Any book counts",
             archived = false,

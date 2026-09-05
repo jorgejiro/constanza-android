@@ -54,7 +54,6 @@ class PortabilityTestFixture(context: Context, dataStoreFile: File) {
 
 fun habitEntity(name: String, archived: Boolean = false, archivedAt: String? = null): HabitEntity = HabitEntity(
     name = name,
-    question = null,
     colorArgb = 0,
     notes = null,
     archived = archived,
