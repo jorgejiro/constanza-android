@@ -98,7 +98,7 @@ class NotificationPosterTest {
     fun `postReminder skips notify entirely and reports no post when posting is blocked`() = runTest {
         every { manager.areNotificationsEnabled() } returns false
 
-        assertFalse(poster.postReminder(OCCURRENCE_ID, "Meditate", "Did you meditate today?", 0))
+        assertFalse(poster.postReminder(OCCURRENCE_ID, "Meditate", 0))
 
         verify(exactly = 0) { manager.notify(any<Int>(), any()) }
     }

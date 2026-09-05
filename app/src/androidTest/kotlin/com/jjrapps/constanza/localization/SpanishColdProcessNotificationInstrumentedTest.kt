@@ -96,7 +96,8 @@ class SpanishColdProcessNotificationInstrumentedTest {
 
     @Test
     fun aReminderFiredWithNoActivityEverCreatedPostsInSpanish() = runBlocking {
-        val habitId = fixture.database.insertHabitWithSchedule(kind = "DAILY", name = "Meditar", question = null)
+        val habitName = "Meditar"
+        val habitId = fixture.database.insertHabitWithSchedule(kind = "DAILY", name = habitName, question = null)
         val now = Instant.now()
         val occurrenceId = fixture.database.reminderOccurrenceDao().upsert(
             ReminderOccurrenceEntity(
@@ -114,10 +115,22 @@ class SpanishColdProcessNotificationInstrumentedTest {
 
         fixture.fireArmedAlarmFor(occurrence)
 
+        // reminder-response (MODIFIED): the language guarantee moved from the body to the title.
+        // The title is the one locale-survival witness left in this cold-process class; the body
+        // is the user's own habit name and MUST NOT be localized (it happens to be a Spanish word
+        // here only because the test's fixture habit is named "Meditar").
         val posted = fixture.awaitPostedNotification(occurrenceId.toInt())
         assertEquals(
-            "¿Lo has hecho?",
+            "Seguimiento de hábitos",
+            posted.notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
+        )
+        assertEquals(
+            habitName,
             posted.notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString(),
+        )
+        assertEquals(
+            habitName,
+            posted.notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString(),
         )
         val actionLabels = posted.notification.actions.map { it.title.toString() }
         assertEquals(listOf("Sí", "No", "Aplazar"), actionLabels)
