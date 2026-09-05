@@ -8,7 +8,8 @@ Defines creation, editing, and archiving of `Habit` records and their attached `
 
 ### Requirement: Habit Creation
 
-The system MUST allow creating a `Habit` with a name, an optional guiding question, optional colour, optional notes, and exactly one attached `Schedule` of any supported frequency kind.
+The system MUST allow creating a `Habit` with a name, optional colour, optional notes, and
+exactly one attached `Schedule` of any supported frequency kind.
 
 #### Scenario: Create a daily habit
 - GIVEN no existing habits
@@ -165,3 +166,32 @@ listed, not only within the habit editor.
 - WHEN the user views the habit list screen
 - THEN each habit's row visibly displays its own colour, distinguishing the two habits from each
   other
+
+### Requirement: Habit List Row Actions And Name Display
+
+The habit list row's trailing content MUST show only one overflow menu launcher; it MUST NOT
+render Progress, Archive/Un-archive, or Delete as always-visible buttons. Opening the menu MUST
+offer Progress, Archive or Un-archive (matching the habit's current state), and Delete as items.
+The habit's name MUST wrap across up to two lines before truncating, and MUST be ellipsized only
+once both lines are full.
+
+#### Scenario: The row shows only the overflow launcher
+- GIVEN a habit list row
+- WHEN it renders
+- THEN Progress, Archive/Un-archive, and Delete are not shown as always-visible buttons, and the
+  row shows a single overflow menu launcher
+
+#### Scenario: The overflow menu offers all three actions
+- GIVEN a habit list row with the overflow menu closed
+- WHEN the user opens it
+- THEN Progress, Archive or Un-archive, and Delete all appear as menu items
+
+#### Scenario: A long name wraps onto a second line before truncating
+- GIVEN a habit name long enough to need two lines at the row's rendered width but no more
+- WHEN the row renders
+- THEN the full name is visible across two lines with no ellipsis
+
+#### Scenario: A name exceeding two lines is ellipsized
+- GIVEN a habit name that would need more than two lines at the row's rendered width
+- WHEN the row renders
+- THEN the name is capped at two lines and ends with an ellipsis

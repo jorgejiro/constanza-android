@@ -1726,7 +1726,7 @@ carried_forward_open_items:
         output rather than the presence of one string among others.
     - id: "reminder-notification-shows-a-question-and-truncates-long-habit-names"
       title: "The reminder notification carries a question line the maintainer does not want, and clips long habit names"
-      status: open
+      status: resolved
       severity: >
         Cosmetic in the strict sense — no reminder is lost and no answer is
         mis-recorded — but this is the surface the product is used from. The
@@ -1829,6 +1829,52 @@ carried_forward_open_items:
         Deliberately deferred by the maintainer until the four app-localization
         coverage items above are closed. Analyse it as its own change then;
         do not fold it into that test-coverage pass.
+      resolution: >
+        Closed 2026-09-05 by change `remove-habit-question-field`, archived at
+        openspec/changes/archive/2026-09-05-remove-habit-question-field/,
+        shipped as PRs #80, #82 and #83.
+
+        The `question` field left the product entirely, as the maintainer
+        asked, rather than being hidden from the notification. The notification
+        now carries a fixed localized title (`Seguimiento de hábitos` /
+        `Habit tracker`) with the habit name in the body plus `BigTextStyle`,
+        and the habit list row shows the name alone, bounded to two lines, with
+        every action behind the overflow menu.
+
+        Both shapes were chosen from measured emulator renders, not from
+        reasoning. The notification body took a real 56-character habit from 29
+        visible characters to 44; the row's name column went from 509px to
+        723px, which is the difference between that name clipped at 45
+        characters and rendered whole. Open question 3 above — "resolve these
+        as ONE decision, never as two" — was answered by rendering all three
+        candidates and looking at them: name-as-title was rejected because it
+        pays 15 characters of habit name to buy 11 pixels of card height, and
+        name-in-both because it prints the same sentence truncated twice.
+
+        Open question 1 (old backups) was settled by the maintainer as "no
+        compatibility, the app has never been published". Open question 2 was
+        already settled when this item was filed. Question 4's constraints held:
+        the three actions, `REMINDER_CHANNEL_ID` and the notification id are
+        untouched.
+
+        This change also SUPERSEDED decision D2 of
+        openspec/changes/archive/2026-09-03-habit-deletion/design.md:41-53,
+        which had deliberately kept Progress and Archive inline. Superseded for
+        a reason D2 never weighed — row width. Residual risk carried: Archive
+        and Delete are now adjacent overflow-menu items.
+      residual_manual_verification: >
+        NOT closed by this resolution, and deliberately not hidden inside it:
+        task 4.3 of the change, the manual on-device check of the notification
+        template and the list row on One UI, has not been performed. Every
+        rendering measurement above came from an AOSP emulator, and per
+        `testing.instrumented.device_free_matrix` Samsung's shade metrics are
+        not reproducible there — a green matrix is not evidence about a real
+        S25. Two specific expectations remain unverified on hardware: that the
+        emulator's ONE-line collapsed body renders as TWO on One UI (the
+        maintainer measured two, which would fit the whole 56-character name
+        collapsed), and that the fixed title does not truncate at Samsung's
+        metrics rather than at the emulator's 527px ceiling. If either turns
+        out false on the device, reopen this item rather than filing a new one.
     - id: "today-add-habit-is-not-a-fab"
       title: "Today's add-habit affordance disagrees with the habit list's"
       status: open
