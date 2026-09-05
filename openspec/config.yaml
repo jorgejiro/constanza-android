@@ -1829,6 +1829,105 @@ carried_forward_open_items:
         Deliberately deferred by the maintainer until the four app-localization
         coverage items above are closed. Analyse it as its own change then;
         do not fold it into that test-coverage pass.
+    - id: "today-add-habit-is-not-a-fab"
+      title: "Today's add-habit affordance disagrees with the habit list's"
+      status: open
+      severity: >
+        Cosmetic. Nothing is unreachable and nothing is mis-recorded; the two
+        screens simply offer one action in two shapes.
+      origin: >
+        Reported by the maintainer on 2026-09-05. His words: the button "no me
+        cuadra" — it should be a "+" button, bottom-right, identical to the
+        habit list screen's.
+      reason: >
+        `HabitListScreen.kt:144-148` uses `Scaffold`'s `floatingActionButton`
+        slot with `Icons.Filled.Add`. Today instead uses a centred filled
+        Button in two presentations — `TodayEmptyState` (`TodayScreen.kt:207`)
+        and `TrailingAddHabitAction` (`TodayScreen.kt:227`), both living in
+        `tracking/TodayAddHabitAction.kt`.
+      supersedes: >
+        This REVERSES a recorded decision, and whoever implements it should
+        read what they are reversing. The resolution of the resolved item
+        `today-has-no-add-habit-affordance` above says, verbatim: "NOT a
+        FloatingActionButton for the populated case […] `HabitListScreen`
+        already has a FAB for creating a habit and is one tap away behind
+        'Manage habits', so a second, differently shaped create affordance
+        would leave the two screens disagreeing about what creating a habit
+        looks like."
+
+        That argument invokes consistency and reaches the opposite conclusion
+        from the maintainer's, and it does not parse cleanly: if Today also had
+        a FAB the two screens would AGREE, not disagree. The same resolution's
+        second argument actively supports the change — it worried a trailing
+        list item could be misread as a habit row, since every row leads with
+        a colour dot; a floating button sits above the list and cannot be
+        misread that way at all.
+      open_questions: >
+        1. The empty state. The centred button currently pairs with the
+        `today_empty` sentence — the sentence says what the state is, the
+        button says what to do about it. Does the FAB replace that pairing, or
+        do both survive?
+        2. Past days. `today-past-day-correction` deliberately REMOVES
+        add-habit when a past day is being viewed, in both the empty and
+        populated branches, because a schedule starts when the habit is
+        created. The FAB must respect that or the rule is silently broken.
+      sizing: >
+        One screen, one extracted composable, and its compose tests. Small
+        enough for a direct change once the two questions above are answered.
+    - id: "no-weekday-only-schedule-kind"
+      title: "A habit cannot be scheduled for weekdays only"
+      status: open
+      severity: >
+        Missing capability, not a defect. Today the nearest fit is Daily, which
+        fires on Saturday and Sunday too, so a weekday habit is guaranteed to
+        record weekend misses it never earned — which corrupts the streak and
+        compliance figures rather than merely annoying the user.
+      origin: >
+        Requested by the maintainer on 2026-09-05: alongside the existing
+        options when creating a habit, one that notifies only on working days,
+        Monday to Friday. His framing — "básicamente es como un hábito diario
+        pero solo los días laborables".
+      reason: >
+        `Schedule` (domain/.../model/Model.kt:24-54) is a sealed hierarchy of
+        six kinds — `Daily`, `TimesPerDay`, `NTimesPerWeek`,
+        `Weekly(dayOfWeek)`, `Monthly(dayOfMonth)`, `EveryNDays(n, anchor)`.
+        None expresses a set of weekdays: `Weekly` carries exactly ONE
+        `DayOfWeek`, and `ScheduleEntity.dayOfWeek` (Entities.kt:42) is a
+        single nullable Int to match.
+      design_fork: >
+        The sharpest decision, and it belongs to the maintainer rather than
+        the implementer, because the cheap answer forecloses the useful one.
+
+        (a) A narrow `Weekdays` kind — smallest change, answers exactly what
+        was asked, and adds a seventh member that a later "Mon/Wed/Fri"
+        request would have to duplicate.
+
+        (b) A general `DaysOfWeek(Set<DayOfWeek>)` kind that SUBSUMES `Weekly`
+        (a one-element set) and gives Mon/Wed/Fri, weekends-only and every
+        other combination for free. Larger: it either migrates `Weekly` into it
+        or leaves two overlapping kinds, and the picker must present a set
+        without becoming a wall of checkboxes.
+      storage_note: >
+        Either way `ScheduleEntity.dayOfWeek` cannot hold a set. A bitmask in
+        the existing column or a new column both mean a Room migration — v3 to
+        v4, since `remove-habit-question-field` is consuming v3. Whoever plans
+        this should read that change's design first: it establishes that a
+        parent-table rebuild cascade-deletes children unless handled, and that
+        `PRAGMA defer_foreign_keys` does NOT prevent it.
+      open_questions: >
+        1. Is "laborable" literally Monday-to-Friday, or derived from the
+        configurable `weekStart` the model already carries and injects
+        (design.md D7)? The maintainer said Monday to Friday explicitly, so
+        literal is the default reading — but the model is locale-aware
+        everywhere else, and a kind that ignores `weekStart` should say so
+        deliberately rather than by omission.
+        2. Holidays are NOT in scope unless the maintainer says otherwise. A
+        public-holiday calendar is a different feature with a data source
+        behind it.
+      sizing: >
+        Domain model, Room migration, the occurrence planner, the schedule
+        editor UI, backup format and strings in both locales. SDD-sized, and
+        option (b) more so than (a).
 stack:
   status: ratified
   note: >
