@@ -65,9 +65,9 @@ class OccurrencePlannerTest {
         dayOfMonth = null, intervalDays = null, anchorDate = null, weekStart = 1,
     )
 
-    private fun weekly(dayOfWeek: Int) = ScheduleEntity(
-        habitId = HABIT_ID, kind = "WEEKLY", timesPerWeek = null, dayOfWeek = dayOfWeek,
-        dayOfMonth = null, intervalDays = null, anchorDate = null, weekStart = 1,
+    private fun daysOfWeek(mask: Int) = ScheduleEntity(
+        habitId = HABIT_ID, kind = "DAYS_OF_WEEK", timesPerWeek = null, dayOfWeek = null,
+        dayOfMonth = null, intervalDays = null, anchorDate = null, weekStart = 1, daysOfWeekMask = mask,
     )
 
     private fun slot(id: Long = SLOT_ID, enabled: Boolean = true) =
@@ -129,8 +129,8 @@ class OccurrencePlannerTest {
         stubTimeAndDefaults()
         coEvery { habitDao.findAllSnapshot() } returns listOf(habit())
         // TODAY is Thursday 2026-01-01; the horizon (Thu/Fri/Sat) contains no Monday, so the next
-        // Monday (2026-01-05) must be found by the beyond-horizon search.
-        coEvery { scheduleDao.findByHabitId(HABIT_ID) } returns weekly(dayOfWeek = 1)
+        // Monday (2026-01-05) must be found by the beyond-horizon search. Mask bit 0 == Monday.
+        coEvery { scheduleDao.findByHabitId(HABIT_ID) } returns daysOfWeek(mask = 0b0000001)
         coEvery { reminderSlotDao.findByHabitId(HABIT_ID) } returns listOf(slot())
         coEvery { reminderOccurrenceDao.findByHabitId(HABIT_ID) } returns emptyList()
 

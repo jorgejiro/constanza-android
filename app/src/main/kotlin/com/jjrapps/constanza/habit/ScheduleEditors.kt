@@ -73,8 +73,10 @@ fun ScheduleSection(
                 modifier = Modifier.padding(top = 8.dp),
             )
 
-            is Schedule.Weekly -> DayOfWeekPicker(
-                selected = schedule.dayOfWeek,
+            // weekday-only-schedule WU1: mechanical repoint, single-day selection unchanged.
+            // WU2 replaces this branch with a real multi-select DayOfWeekPicker(selectedDays, ...).
+            is Schedule.DaysOfWeek -> DayOfWeekPicker(
+                selected = schedule.days.first(),
                 onDayOfWeekChange = { onScheduleParamChange(ScheduleParamAction.DayOfWeek(it)) },
                 modifier = Modifier.padding(top = 8.dp),
             )

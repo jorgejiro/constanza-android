@@ -93,7 +93,7 @@ class DayRollupTest {
 
     @Test
     fun `a date the schedule does not require rolls up to NOT_DUE`() {
-        val weekly = Schedule.Weekly(dayOfWeek = java.time.DayOfWeek.MONDAY)
+        val weekly = Schedule.DaysOfWeek(days = setOf(java.time.DayOfWeek.MONDAY))
         // 2026-09-01 is a Tuesday, so a MONDAY-only weekly habit is not due that day.
         assertEquals(DayStatus.NOT_DUE, rollupDay(weekly, date, emptyList(), emptyList()))
     }

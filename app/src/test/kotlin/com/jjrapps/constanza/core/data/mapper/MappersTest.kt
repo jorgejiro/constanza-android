@@ -61,7 +61,7 @@ class MappersTest {
             Schedule.Daily(DayOfWeek.MONDAY),
             Schedule.TimesPerDay(DayOfWeek.MONDAY),
             Schedule.NTimesPerWeek(times = 3, weekStart = DayOfWeek.SUNDAY),
-            Schedule.Weekly(dayOfWeek = DayOfWeek.WEDNESDAY, weekStart = DayOfWeek.MONDAY),
+            Schedule.DaysOfWeek(days = setOf(DayOfWeek.WEDNESDAY), weekStart = DayOfWeek.MONDAY),
             Schedule.Monthly(dayOfMonth = 15, weekStart = DayOfWeek.MONDAY),
             Schedule.EveryNDays(n = 2, anchor = LocalDate.of(2026, 1, 1), weekStart = DayOfWeek.MONDAY),
         )
@@ -69,6 +69,36 @@ class MappersTest {
         schedules.forEach { schedule ->
             assertEquals(schedule, schedule.toEntity(habitId).toDomain())
         }
+    }
+
+    @Test
+    fun `a single-day DAYS_OF_WEEK schedule round-trips through the bitmask`() {
+        val schedule = Schedule.DaysOfWeek(days = setOf(DayOfWeek.MONDAY))
+
+        val entity = schedule.toEntity(habitId = 1L)
+
+        assertEquals("DAYS_OF_WEEK", entity.kind)
+        assertEquals(1, entity.daysOfWeekMask)
+        assertEquals(schedule, entity.toDomain())
+    }
+
+    @Test
+    fun `a five-day DAYS_OF_WEEK schedule round-trips through the bitmask`() {
+        val schedule = Schedule.DaysOfWeek(
+            days = setOf(
+                DayOfWeek.MONDAY,
+                DayOfWeek.TUESDAY,
+                DayOfWeek.WEDNESDAY,
+                DayOfWeek.THURSDAY,
+                DayOfWeek.FRIDAY,
+            ),
+        )
+
+        val entity = schedule.toEntity(habitId = 1L)
+
+        assertEquals("DAYS_OF_WEEK", entity.kind)
+        assertEquals(0b0011111, entity.daysOfWeekMask)
+        assertEquals(schedule, entity.toDomain())
     }
 
     @Test

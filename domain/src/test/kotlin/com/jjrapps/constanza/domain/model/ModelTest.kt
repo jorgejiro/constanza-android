@@ -4,6 +4,7 @@ import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import org.junit.Test
 
@@ -36,12 +37,27 @@ class ModelTest {
             Schedule.Daily(),
             Schedule.TimesPerDay(),
             Schedule.NTimesPerWeek(times = 3),
-            Schedule.Weekly(dayOfWeek = DayOfWeek.MONDAY),
+            Schedule.DaysOfWeek(days = setOf(DayOfWeek.MONDAY)),
             Schedule.Monthly(dayOfMonth = 31),
             Schedule.EveryNDays(n = 30, anchor = LocalDate.of(2026, 1, 1)),
         )
         assertEquals(6, schedules.size)
         schedules.forEach { assertEquals(DayOfWeek.MONDAY, it.weekStart) }
+    }
+
+    @Test
+    fun `DaysOfWeek cannot be constructed with an empty day set`() {
+        assertFailsWith<IllegalArgumentException> {
+            Schedule.DaysOfWeek(days = emptySet())
+        }
+    }
+
+    @Test
+    fun `DaysOfWeek copy also enforces the non-empty invariant`() {
+        val schedule = Schedule.DaysOfWeek(days = setOf(DayOfWeek.MONDAY))
+        assertFailsWith<IllegalArgumentException> {
+            schedule.copy(days = emptySet())
+        }
     }
 
     @Test

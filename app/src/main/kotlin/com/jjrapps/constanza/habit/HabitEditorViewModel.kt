@@ -218,7 +218,9 @@ private fun defaultScheduleFor(kind: ScheduleKind, weekStart: DayOfWeek, today: 
     ScheduleKind.DAILY -> Schedule.Daily(weekStart)
     ScheduleKind.TIMES_PER_DAY -> Schedule.TimesPerDay(weekStart)
     ScheduleKind.N_TIMES_PER_WEEK -> Schedule.NTimesPerWeek(DEFAULT_TIMES_PER_WEEK, weekStart)
-    ScheduleKind.WEEKLY -> Schedule.Weekly(DayOfWeek.MONDAY, weekStart)
+    // weekday-only-schedule WU1: mechanical repoint onto the new type only. ScheduleKind.WEEKLY,
+    // its label, and single-day behavior are unchanged here — WU2 turns this into real multi-select.
+    ScheduleKind.WEEKLY -> Schedule.DaysOfWeek(setOf(DayOfWeek.MONDAY), weekStart)
     ScheduleKind.MONTHLY -> Schedule.Monthly(MIN_DAY_OF_MONTH, weekStart)
     ScheduleKind.EVERY_N_DAYS -> Schedule.EveryNDays(DEFAULT_EVERY_N_DAYS, today, weekStart)
 }
@@ -246,9 +248,12 @@ private fun applyTimesPerWeek(state: HabitEditorUiState, times: Int): HabitEdito
     return state.copy(schedule = schedule.copy(times = times.coerceAtLeast(MIN_POSITIVE)))
 }
 
+/** weekday-only-schedule WU1: mechanical repoint onto [Schedule.DaysOfWeek] as a single-day set —
+ *  still exactly one day in and out, matching the prior [Schedule.Weekly] behavior. WU2 replaces
+ *  this with a real multi-select toggle reducer. */
 private fun applyDayOfWeek(state: HabitEditorUiState, dayOfWeek: DayOfWeek): HabitEditorUiState {
-    val schedule = state.schedule as? Schedule.Weekly ?: return state
-    return state.copy(schedule = schedule.copy(dayOfWeek = dayOfWeek))
+    val schedule = state.schedule as? Schedule.DaysOfWeek ?: return state
+    return state.copy(schedule = schedule.copy(days = setOf(dayOfWeek)))
 }
 
 private fun applyDayOfMonth(state: HabitEditorUiState, dayOfMonth: Int): HabitEditorUiState {
@@ -289,7 +294,7 @@ val Schedule.kind: ScheduleKind
         is Schedule.Daily -> ScheduleKind.DAILY
         is Schedule.TimesPerDay -> ScheduleKind.TIMES_PER_DAY
         is Schedule.NTimesPerWeek -> ScheduleKind.N_TIMES_PER_WEEK
-        is Schedule.Weekly -> ScheduleKind.WEEKLY
+        is Schedule.DaysOfWeek -> ScheduleKind.WEEKLY
         is Schedule.Monthly -> ScheduleKind.MONTHLY
         is Schedule.EveryNDays -> ScheduleKind.EVERY_N_DAYS
     }

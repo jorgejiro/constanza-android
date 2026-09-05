@@ -34,10 +34,19 @@ sealed interface Schedule {
         override val weekStart: DayOfWeek = DayOfWeek.MONDAY,
     ) : Schedule
 
-    data class Weekly(
-        val dayOfWeek: DayOfWeek,
+    /**
+     * A literal calendar day-of-week set. Membership is evaluated against the calendar day of
+     * week only — it is NOT derived from [weekStart] or any other locale-dependent setting, and
+     * an empty set is deliberately unrepresentable rather than validated at save time.
+     */
+    data class DaysOfWeek(
+        val days: Set<DayOfWeek>,
         override val weekStart: DayOfWeek = DayOfWeek.MONDAY,
-    ) : Schedule
+    ) : Schedule {
+        init {
+            require(days.isNotEmpty()) { "A DaysOfWeek schedule must carry at least one day." }
+        }
+    }
 
     /** True calendar-month kind; clamped to the month's actual last day (habit-scheduling spec). */
     data class Monthly(

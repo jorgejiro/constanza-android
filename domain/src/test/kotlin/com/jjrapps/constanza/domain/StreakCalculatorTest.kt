@@ -69,7 +69,7 @@ class StreakCalculatorTest {
 
     @Test
     fun `a day that is not due at all neither breaks nor extends the streak`() {
-        val schedule = Schedule.Weekly(dayOfWeek = DayOfWeek.WEDNESDAY)
+        val schedule = Schedule.DaysOfWeek(days = setOf(DayOfWeek.WEDNESDAY))
         // Four consecutive Wednesdays, all completed; no entries on the days in between.
         val wednesdays = listOf(
             LocalDate.of(2026, 3, 4),

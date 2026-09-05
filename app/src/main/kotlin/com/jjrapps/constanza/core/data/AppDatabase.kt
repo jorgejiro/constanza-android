@@ -31,6 +31,12 @@ import com.jjrapps.constanza.core.data.entity.ScheduleEntity
  * The rebuild runs while Room's own foreign-keys enforcement is still off (design.md D1's
  * rationale), and a runtime child-row count guard (design.md D2) throws if any row in `schedules`,
  * `reminder_slots`, `entries`, or `reminder_occurrences` is lost across the rebuild.
+ *
+ * `version = 4` (weekday-only-schedule): adds `ScheduleEntity.daysOfWeekMask: Int?`, an additive
+ * `ALTER TABLE ADD COLUMN` requiring no rebuild, so `4.json`'s `identityHash` genuinely differs
+ * from `3.json`'s. `AppMigrations.migration3To4` also rewrites every legacy `kind = 'WEEKLY'` row
+ * into `kind = 'DAYS_OF_WEEK'` with the day encoded as a bitmask, and throws if any such row
+ * survives un-rewritten (weekday-only-schedule design.md decision 3).
  */
 @Database(
     entities = [
@@ -40,7 +46,7 @@ import com.jjrapps.constanza.core.data.entity.ScheduleEntity
         EntryEntity::class,
         ReminderOccurrenceEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

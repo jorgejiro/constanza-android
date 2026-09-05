@@ -133,7 +133,7 @@ class LanguageOverrideComposeTest {
         composeTestRule.setContent {
             ProvideAppLocale(AppLanguage.Spanish) {
                 ScheduleSection(
-                    state = HabitEditorUiState(schedule = Schedule.Weekly(dayOfWeek = DayOfWeek.MONDAY)),
+                    state = HabitEditorUiState(schedule = Schedule.DaysOfWeek(days = setOf(DayOfWeek.MONDAY))),
                     onScheduleParamChange = {},
                     onSlotAction = {},
                 )
