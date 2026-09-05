@@ -1937,7 +1937,7 @@ carried_forward_open_items:
         enough for a direct change once the two questions above are answered.
     - id: "no-weekday-only-schedule-kind"
       title: "A habit cannot be scheduled for weekdays only"
-      status: open
+      status: resolved
       severity: >
         Missing capability, not a defect. Today the nearest fit is Daily, which
         fires on Saturday and Sunday too, so a weekday habit is guaranteed to
@@ -1989,6 +1989,56 @@ carried_forward_open_items:
         Domain model, Room migration, the occurrence planner, the schedule
         editor UI, backup format and strings in both locales. SDD-sized, and
         option (b) more so than (a).
+      resolution: >
+        Closed 2026-09-05 by change `weekday-only-schedule`, archived at
+        openspec/changes/archive/2026-09-05-weekday-only-schedule/, shipped as
+        PRs #87 and #88.
+
+        The maintainer chose option (b), the general
+        `DaysOfWeek(Set<DayOfWeek>)` kind, over the narrow `Weekdays` one, so
+        Mon/Wed/Fri and every other combination cost nothing later. The kind
+        DEFAULTS to Monday-Friday, so the request that started this item costs
+        zero extra taps and needed no separate preset control.
+
+        The exploration corrected two assumptions this item made, both in
+        (b)'s favour: `ScheduleEntity.kind` is a bare TEXT column with no CHECK
+        constraint, and the existing `DayOfWeekPicker` was already a FlowRow of
+        chips that generalises to multi-select rather than becoming the "wall
+        of checkboxes" this item feared.
+
+        Open question 1 was settled with evidence rather than in the abstract:
+        every reader of `weekStart` uses it only for `NTimesPerWeek`
+        week-boundary arithmetic, never to classify weekday-vs-weekend, so
+        literal Monday-to-Friday is orthogonal to the model's locale-awareness.
+        Public holidays stayed out of scope as filed.
+
+        `DaysOfWeek` SUBSUMES `Weekly` rather than sitting beside it — that was
+        the orchestrator's call, not the maintainer's, and it is recorded so it
+        can be revisited: coexistence would leave two ways to express "every
+        Monday" and force the editor to offer both. Six kinds stay six.
+      process_failure_worth_keeping: >
+        The first slicing attempt cut at the storage contract, an architectural
+        layer, and produced a WU1 that failed `:app:compileDebugKotlin` with
+        five unresolved references — not a mergeable PR. The mechanical
+        call-site repoint was moved into WU1 so the boundary followed
+        compilability instead.
+
+        Recorded because the repo had ALREADY written that lesson down the same
+        day, in `remove-habit-question-field`'s proposal: "Kotlin field removal
+        is atomically compile-bound, so slice boundaries must follow
+        compilability rather than architectural layers." It was repeated
+        anyway. Before opening any slice's PR, run `:app:compileDebugKotlin` on
+        that branch rather than trusting the plan's boundary.
+      residual_manual_verification: >
+        NOT closed by this resolution: the multi-select chip row has never been
+        seen on real One UI hardware. Every layout measurement came from an
+        AOSP emulator, and per `testing.instrumented.device_free_matrix`
+        Samsung's metrics are not reproducible there. Task 7.1 of the change is
+        deliberately left unchecked in its archived tasks.md.
+
+        Note the contrast with the sibling item above, whose notification half
+        WAS confirmed on device on the same day — that confirmation says
+        nothing about this chip row.
 stack:
   status: ratified
   note: >
