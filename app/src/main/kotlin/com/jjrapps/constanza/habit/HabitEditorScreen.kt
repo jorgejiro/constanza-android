@@ -234,6 +234,8 @@ private fun HabitEditorForm(
             value = state.notes,
             onValueChange = actions.onNotesChange,
             label = { Text(stringResource(R.string.habit_editor_notes_label)) },
+            minLines = NOTES_MIN_LINES,
+            maxLines = NOTES_MAX_LINES,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 8.dp)
@@ -338,6 +340,13 @@ private fun DiscardChangesDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 private const val FIELD_NAME = "name"
 private const val FIELD_QUESTION = "question"
 private const val FIELD_NOTES = "notes"
+
+/** Notes grows from a single-line field into a small multi-line one: `minLines` reserves the room
+ *  up front so the field does not visibly jump taller the moment a second line is typed, and
+ *  `maxLines` caps it before it could crowd the colour swatches and schedule section below out of
+ *  the initial viewport. */
+private const val NOTES_MIN_LINES = 3
+private const val NOTES_MAX_LINES = 5
 
 @Composable
 private fun focusRestoring(fieldId: String, focusedFieldId: MutableState<String?>): Modifier {

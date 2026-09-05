@@ -3,6 +3,7 @@ package com.jjrapps.constanza.habit
 import android.content.Context
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -74,6 +75,15 @@ class HabitListArchiveComposeTest {
         }
     }
 
+    /** habit-management: Habit List Row Actions And Name Display (design.md D5). Archive and
+     *  Un-archive moved off the row's always-visible trailing controls into the overflow
+     *  [androidx.compose.material3.DropdownMenu]; every click on either label must now open that
+     *  menu first, the same open-menu-then-click pattern `HabitDeleteDialogComposeTest` already
+     *  uses for Delete. */
+    private fun openOverflowMenu() {
+        composeTestRule.onNodeWithContentDescription(text(R.string.habit_list_more_options)).performClick()
+    }
+
     @Test
     fun archivingAndUnArchivingRoundTripsTheHabitThroughTheListsFilter() {
         val viewModel = fixture.habitListViewModel()
@@ -86,18 +96,23 @@ class HabitListArchiveComposeTest {
 
         // Starts visible in the active (default) filter.
         waitForNodeWithText(HABIT_NAME)
+        openOverflowMenu()
         composeTestRule.onNodeWithText(archiveLabel).performClick()
         waitForNoNodeWithText(HABIT_NAME) // archiving moves it out of the active filter
 
         // Switching the filter reveals it again, now with an "un-archive" action.
         composeTestRule.onNodeWithText(showArchivedLabel).performClick()
         waitForNodeWithText(HABIT_NAME)
+        openOverflowMenu()
         composeTestRule.onNodeWithText(unarchiveLabel).performClick()
         waitForNoNodeWithText(HABIT_NAME) // un-archiving moves it out of the archived filter
 
         // Switching back to the active filter shows it round-tripped there.
         composeTestRule.onNodeWithText(showArchivedLabel).performClick()
         waitForNodeWithText(HABIT_NAME)
+        // The menu auto-dismisses after a click, so the closing assertion must reopen it — the
+        // node it is asserting on lives inside the DropdownMenu now, not on the row itself.
+        openOverflowMenu()
         composeTestRule.onNodeWithText(archiveLabel).assertExists()
     }
 }

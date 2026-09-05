@@ -37,6 +37,7 @@ class PreMigrationSnapshotWriterTest {
     @Test
     fun `write returns false and leaves no file when reading the database throws`() {
         val db = mockk<SupportSQLiteDatabase>()
+        every { db.version } returns 1
         every { db.query(any<String>()) } throws RuntimeException("boom")
 
         val result = PreMigrationSnapshotWriter(targetDir).write(db)
