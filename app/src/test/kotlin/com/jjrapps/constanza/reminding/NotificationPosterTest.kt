@@ -26,6 +26,17 @@ private const val OCCURRENCE_ID = 42L
  * [android.app.PendingIntent.getBroadcast] — no Robolectric, no real `Notification` construction
  * in this test class. [canPost]'s decision table is exercised here; the actual notification
  * content and its three actions are proven on-device (`NotificationPosterInstrumentedTest`).
+ *
+ * reminder-notification-tap-opens-today added no test to this class: this module's mockable
+ * `android.jar` (`isReturnDefaultValues = true`, see `app/build.gradle.kts`) strips every method
+ * body out of framework classes, `android.content.Intent` included — `new Intent(ctx, cls)`,
+ * `.setClassName(...)`, `.putExtra(...)` and every getter all become no-ops that hand back
+ * `null`/`0`/`false` regardless of what was actually set. A field-level assertion on a real
+ * `Intent` was tried here and failed for exactly that reason (`intent.component` came back `null`
+ * even though [reminderTapIntent] had just targeted [com.jjrapps.constanza.core.ui.MainActivity]);
+ * it would have needed Robolectric, which this project does not use. `reminderTapIntent`'s actual
+ * construction is instead proven on-device in `NotificationPosterInstrumentedTest`, the one place
+ * a real `Intent` exists to inspect.
  */
 class NotificationPosterTest {
 

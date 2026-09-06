@@ -3,6 +3,7 @@ package com.jjrapps.constanza.reminding
 import android.Manifest
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationManagerCompat
@@ -10,6 +11,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.jjrapps.constanza.core.di.ReminderSettingsDataStoreEntryPoint
+import com.jjrapps.constanza.core.ui.MainActivity
 import com.jjrapps.constanza.core.ui.theme.HabitColor
 import com.jjrapps.constanza.localization.AppLocaleController
 import dagger.hilt.android.EntryPointAccessors
@@ -92,6 +94,13 @@ class NotificationPosterInstrumentedTest {
 
         val posted = awaitPosted(OCCURRENCE_ID)
         assertEquals(EXPECTED_ACTION_COUNT, posted.notification.actions?.size)
+        // reminder-notification-tap-opens-today: the one part of that change only a real posted
+        // `Notification` can prove — that `setContentIntent` actually reached the system object,
+        // not merely that `NotificationPoster` attempted to build one.
+        assertTrue(
+            "The posted notification must carry a content PendingIntent so tapping its body opens the app",
+            posted.notification.contentIntent != null,
+        )
     }
 
     /**
@@ -126,6 +135,21 @@ class NotificationPosterInstrumentedTest {
             expectedColor,
             posted.notification.color,
         )
+    }
+
+    /**
+     * reminder-notification-tap-opens-today: [reminderTapIntent]'s field-level assertions belong
+     * here, not in [NotificationPosterTest] — this module's mockable `android.jar` (unit-test
+     * side) strips every `android.content.Intent` method body, so a real connected device is the
+     * only place a constructed `Intent` can honestly be inspected. See that class's KDoc.
+     */
+    @Test
+    fun reminderTapIntentTargetsMainActivitySingleTopWithTheMarkerExtra() {
+        val intent = reminderTapIntent(context)
+
+        assertEquals(MainActivity::class.java.name, intent.component?.className)
+        assertEquals(Intent.FLAG_ACTIVITY_SINGLE_TOP, intent.flags)
+        assertTrue(intent.getBooleanExtra(MainActivity.EXTRA_FROM_REMINDER_NOTIFICATION, false))
     }
 
     /**
