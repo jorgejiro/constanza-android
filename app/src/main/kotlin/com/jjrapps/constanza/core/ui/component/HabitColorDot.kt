@@ -26,10 +26,22 @@ const val HABIT_COLOR_DOT_TEST_TAG = "habit_color_dot"
  * `NotificationPoster.setColor()` already share, so no colour ever gets reinterpreted on its way
  * into this composable.
  *
- * Placed via `ListItem(leadingContent = …)` everywhere it appears (`HabitListScreen.HabitRow`,
- * `TodayScreen.HabitRollupRow`'s multi-slot branch) so a row's measured height never changes — the
- * whole geometry argument decision 6 makes for why `TodayAdaptiveComposeTest` stays green at
- * `sw = 600dp` (task 4.8).
+ * **This dot never makes a row taller than the text beside it, and that — not the container it is
+ * placed in — is the geometry argument decision 6 makes for why `TodayAdaptiveComposeTest` stays
+ * green at `sw = 600dp` (task 4.8).** [Dimens.HabitDotSlot] is 24dp and Material 3's `bodyLarge`
+ * line box is also 24dp, so a one-line habit name and this dot measure the same, and a wrapped name
+ * is always the taller of the two. Keep that equality if either value is ever touched: it is what
+ * lets a caller align the dot to a name's FIRST line with `Alignment.Top` and land it exactly,
+ * rather than centring it on a multi-line row where it belongs to neither line.
+ *
+ * *(Corrected by today-row-alignment. This paragraph used to say the dot was placed via
+ * `ListItem(leadingContent = …)` "everywhere it appears", and attributed the height stability to
+ * `ListItem`. That was already false for `TodayScreen.HabitRollupRow`'s single-slot branch, which
+ * has always used a plain `Row`, and it is now false for the multi-slot branch too — `ListItem`
+ * puts its headline at 56dp, which was a third conflicting left edge on that screen. The two live
+ * call sites are `HabitListScreen.HabitRow`, still a `ListItem`, and
+ * `TodayScreen.HabitRollupHeader`, a plain `Row`. The conclusion survives the correction; the
+ * reason it gave did not.)*
  *
  * No `contentDescription`: colour is a secondary recognition channel here, never the only one — the
  * habit name sitting beside every placement is the accessible label. This is deliberate, not an

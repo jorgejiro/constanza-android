@@ -144,9 +144,17 @@ class TodayAnsweredSlotComposeTest {
 
     /**
      * Scenario: "The change route is reachable without a gesture and names its own slot." Each
-     * slot's [ChangeButton] carries a `TextButton` — reachable by an ordinary [performClick], no
+     * slot's Change control carries a `TextButton` — reachable by an ordinary [performClick], no
      * swipe or other gesture — and its accessible label differs from every sibling's, asserted here
      * by exact match against each slot's own expected sentence rather than only counting nodes.
+     *
+     * today-row-alignment: these are multi-slot rows, so each sentence leads with its own reminder
+     * time — that time is what tells the three siblings apart, and it is precisely what this test
+     * exists to prove is distinct. The join is a single space rather than the old em dash because
+     * the label is SPOKEN: the screen renders the two halves separated by `TODAY_SLOT_STATUS_GAP`
+     * and collapses that back to one space before handing it to `today_slot_change_a11y`, since
+     * typographic padding is not a word. Kept as exact matches, not substrings — the whole point is
+     * that no two labels coincide, and a substring match cannot say that.
      */
     @Test
     fun eachChangeControlHasAnAccessibleLabelDistinctFromItsSiblings() = runBlocking {
@@ -164,9 +172,9 @@ class TodayAnsweredSlotComposeTest {
         val midday = expectedTimeOnDevice(inTwentyFourHour = "12:00", inTwelveHour = "12:00 PM")
         val evening = expectedTimeOnDevice(inTwentyFourHour = "20:00", inTwelveHour = "8:00 PM")
         val descriptions = listOf(
-            changeDescription("Stretch", "$morning — ${text(R.string.today_slot_completed)}"),
-            changeDescription("Stretch", "$midday — ${text(R.string.today_slot_missed)}"),
-            changeDescription("Stretch", "$evening — ${text(R.string.today_slot_skipped)}"),
+            changeDescription("Stretch", "$morning ${text(R.string.today_slot_completed)}"),
+            changeDescription("Stretch", "$midday ${text(R.string.today_slot_missed)}"),
+            changeDescription("Stretch", "$evening ${text(R.string.today_slot_skipped)}"),
         )
         assertEquals(3, descriptions.toSet().size)
         descriptions.forEach { description ->

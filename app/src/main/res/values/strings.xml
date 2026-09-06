@@ -153,7 +153,10 @@
     <string name="today_slot_completed">Done</string>
     <string name="today_slot_missed">Missed</string>
     <string name="today_slot_skipped">Skipped</string>
-    <string name="today_slot_pending_snoozed_until">Pending, snoozed until %1$s</string>
+    <!-- today-row-alignment: the leading "Pending, " is gone. A snoozed slot is self-evidently
+         unanswered, so the word bought nothing and cost the row a wrapped line: at 360dp the status
+         column is 109dp wide and this is the longest string that can land in it. -->
+    <string name="today_slot_pending_snoozed_until">Snoozed until %1$s</string>
 
     <!-- habit-entry-tracking: in-app Entry write path, SKIPPED is in-app only (task 6b.2). -->
     <string name="today_answer_yes">Yes</string>

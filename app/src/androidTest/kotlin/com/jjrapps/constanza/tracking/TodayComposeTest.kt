@@ -1,6 +1,7 @@
 package com.jjrapps.constanza.tracking
 
 import android.content.Context
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -83,6 +84,58 @@ class TodayComposeTest {
             .first { it.id == entries.single().slotId }
         assertEquals(EntryStatus.COMPLETED.name, entries.single().status)
         assertEquals(MORNING_MINUTE, answeredSlot.minuteOfDay)
+    }
+
+    /**
+     * today-row-alignment, decision 2. A collapsed multi-slot row is the ONE row on this screen with
+     * no slot line under it, so its day rollup is the only state it shows at all — collapse it and a
+     * row with no rollup says nothing about the habit whatsoever.
+     *
+     * That is not hypothetical. The rollup used to be `ListItem`'s `supportingContent`, and dropping
+     * `ListItem` — which today-row-alignment had to do, because its 56dp headline would have been a
+     * third left edge — took the rollup with it. Nothing failed: every multi-slot assertion in the
+     * shipped suite taps `today_expand` first, so all of them ran against the expanded state, where
+     * the slot lines carry their own status. It was caught by looking at a render, which is not a
+     * guard.
+     *
+     * Asserted in the collapsed state deliberately, and before any expand: `today_status_partial` is
+     * a DAY rollup string that no slot line can produce, so a passing assertion here cannot be
+     * satisfied by an expanded slot's own text. The row is seeded PARTIAL rather than PENDING for
+     * the same reason — `today_status_pending` and `today_slot_pending` are both "Pendiente", so
+     * pending would have been indistinguishable from a slot line leaking in.
+     */
+    @Test
+    // Explicit `: Unit`, not inferred: this body ends on an `assertExists()` that returns a
+    // `SemanticsNodeInteraction`, so `= runBlocking { … }` infers THAT as the return type and JUnit
+    // rejects the whole class with "should be void" at runner-construction time — taking every other
+    // test in the file down with it. It compiles cleanly either way; only the matrix catches it.
+    // `TodayAnsweredSlotComposeTest.aHabitWithNoReminderTimeReopensAndRecollapsesItsSingleNullSlot`
+    // carries the same annotation for the same reason.
+    fun aCollapsedMultiSlotRowStillNamesItsDayStatus(): Unit = runBlocking {
+        val slots = listOf(
+            ReminderSlot(id = 0, habitId = 0, minuteOfDay = MORNING_MINUTE, enabled = true),
+            ReminderSlot(id = 0, habitId = 0, minuteOfDay = EVENING_MINUTE, enabled = true),
+        )
+        fixture.habitRepository.create(newHabit("Stretch"), Schedule.TimesPerDay(), slots)
+        viewModel.awaitOneRowWithSlots(2)
+
+        composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
+
+        // Collapsed: the expand affordance is on screen, so no slot line is.
+        composeTestRule.onNodeWithText(text(R.string.today_expand)).assertExists()
+        composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).assertCountEquals(0)
+
+        // Answer one slot through the expanded view, then collapse again, so the row has a rollup
+        // that is neither "all done" nor untouched — PARTIAL is the state a collapsed row is least
+        // able to imply from anything else on screen.
+        composeTestRule.onNodeWithText(text(R.string.today_expand)).performClick()
+        composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes))[0].performClick()
+        viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.COMPLETED)
+        composeTestRule.onNodeWithText(text(R.string.today_collapse)).performClick()
+
+        composeTestRule.onNodeWithText(text(R.string.today_expand)).assertExists()
+        composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).assertCountEquals(0)
+        composeTestRule.onNodeWithText(text(R.string.today_status_partial), substring = true).assertExists()
     }
 
     /**

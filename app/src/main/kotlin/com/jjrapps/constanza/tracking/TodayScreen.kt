@@ -7,12 +7,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -34,11 +37,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.component.HabitColorDot
-import com.jjrapps.constanza.core.ui.rememberTimeOfDayFormat
+import com.jjrapps.constanza.core.ui.theme.Dimens
 import com.jjrapps.constanza.core.ui.theme.Spacing
-import com.jjrapps.constanza.domain.model.DayStatus
 import com.jjrapps.constanza.domain.model.EntryStatus
-import java.time.Instant
 import java.time.ZoneId
 
 /** Task 6b.1 — container, matching [com.jjrapps.constanza.habit.HabitListRoute]'s hoisted-route
@@ -153,6 +154,20 @@ fun TodayScreen(
  *  spare. */
 private val FAB_SCROLL_CLEARANCE = 88.dp
 
+/** today-row-alignment, decision 1: the ONE left edge every line of a habit row starts at.
+ *
+ *  Computed from the tokens the colour dot is actually drawn with, never written as a `48.dp`
+ *  literal: the row's own [Spacing.lg] gutter, plus [Dimens.HabitDotSlot] — the dot's full slot, not
+ *  its 12dp core — plus one [Spacing.sm] so 16sp text does not sit flush against the dot the way it
+ *  did before this change. Change any of the three and the status line follows the habit name
+ *  automatically, which is the whole point: the defect being fixed here WAS two independent
+ *  literals that had drifted apart. `HabitRollupRow`'s name row padded `start = 16.dp` and then drew
+ *  a 24dp dot, putting the name at 40dp, while [SlotRow] padded `start = 16.dp` (or 32dp when it was
+ *  `indented`) — so a row's status line hung 24dp to the LEFT of the name it belonged to, and the
+ *  indented case disagreed with both. Measured at 360dp before the fix; that is what "mal alineada"
+ *  meant. Resolves to 48dp today. */
+private val ROW_CONTENT_INSET = Spacing.lg + Dimens.HabitDotSlot + Spacing.sm
+
 /** today-answered-slot-collapse, design.md decision 5: one holder instead of two extra parameters
  *  on both [HabitRollupRow] and [SlotRow], which would otherwise push each past detekt's
  *  unconfigured `LongParameterList` default of 6 — and, one level up, past [TodayContent]'s own
@@ -245,8 +260,27 @@ private fun TodayContent(
     }
 }
 
-/** OA-2, as revised (design.md §1): a single-slot habit reads as one plain row; a multi-slot
- *  habit shows the day rollup and expands to each independently answerable slot. */
+/** OA-2, as revised (design.md §1): a single-slot habit reads as one plain row; a multi-slot habit
+ *  shows the day rollup and expands to each independently answerable slot.
+ *
+ *  today-row-alignment, decision 2: both branches now share [HabitRollupHeader], and the multi-slot
+ *  branch no longer uses `ListItem`. `ListItem` with `leadingContent` places its headline at
+ *  16 + 24 + 16 = 56dp, which would have been a THIRD left edge on a screen whose entire defect was
+ *  having two — so the one thing this change exists to remove would have survived in precisely the
+ *  case [SlotRow]'s old `indented` parameter existed for.
+ *
+ *  Dropping `ListItem` costs two things, both accepted knowingly rather than overlooked. The first
+ *  is its `supportingContent` slot, which was carrying the day rollup; [HabitRollupHeader] carries
+ *  it by hand instead. The second is its container fill: a multi-slot header used to sit on a
+ *  faintly lighter band (`ListItem` reads `surfaceContainer`), and now sits on the page like every
+ *  other row. That was visible in the renders the change was approved from and was approved with
+ *  it — the grouping cue a collapsed row needs is its own rollup text, not a background tint. Do not
+ *  reintroduce the band by wrapping this header in a `Surface`: the band is what made the header a
+ *  different width from its own slot lines in the first place. That is not a detail — a COLLAPSED
+ *  multi-slot row is the one row on this screen with no slot line under it, so without the rollup it
+ *  shows no state whatsoever. It was written that way once during this change and nothing on screen
+ *  or in the suite said so; `TodayComposeTest.aCollapsedMultiSlotRowStillNamesItsDayStatus` exists
+ *  because of that. */
 @Composable
 private fun HabitRollupRow(
     row: TodayHabitRow,
@@ -255,58 +289,96 @@ private fun HabitRollupRow(
     onToggleExpanded: (Long) -> Unit,
     actions: SlotActions,
 ) {
-    if (row.slots.size <= 1) {
-        val slot = row.slots.firstOrNull()
-        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-            Row(
-                // `end` padding added with the SlotRow width fix below: a long habit name — the
-                // reported case was a full sentence — otherwise runs to the very edge of the
-                // screen with nothing between it and the bezel.
-                modifier = Modifier.padding(start = 16.dp, end = Spacing.lg, top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                HabitColorDot(row.colorArgb)
-                Text(row.habitName)
-            }
-            if (slot != null) SlotRow(row, slot, zone, actions)
+    val multiSlot = row.slots.size > 1
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        HabitRollupHeader(row, expanded, multiSlot, onToggleExpanded)
+        if (!multiSlot) {
+            row.slots.firstOrNull()?.let { slot -> SlotRow(row, slot, zone, actions) }
+        } else if (expanded) {
+            // No indent, deliberately, and this is where `indented = true` went: an indent here is a
+            // second left edge, which is the defect rather than the fix. What distinguishes these
+            // rows from one another instead is their reminder time, which `timeIsIdentity` promotes
+            // to the front of the line — see [slotStatusText]'s decision 4.
+            row.slots.forEach { slot -> SlotRow(row, slot, zone, actions, timeIsIdentity = true) }
         }
-        return
     }
-    Column(modifier = Modifier.fillMaxWidth()) {
-        ListItem(
-            leadingContent = { HabitColorDot(row.colorArgb) },
-            headlineContent = { Text(row.habitName) },
-            supportingContent = { Text(stringResource(dayStatusLabel(row.dayStatus))) },
-            trailingContent = {
-                val labelRes = if (expanded) R.string.today_collapse else R.string.today_expand
-                TextButton(onClick = { onToggleExpanded(row.habitId) }) { Text(stringResource(labelRes)) }
-            },
+}
+
+/** today-row-alignment, decision 3: the colour dot is aligned to the name's FIRST LINE rather than
+ *  to the row's vertical centre.
+ *
+ *  `bodyLarge`'s line box is 24dp and [Dimens.HabitDotSlot] is 24dp, so [Alignment.Top] lands the
+ *  dot exactly on that first line with no offset constant to keep in sync, and it stays landed
+ *  however many lines the name wraps to. `Alignment.CenterVertically`, which this replaces, put the
+ *  dot in the GAP between the two lines of a wrapped name — the reported list has two such names —
+ *  where it read as belonging to neither. That was the other half of "mal alineada".
+ *
+ *  The [Spacer] is not decoration either: [HabitColorDot] centres a 12dp core inside a 24dp slot, so
+ *  butting the name straight against the slot leaves 6dp between glyph and dot. [ROW_CONTENT_INSET]
+ *  includes the same [Spacing.sm] so the name and the status line below it still agree. */
+@Composable
+private fun HabitRollupHeader(
+    row: TodayHabitRow,
+    expanded: Boolean,
+    multiSlot: Boolean,
+    onToggleExpanded: (Long) -> Unit,
+) {
+    Row(
+        // `end` padding: a long habit name — the reported case was a full sentence — otherwise runs
+        // to the very edge of the screen with nothing between it and the bezel.
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.sm),
+        verticalAlignment = Alignment.Top,
+    ) {
+        HabitColorDot(row.colorArgb)
+        Spacer(modifier = Modifier.width(Spacing.sm))
+        Text(
+            // A multi-slot habit's own line has no answerable slot, so the day rollup is the only
+            // state it can carry — and it has to carry it while collapsed. Demoted rather than given
+            // its own line: it is a summary of the slot lines, not a peer of the habit name.
+            demotedSuffix(row.habitName, stringResource(dayStatusLabel(row.dayStatus)).takeIf { multiSlot }),
+            // `weight(1f)` for the same reason [SlotRow]'s status text carries one: without it the
+            // name takes what it wants and the expand control is squeezed into the remainder.
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyLarge,
         )
-        if (expanded) {
-            row.slots.forEach { slot -> SlotRow(row, slot, zone, actions, indented = true) }
+        if (multiSlot) {
+            val labelRes = if (expanded) R.string.today_collapse else R.string.today_expand
+            TextButton(onClick = { onToggleExpanded(row.habitId) }) { Text(stringResource(labelRes)) }
         }
     }
 }
 
 /** today-answered-slot-collapse, design.md decision 2: a pending slot ([EntryStatus.UNKNOWN]), or
- *  one the user just asked to change via [SlotActions.reopenedKeys], keeps [AnswerButtons]
- *  verbatim. Any other status instead shows the text naming its own answer plus one [ChangeButton]
- *  — never both, and never Yes/No/Skip alongside a resolved status. [row] replaces the old bare
- *  `habitId: Long` parameter because the Change control's accessible label needs the habit name
- *  too (design.md decision 3), and this keeps the parameter count at 5 rather than adding a sixth. */
+ *  one the user just asked to change via [SlotActions.reopenedKeys], keeps [AnswerButtons] verbatim.
+ *  Any other status instead shows the text naming its own answer plus one [ChangeButton] — never
+ *  both, and never Yes/No/Skip alongside a resolved status. [row] replaces the old bare
+ *  `habitId: Long` parameter because the Change control's accessible label needs the habit name too
+ *  (design.md decision 3), and this keeps the parameter count at 5 rather than adding a sixth.
+ *
+ *  today-row-alignment, decision 1: `indented: Boolean` is gone and [timeIsIdentity] took its slot.
+ *  The old parameter chose between a 32dp and a 16dp start padding and BOTH disagreed with the
+ *  name's own 40dp edge one line above; every line now starts at [ROW_CONTENT_INSET]. The status
+ *  text also drops from the inherited `bodyLarge` to `bodyMedium`, so a row reads name (16sp) then
+ *  status (14sp) then time (11sp) — three steps down, in the order the eye should take them. */
 @Composable
 private fun SlotRow(
     row: TodayHabitRow,
     slot: TodaySlot,
     zone: ZoneId,
     actions: SlotActions,
-    indented: Boolean = false,
+    timeIsIdentity: Boolean = false,
 ) {
     val key = slot.keyIn(row.habitId)
+    // A reopened slot is pending for display purposes, which is why `bypassSnooze` is derived from
+    // this rather than from the stored status: the branch below and the sentence must agree.
+    val pending = slot.status == EntryStatus.UNKNOWN || key in actions.reopenedKeys
+    val statusText = slotStatusText(slot, zone, timeIsIdentity, bypassSnooze = !pending)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = if (indented) 32.dp else 16.dp, end = 16.dp, bottom = 8.dp),
+            .padding(start = ROW_CONTENT_INSET, end = 16.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -315,16 +387,17 @@ private fun SlotRow(
         // takes whatever width it wants and `SpaceBetween` squeezes the button group into the
         // remainder, so "Skip" wrapped mid-word as "Ski / p" — reported from a real Galaxy S25.
         // The buttons keep their intrinsic width and the text wraps instead, which is the right way
-        // round: a wrapped sentence is readable, a wrapped control label is not.
-        if (slot.status == EntryStatus.UNKNOWN || key in actions.reopenedKeys) {
-            Text(
-                slotStatusText(slot, zone),
-                modifier = Modifier.weight(1f).padding(end = Spacing.sm),
-            )
+        // round: a wrapped sentence is readable, a wrapped control label is not. Still true after
+        // this row moved right: [ROW_CONTENT_INSET] costs this column 32dp against the 141dp it had
+        // at a 16dp start, and the buttons are unmoved at 165dp-344dp on a 360dp screen.
+        Text(
+            statusText,
+            modifier = Modifier.weight(1f).padding(end = Spacing.sm),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        if (pending) {
             AnswerButtons(onAnswer = { status -> actions.onAnswer(row.habitId, slot, status) })
         } else {
-            val statusText = slotStatusText(slot, zone, bypassSnooze = true)
-            Text(statusText, modifier = Modifier.weight(1f).padding(end = Spacing.sm))
             ChangeButton(row.habitName, statusText, onClick = { actions.onRequestChange(key) })
         }
     }
@@ -349,73 +422,21 @@ private fun AnswerButtons(onAnswer: (InAppEntryStatus) -> Unit) {
  *  TalkBack's default activate action — no gesture, satisfying the spec's "gesture-free" scenario
  *  directly. The visible label is identical on every row; [contentDescription] carries the
  *  discriminator instead, which is also why this cannot collide with the four existing
- *  `onNodeWithText` assertions — Compose's text matcher never reads `contentDescription`. */
+ *  `onNodeWithText` assertions — Compose's text matcher never reads `contentDescription`.
+ *
+ *  today-row-alignment: [answeredStatus] arrives as the rendered [AnnotatedString] rather than as a
+ *  plain `String`, and the label collapses [TODAY_SLOT_STATUS_GAP] back to a single space before
+ *  reading it out. Those extra spaces are typographic separation between two rendered halves, not
+ *  words — a label is spoken, not laid out — and `TodayAnsweredSlotComposeTest` asserts these
+ *  sentences by exact match, so the difference is visible rather than a matter of taste. */
 @Composable
-private fun ChangeButton(habitName: String, answeredStatusText: String, onClick: () -> Unit) {
-    val description = stringResource(R.string.today_slot_change_a11y, habitName, answeredStatusText)
+private fun ChangeButton(habitName: String, answeredStatus: AnnotatedString, onClick: () -> Unit) {
+    val spoken = answeredStatus.text.replace(TODAY_SLOT_STATUS_GAP, " ")
+    val description = stringResource(R.string.today_slot_change_a11y, habitName, spoken)
     TextButton(
         onClick = onClick,
         modifier = Modifier.semantics { contentDescription = description },
     ) {
         Text(stringResource(R.string.today_slot_change))
     }
-}
-
-/** [zone] comes from [TodayUiState.zone] ([com.jjrapps.constanza.core.time.TimeProvider.zone]),
- *  never `ZoneId.systemDefault()` directly — the same clock-access ban design.md §4 enforces
- *  everywhere else (config/detekt/detekt.yml `ForbiddenMethodCall`).
- *
- *  Both times here — the slot's own time and the snoozed-until time — go through the one
- *  [com.jjrapps.constanza.core.ui.TimeOfDayFormat]. They used to be formatted two different ways in
- *  this one function: a `DateTimeFormatter.ofPattern("HH:mm")` file constant for the snooze and a
- *  bare `"%02d:%02d"` literal for the slot, which is two copies of a decision that has to agree.
- *
- *  The format is remembered per row rather than hoisted into [TodayContent] and threaded down. That
- *  is deliberate: threading it would add a sixth parameter to both [HabitRollupRow] and [SlotRow]
- *  to save one small immutable object per visible row, and the rows are already carrying every
- *  argument they can justify.
- *
- *  [bypassSnooze] is today-answered-slot-collapse, design.md decision 2: `SlotRow`'s answered
- *  branch passes `true` so the snooze sentence below is never even reached for a slot already
- *  carrying a resolved `Entry` — `&&` short-circuits before `snoozedUntilEpochMs` is read at all,
- *  not merely before it renders. Without this an answered slot whose occurrence had not yet been
- *  resolved would read "Pending, snoozed until 09:00" over a `COMPLETED` entry, a literal failure
- *  of the spec's "text naming its specific answer". */
-@Composable
-private fun slotStatusText(slot: TodaySlot, zone: ZoneId, bypassSnooze: Boolean = false): String {
-    val timeFormat = rememberTimeOfDayFormat()
-    val time = slot.minuteOfDay?.let(timeFormat::format)
-    val statusText = if (!bypassSnooze && slot.snoozedUntilEpochMs != null) {
-        // Still ahead of the status itself: a snoozed slot is pending WITH a time attached, and
-        // that time is the more useful half of the sentence.
-        stringResource(
-            R.string.today_slot_pending_snoozed_until,
-            timeFormat.format(Instant.ofEpochMilli(slot.snoozedUntilEpochMs).atZone(zone).toLocalTime()),
-        )
-    } else {
-        stringResource(slotStatusLabel(slot.status))
-    }
-    return if (time != null) "$time — $statusText" else statusText
-}
-
-/** today-row-answering-is-cramped-and-always-on, defect 2. The fallback here used to be
- *  `slot.status.name`, which put the Kotlin constant `COMPLETED` on screen; this mirrors
- *  [dayStatusLabel]'s existing shape instead, which is what it should have done from the start.
- *
- *  Exhaustive over [EntryStatus] with no `else`, deliberately: adding a member to that enum must
- *  break this compile rather than silently reach a default. [EntryStatus.UNKNOWN] is the pending
- *  case and keeps the string it already had. */
-private fun slotStatusLabel(status: EntryStatus) = when (status) {
-    EntryStatus.COMPLETED -> R.string.today_slot_completed
-    EntryStatus.MISSED -> R.string.today_slot_missed
-    EntryStatus.SKIPPED -> R.string.today_slot_skipped
-    EntryStatus.UNKNOWN -> R.string.today_slot_pending
-}
-
-private fun dayStatusLabel(status: DayStatus) = when (status) {
-    DayStatus.ALL_COMPLETED -> R.string.today_status_all_completed
-    DayStatus.PARTIAL -> R.string.today_status_partial
-    DayStatus.ANY_MISSED -> R.string.today_status_any_missed
-    DayStatus.ALL_SKIPPED -> R.string.today_status_all_skipped
-    DayStatus.PENDING, DayStatus.NOT_DUE -> R.string.today_status_pending
 }

@@ -138,7 +138,7 @@
     <string name="today_slot_completed">Hecho</string>
     <string name="today_slot_missed">Perdido</string>
     <string name="today_slot_skipped">Omitido</string>
-    <string name="today_slot_pending_snoozed_until">Pendiente, aplazado hasta %1$s</string>
+    <string name="today_slot_pending_snoozed_until">Aplazado hasta %1$s</string>
 
     <!-- habit-entry-tracking: in-app Entry write path, SKIPPED is in-app only (task 6b.2). -->
     <string name="today_answer_yes">Sí</string>

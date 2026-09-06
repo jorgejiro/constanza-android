@@ -99,14 +99,22 @@ class TodaySlotRowComposeTest {
     }
 
     /**
-     * `fix/time-format-consistency`: the slot line is `<time> — <status>`, and the time half now
-     * follows the device's 12/24-hour setting instead of always being `HH:mm`.
+     * `fix/time-format-consistency`: the time half of the slot line follows the device's 12/24-hour
+     * setting instead of always being `HH:mm`.
      *
      * Asserted as the whole sentence rather than as a substring, because the sentence is the thing
-     * the row renders and the em dash is the only thing joining its two halves. Both notations are
-     * hand-written literals; the device picks which one applies, and the other is asserted absent —
-     * a positive check on its own would still pass on a screen that had gone back to hardcoding
-     * whichever cycle this device happens to use.
+     * the row renders and its two halves are joined by nothing else. Both notations are hand-written
+     * literals; the device picks which one applies, and the other is asserted absent — a positive
+     * check on its own would still pass on a screen that had gone back to hardcoding whichever cycle
+     * this device happens to use.
+     *
+     * today-row-alignment: the sentence is now `<status><gap><time>` rather than `<time> — <status>`
+     * on a SINGLE-SLOT habit — the time is metadata on a row whose name is its identity, so it
+     * trails demoted. This test seeds a single-slot habit, so it asserts that order; a multi-slot
+     * slot leads with its time instead and `TodayAdaptiveComposeTest` is what covers that. See
+     * `slotStatusText`'s decision 4 for why the two orders are deliberate and must not be unified.
+     * [TODAY_SLOT_STATUS_GAP] is read from the screen rather than re-typed as three invisible spaces
+     * so this assertion cannot quietly rot into a whitespace mismatch.
      */
     @Test
     fun theSlotTimeReadsInTheDeviceHourCycle() = runBlocking {
@@ -117,7 +125,7 @@ class TodaySlotRowComposeTest {
         val shown = expectedTimeOnDevice(inTwentyFourHour = "08:00", inTwelveHour = "8:00 AM")
 
         composeTestRule
-            .onNodeWithText("$shown — ${text(R.string.today_slot_pending)}")
+            .onNodeWithText("${text(R.string.today_slot_pending)}$TODAY_SLOT_STATUS_GAP$shown")
             .assertIsDisplayed()
         composeTestRule
             .onNodeWithText(
