@@ -10,6 +10,7 @@ import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.MainActivity
 import com.jjrapps.constanza.localization.AppLocaleController
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -46,6 +47,20 @@ class NotificationPoster @Inject constructor(
      * of every [PendingIntent] below — the same integer [com.jjrapps.constanza.scheduling.AlarmScheduler]
      * already uses for the alarm's own `PendingIntent`. No second id scheme exists anywhere in
      * this pipeline.
+     *
+     * reminder-notification-tap-opens-today extends that same single scheme to the notification's
+     * content [PendingIntent] ([contentIntent]) rather than inventing a parallel offset: it reuses
+     * [occurrenceId] as its request code too. That is safe, not merely convenient — `PendingIntent`
+     * identity keys on the creating factory ([PendingIntent.getActivity] vs.
+     * [PendingIntent.getBroadcast], an internal "operation type" the platform tracks alongside the
+     * request code) as well as `Intent.filterEquals` (action, data, component, categories), and
+     * [contentIntent] both calls a different factory AND targets a different component
+     * ([MainActivity], never [ActionIntentContract.ACTION_RECEIVER_CLASS]) than the three actions
+     * below. Four `PendingIntent`s now share one request code and stay four distinct system
+     * entries on two independent grounds at once.
+     *
+     * That is why the KDoc's "no second id scheme" claim still holds after this notification grew
+     * a fourth `PendingIntent`.
      *
      * Returns whether the notification actually reached the system: `false` means [canPost] gated
      * it and nothing was posted. Callers that persist delivery MUST branch on this instead of
@@ -145,12 +160,34 @@ class NotificationPoster @Inject constructor(
             .setStyle(NotificationCompat.BigTextStyle().bigText(habitName))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(false)
+            .setContentIntent(contentIntent(ctx, occurrenceId))
             .addAction(action(ctx, occurrenceId, ActionIntentContract.ACTION_YES, R.string.notification_action_yes))
             .addAction(action(ctx, occurrenceId, ActionIntentContract.ACTION_NO, R.string.notification_action_no))
             .addAction(
                 action(ctx, occurrenceId, ActionIntentContract.ACTION_SNOOZE, R.string.notification_action_snooze),
             )
             .build()
+
+    /**
+     * reminder-notification-tap-opens-today: tapping the notification body must open the app on
+     * Today WITHOUT dismissing the notification ([setAutoCancel] above already stays `false` for
+     * that) and without stacking a second [MainActivity] instance on top of a running one.
+     *
+     * `FLAG_ACTIVITY_SINGLE_TOP`, not a manifest `android:launchMode`, is set directly on this one
+     * `Intent` (see [MainActivity]'s class KDoc for why that scoping choice was made): a warm tap
+     * reuses the running instance and calls its `onNewIntent` instead of creating a new one, while
+     * a cold tap (no task exists yet) launches normally — `singleTop` only changes behaviour when
+     * an instance is already at the top, which this single-Activity app's task always is once
+     * running. [MainActivity.EXTRA_FROM_REMINDER_NOTIFICATION] is how `onNewIntent` tells this tap
+     * apart from any other way a new `Intent` could reach that Activity.
+     */
+    private fun contentIntent(ctx: Context, occurrenceId: Long): PendingIntent =
+        PendingIntent.getActivity(
+            ctx,
+            occurrenceId.toInt(),
+            reminderTapIntent(ctx),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
 
     private fun action(
         ctx: Context,
@@ -173,4 +210,20 @@ class NotificationPoster @Inject constructor(
         )
         return NotificationCompat.Action(NO_ACTION_ICON, ctx.getString(labelRes), pendingIntent)
     }
+}
+
+/**
+ * reminder-notification-tap-opens-today: the `Intent` [NotificationPoster.contentIntent] wraps in
+ * a `PendingIntent`, pulled out to its own top-level `internal` function purely so
+ * [NotificationPosterTest] can assert on the target component, `FLAG_ACTIVITY_SINGLE_TOP`, and
+ * [MainActivity.EXTRA_FROM_REMINDER_NOTIFICATION] directly — without going through
+ * `PendingIntent.getActivity` (a real system call the mockable `android.jar` cannot answer
+ * meaningfully) or a real `Notification` build (deliberately kept out of this unit-test class, see
+ * [NotificationPosterTest]'s own class KDoc).
+ */
+internal fun reminderTapIntent(ctx: Context): Intent {
+    val intent = Intent(ctx, MainActivity::class.java)
+    intent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+    intent.putExtra(MainActivity.EXTRA_FROM_REMINDER_NOTIFICATION, true)
+    return intent
 }

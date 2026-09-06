@@ -1,5 +1,6 @@
 package com.jjrapps.constanza.core.ui
 
+import android.content.Intent
 import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -7,6 +8,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +29,7 @@ import com.jjrapps.constanza.reminding.ReminderSettingsStore
 import com.jjrapps.constanza.reminding.SnoozeSettingsRoute
 import com.jjrapps.constanza.scheduling.ReplanOnResumeObserver
 import com.jjrapps.constanza.tracking.TodayRoute
+import com.jjrapps.constanza.tracking.TodayViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -44,11 +47,30 @@ import kotlinx.coroutines.flow.stateIn
  *
  * §13.1's non-blocking exact-alarm banner (task 6b.9) lives on the Today screen itself —
  * [com.jjrapps.constanza.tracking.TodayScreen] — not here.
+ *
+ * reminder-notification-tap-opens-today: [onNewIntent] is the other non-UI thing it does. The
+ * reminder notification's content [android.app.PendingIntent] (built in
+ * [com.jjrapps.constanza.reminding.NotificationPoster]) targets this Activity with
+ * `FLAG_ACTIVITY_SINGLE_TOP` set on its own `Intent`, not a manifest `launchMode`: this is a
+ * single-Activity app, so [MainActivity] is always alone at the top of its own task, and scoping
+ * the flag to that one `Intent` keeps the behaviour change local to the reminder-tap path instead
+ * of silently altering how every other future caller of this Activity gets launched. `singleTop`
+ * routes a warm tap to [onNewIntent] instead of a stacked second instance; [resetToTodaySignal]
+ * is how that event reaches the Compose tree held by [setContent]'s captured lambda, since Compose
+ * state — not a plain `var` — is what triggers recomposition.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var replanOnResumeObserver: ReplanOnResumeObserver
+
+    /** reminder-notification-tap-opens-today: starts at 0 (never fired) and counts up once per
+     *  qualifying [onNewIntent] call, never resets in between — [ConstanzaApp] reacts to every
+     *  distinct value via `LaunchedEffect(resetToTodaySignal)`, including a second tap that arrives
+     *  while the app is already on Today. A rotation recreates this Activity and this field with
+     *  it (no `android:configChanges`, see the class KDoc above), which is correct: there is no
+     *  pending notification tap to replay across that recreation. */
+    private var resetToTodaySignal by mutableStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,9 +84,32 @@ class MainActivity : ComponentActivity() {
         lifecycle.addObserver(replanOnResumeObserver)
         setContent {
             ConstanzaTheme {
-                FirstRunGate()
+                FirstRunGate(resetToTodaySignal = resetToTodaySignal)
             }
         }
+    }
+
+    /** reminder-notification-tap-opens-today: fires instead of a fresh [onCreate] whenever
+     *  `FLAG_ACTIVITY_SINGLE_TOP` finds this Activity already at the top of its task — i.e. every
+     *  warm case, since cold start already lands on Today via [ConstanzaApp]'s own default
+     *  `startRoute`. [setIntent] keeps [getIntent] consistent with what actually launched this
+     *  instance, matching the platform's own documented contract for this callback. Only
+     *  [MainActivity.EXTRA_FROM_REMINDER_NOTIFICATION] bumps [resetToTodaySignal] — a future
+     *  unrelated new intent to this same Activity must not be misread as a reminder tap. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_FROM_REMINDER_NOTIFICATION, false)) {
+            resetToTodaySignal++
+        }
+    }
+
+    companion object {
+        /** reminder-notification-tap-opens-today: the reminder notification's content
+         *  [android.app.PendingIntent] sets this boolean extra so [onNewIntent] can tell "the user
+         *  tapped the notification body" apart from any other way a new `Intent` could reach this
+         *  already-running Activity. */
+        const val EXTRA_FROM_REMINDER_NOTIFICATION = "com.jjrapps.constanza.EXTRA_FROM_REMINDER_NOTIFICATION"
     }
 }
 
@@ -112,10 +157,28 @@ private sealed interface ConstanzaRoute : java.io.Serializable {
  *  [startRoute] (first-run-onboarding design.md §5.1) lets [FirstRunGate] seed this composable's
  *  ONE `rememberSaveable` initial value with [ConstanzaRoute.HabitEditor] tagged
  *  [ConstanzaRoute.EditorOrigin.Onboarding], so the handoff from onboarding into habit creation is
- *  a normal route entry rather than a second navigation mechanism. */
+ *  a normal route entry rather than a second navigation mechanism.
+ *
+ *  [resetToTodaySignal] (reminder-notification-tap-opens-today) is [MainActivity.onNewIntent]'s
+ *  side of a warm reminder-notification tap. Landing on Today is not enough by itself: task 6b's
+ *  [TodayViewModel] is scoped to this Activity's `ViewModelStore`, not to whichever composable
+ *  currently has `route`, so it survives untouched while the user is away on another screen —
+ *  including any past-day navigation left behind by [TodayViewModel.showPreviousDay]. Setting
+ *  `route` back to [ConstanzaRoute.Today] alone would leave that past day showing the moment the
+ *  Today screen recomposes. [TodayViewModel] is only obtained here, via [hiltViewModel], once a
+ *  tap has actually happened (`resetToTodaySignal > 0`) — never unconditionally — so a session
+ *  that never taps a notification never constructs it a moment earlier than [TodayRoute] itself
+ *  would have. */
 @Composable
-private fun ConstanzaApp(startRoute: ConstanzaRoute = ConstanzaRoute.Today) {
+private fun ConstanzaApp(startRoute: ConstanzaRoute = ConstanzaRoute.Today, resetToTodaySignal: Int = 0) {
     var route by rememberSaveable { mutableStateOf(startRoute) }
+    if (resetToTodaySignal > 0) {
+        val todayViewModel: TodayViewModel = hiltViewModel()
+        LaunchedEffect(resetToTodaySignal) {
+            route = ConstanzaRoute.Today
+            todayViewModel.showToday()
+        }
+    }
     when (val current = route) {
         is ConstanzaRoute.Today -> TodayRoute(
             onManageHabits = { route = ConstanzaRoute.HabitList },
@@ -225,9 +288,14 @@ internal data class StartupState(
  * `android:windowBackground` already painted, so the blank hold is an extension of the cold-start
  * window, not a new visual state — see `res/values/colors.xml`'s note that `window_background`
  * must match [com.jjrapps.constanza.core.ui.theme.ConstanzaColors.Background] exactly.
+ *
+ * [resetToTodaySignal] (reminder-notification-tap-opens-today) passes straight through to
+ * [ConstanzaApp] — see that composable's KDoc. It is meaningless during onboarding (no habit,
+ * hence no reminder, can exist before onboarding finishes), so the [OnboardingRoute] branch below
+ * simply never reads it.
  */
 @Composable
-private fun FirstRunGate(viewModel: FirstRunGateViewModel = hiltViewModel()) {
+private fun FirstRunGate(viewModel: FirstRunGateViewModel = hiltViewModel(), resetToTodaySignal: Int = 0) {
     val startupState by viewModel.startupState.collectAsState()
     // Write-once. Set synchronously inside onFinished, BEFORE the flag write is requested
     // (design.md §9). rememberSaveable, not remember: a rotation in the frame between onFinished
@@ -241,7 +309,7 @@ private fun FirstRunGate(viewModel: FirstRunGateViewModel = hiltViewModel()) {
         // whose device is in Spanish must not meet the first-run flow in English.
         else -> ProvideAppLocale(state.language) {
             if (state.onboardingDone) {
-                ConstanzaApp(startRoute = startRoute)
+                ConstanzaApp(startRoute = startRoute, resetToTodaySignal = resetToTodaySignal)
             } else {
                 OnboardingRoute(
                     onFinished = {
