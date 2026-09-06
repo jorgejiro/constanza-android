@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -27,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -403,7 +406,39 @@ private fun HabitRollupHeader(
  *  [slotStatusText]'s own `muted` pass-through, so the demoted time suffix dims WITH the lead
  *  rather than staying at the brighter `onSurfaceVariant` — and tightens its bottom padding to
  *  [Spacing.xs]. It never touches [AnswerButtons] or [ChangeButton]: both are live controls in
- *  every section, in every row. */
+ *  every section, in every row.
+ *
+ *  today-slot-status-air: `verticalAlignment = Alignment.CenterVertically` used to size this whole
+ *  Row from its tallest child — [AnswerButtons]/[ChangeButton] — and centre the status text inside
+ *  it. A snoozed slot's status ("Aplazado hasta 15:02") wraps to two lines of `bodyMedium`, which
+ *  alone very nearly fills that row: the centring slack that gave a one-line status its visible
+ *  headroom under the habit name collapsed to almost nothing, while every one-line row kept it. The
+ *  name-to-status gap should not depend on how many lines the status happens to wrap to.
+ *
+ *  Switching to `Alignment.Top` alone would have driven that headroom to zero on EVERY row, not
+ *  just the wrapped one — the trap: `Top` alignment means zero air by definition, and a one-line
+ *  row was never air-free. So this stays `Alignment.Top` for layout, and [statusTopPadding] gives
+ *  the text back the exact air a one-line row already had before this change: half the slack
+ *  `Center` used to leave above one line, `(rowHeight - oneLineHeight) / 2`, floored at 0dp so a
+ *  future taller line height (e.g. accessibility font scaling) never goes negative.
+ *
+ *  [rowHeight] is `max(ButtonDefaults.MinHeight, LocalMinimumInteractiveComponentSize.current)`,
+ *  not `ButtonDefaults.MinHeight` alone (40dp) — a `TextButton` is a Material 3 `Surface`, and every
+ *  clickable `Surface` wraps itself in `Modifier.minimumInteractiveComponentSize()`, which pads a
+ *  control up to the accessible touch-target size (48dp by default) *outside* its own visual 40dp
+ *  box when the two differ. That outer 48dp box, not the button's own 40dp, is what `Center` was
+ *  ever centring the status text against. Measured at 360dp/2.625x: seeding `ButtonDefaults
+ *  .MinHeight` alone into the formula reproduced a visibly SMALLER gap on one-line rows than they
+ *  had before this change (26px against a real 37px, i.e. 10dp against a real ~14dp) — the fix
+ *  would have shipped its own version of this same defect, just smaller. Reading the touch-target
+ *  token this row's own buttons are actually built on, rather than only the button's inner content
+ *  height, is what makes the formula answer to what `Center` really did.
+ *
+ *  That is the same padding for one line and two: constant, not derived from the wrap count. The
+ *  buttons stay centred (`Modifier.align(Alignment.CenterVertically)`, RowScope-local) rather than
+ *  also going `Top` — measured both ways at 360dp/2.625x; top-aligning them additionally pins
+ *  Sí·No·Omitir to the row's first line, which reads as belonging to only half a two-line status,
+ *  while centring keeps them anchored to the status block as a whole regardless of its height. */
 @Composable
 @Suppress("LongParameterList") // muted is the row-level emphasis flag HabitRollupRow threads down.
 private fun SlotRow(
@@ -420,12 +455,21 @@ private fun SlotRow(
     val pending = slot.status == EntryStatus.UNKNOWN || key in actions.reopenedKeys
     val statusText = slotStatusText(slot, zone, timeIsIdentity, bypassSnooze = !pending, muted = muted)
     val statusBottomPadding = if (muted) Spacing.xs else 8.dp
+    // today-slot-status-air: see the doc comment above. Derived from real tokens rather than a
+    // literal — the row's own real driving height, `max(ButtonDefaults.MinHeight,
+    // LocalMinimumInteractiveComponentSize.current)`, against one line of this row's own
+    // `bodyMedium` — so a future type-scale, touch-target or button-size change carries this
+    // constant along with it.
+    val rowHeight = maxOf(ButtonDefaults.MinHeight, LocalMinimumInteractiveComponentSize.current)
+    val statusTopPadding = with(LocalDensity.current) {
+        ((rowHeight - MaterialTheme.typography.bodyMedium.lineHeight.toDp()) / 2).coerceAtLeast(0.dp)
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = ROW_CONTENT_INSET, end = 16.dp, bottom = statusBottomPadding),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
     ) {
         // `weight(1f)` is load bearing, not styling, and is the same fix ExactAlarmBanner and
         // NotificationPermissionBanner already carry in TodayBanners.kt. Without it the status text
@@ -437,21 +481,29 @@ private fun SlotRow(
         // at a 16dp start, and the buttons are unmoved at 165dp-344dp on a 360dp screen.
         Text(
             statusText,
-            modifier = Modifier.weight(1f).padding(end = Spacing.sm),
+            modifier = Modifier.weight(1f).padding(end = Spacing.sm, top = statusTopPadding),
             style = MaterialTheme.typography.bodyMedium,
             color = if (muted) ConstanzaColors.OnBackgroundMuted else Color.Unspecified,
         )
         if (pending) {
-            AnswerButtons(onAnswer = { status -> actions.onAnswer(row.habitId, slot, status) })
+            AnswerButtons(
+                modifier = Modifier.align(Alignment.CenterVertically),
+                onAnswer = { status -> actions.onAnswer(row.habitId, slot, status) },
+            )
         } else {
-            ChangeButton(row.habitName, statusText, onClick = { actions.onRequestChange(key) })
+            ChangeButton(
+                row.habitName,
+                statusText,
+                modifier = Modifier.align(Alignment.CenterVertically),
+                onClick = { actions.onRequestChange(key) },
+            )
         }
     }
 }
 
 @Composable
-private fun AnswerButtons(onAnswer: (InAppEntryStatus) -> Unit) {
-    Row {
+private fun AnswerButtons(onAnswer: (InAppEntryStatus) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier = modifier) {
         TextButton(onClick = { onAnswer(InAppEntryStatus.COMPLETED) }) {
             Text(stringResource(R.string.today_answer_yes))
         }
@@ -476,12 +528,17 @@ private fun AnswerButtons(onAnswer: (InAppEntryStatus) -> Unit) {
  *  words — a label is spoken, not laid out — and `TodayAnsweredSlotComposeTest` asserts these
  *  sentences by exact match, so the difference is visible rather than a matter of taste. */
 @Composable
-private fun ChangeButton(habitName: String, answeredStatus: AnnotatedString, onClick: () -> Unit) {
+private fun ChangeButton(
+    habitName: String,
+    answeredStatus: AnnotatedString,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val spoken = answeredStatus.text.replace(TODAY_SLOT_STATUS_GAP, " ")
     val description = stringResource(R.string.today_slot_change_a11y, habitName, spoken)
     TextButton(
         onClick = onClick,
-        modifier = Modifier.semantics { contentDescription = description },
+        modifier = modifier.semantics { contentDescription = description },
     ) {
         Text(stringResource(R.string.today_slot_change))
     }
