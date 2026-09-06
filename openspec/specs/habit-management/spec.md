@@ -121,35 +121,58 @@ un-archival, without back-filling reminders for dates missed while archived.
 
 ### Requirement: Habit Colour Palette
 
-The system MUST offer exactly six colours in the habit colour picker, and every offered colour
-MUST be a member of the current warm-dark palette (see `visual-design-system`).
+The system MUST offer a palette of standard, mutually distinguishable colours in the habit colour
+picker, and MUST additionally allow any colour to be chosen freely. Offered colours are NOT required
+to belong to the warm-dark palette (see `visual-design-system`): breadth of coverage takes
+precedence over harmony with the app's own accent, because a palette constrained to that accent's
+lightness band cannot express whole colour families at all.
 
-#### Scenario: Picker offers exactly six colours
+Every offered colour MUST clear the ratified non-text contrast floor against the app's surfaces. A
+freely chosen colour is exempt, because the person choosing it can see what they are choosing.
+
+The picker MUST open collapsed, showing a single row of colours plus the free-choice affordance,
+and MUST offer a way to reveal the rest. The colours in that collapsed row MUST be chosen for
+maximum mutual distinguishability rather than being the first N of the full set, and the default
+colour for a new habit MUST be one the collapsed row draws.
+
+#### Scenario: Picker opens collapsed and can be expanded
 - GIVEN the colour picker shown during habit creation or editing
 - WHEN the user opens it
-- THEN exactly six colours are shown, matching the current warm-dark palette values
+- THEN a single row of standard colours is shown alongside a free-choice affordance, and the
+  remaining colours are revealed only after the user asks for them
 
-### Requirement: Persisted Habit Colour Stays On-Palette Across A Palette Change
+#### Scenario: A new habit's default colour is visible without expanding
+- GIVEN habit creation is started and no colour has been chosen
+- WHEN the picker renders
+- THEN the pre-selected colour is one drawn in the collapsed row, never one reachable only by
+  expanding and never the free-choice affordance
 
-When the offered habit colour palette changes, every already-persisted habit's colour MUST be
-rewritten so it remains a member of the current palette; the system MUST NOT leave any habit
-holding a colour absent from the current palette. The rewrite MUST be a one-to-one mapping (no two
-distinct previous colours collapse onto the same new colour). Where a previous colour's hue has no
-same-hue counterpart in the new palette, it MUST map to the one remaining unclaimed colour in the
-new palette rather than collapse onto another habit's colour.
+#### Scenario: Any colour can be chosen freely
+- GIVEN the colour picker
+- WHEN the user chooses the free-choice affordance and picks a colour that is not in the offered
+  palette
+- THEN that colour is accepted and persisted unchanged
 
-#### Scenario: Existing habit keeps a same-family colour
-- GIVEN a habit persisted with a colour from the old palette that has a same-hue counterpart in
-  the new palette (e.g. teal, blue, red, purple, or green)
-- WHEN the palette change is applied
-- THEN the habit's colour is rewritten to the corresponding new-palette colour of the same family
+### Requirement: A Persisted Habit Colour Survives A Palette Change
 
-#### Scenario: Orange changes colour family to pink
-- GIVEN a habit persisted with the old orange colour, whose hue has no counterpart in the new
-  palette because that hue is reserved for the accent
-- WHEN the palette change is applied
-- THEN the habit's colour is rewritten to pink — the one colour in six whose family changes — and
-  it remains distinguishable from the other five habit colours
+A habit's persisted colour MUST survive unchanged when the offered palette changes, and MUST remain
+selectable and visible in the picker even when it is no longer an offered colour. The system MUST
+NOT rewrite a habit's colour merely because the offered palette moved beneath it.
+
+This supersedes the earlier obligation to rewrite every persisted colour onto the new palette.
+That obligation existed because an off-palette colour was unreachable and therefore an orphan: a
+habit holding one could not be re-selected in a picker that did not contain it. Free choice removes
+that premise. An off-palette colour is now an ordinary, representable state, and rewriting a
+colour the user had deliberately chosen would be data loss rather than repair.
+
+The one-to-one rewrite behaviour is retained where it is still needed: importing a backup whose
+declared schema version predates the first palette change (see `data-portability`).
+
+#### Scenario: An existing habit keeps its colour after the palette widens
+- GIVEN a habit persisted with a colour that the newly offered palette does not contain
+- WHEN the palette change ships and the user opens that habit for editing
+- THEN the habit's colour is unchanged, and the picker shows it as the current selection rather
+  than showing nothing selected
 
 ### Requirement: Habit Colour Visible Where Habits Are Listed
 

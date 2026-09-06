@@ -42,6 +42,43 @@
     <string name="habit_editor_name_error">El nombre es obligatorio</string>
     <string name="habit_editor_notes_label">Notas (opcional)</string>
     <string name="habit_editor_color_label">Color</string>
+
+    <!-- habit-management: paleta estándar del selector de color, en el mismo orden que la retícula. -->
+    <string name="habit_color_teal">Verde azulado</string>
+    <string name="habit_color_purple">Púrpura</string>
+    <string name="habit_color_olive">Oliva</string>
+    <string name="habit_color_cyan">Cian</string>
+    <string name="habit_color_violet">Violeta</string>
+    <string name="habit_color_brown">Marrón</string>
+    <string name="habit_color_pink">Rosa</string>
+    <string name="habit_color_green">Verde</string>
+    <string name="habit_color_lilac">Lila</string>
+    <string name="habit_color_red">Rojo</string>
+    <string name="habit_color_silver">Plata</string>
+    <string name="habit_color_yellow">Amarillo</string>
+    <string name="habit_color_amber">Ámbar</string>
+    <string name="habit_color_light_blue">Azul claro</string>
+    <string name="habit_color_peach">Melocotón</string>
+    <string name="habit_color_indigo">Índigo</string>
+    <string name="habit_color_orange">Naranja</string>
+    <string name="habit_color_mint">Menta</string>
+    <string name="habit_color_blue_grey">Gris azulado</string>
+    <string name="habit_color_lime">Lima</string>
+    <string name="habit_color_blue">Azul</string>
+    <string name="habit_color_light_green">Verde claro</string>
+    <string name="habit_color_magenta">Magenta</string>
+    <string name="habit_color_custom">Color personalizado</string>
+
+    <!-- habit-management: selector libre de color detrás del círculo personalizado. -->
+    <!-- habit-management: el selector muestra una fila; esto abre el resto. -->
+    <string name="habit_editor_color_show_more">Más</string>
+    <string name="habit_editor_color_show_fewer">Menos</string>
+
+    <string name="habit_editor_color_custom_title">Color personalizado</string>
+    <string name="habit_editor_color_custom_confirm">Usar este color</string>
+    <string name="habit_editor_color_hue">Tono</string>
+    <string name="habit_editor_color_saturation">Saturación</string>
+    <string name="habit_editor_color_brightness">Brillo</string>
     <string name="habit_editor_save">Guardar</string>
 
     <!-- habit-management: leaving the editor without saving. -->
