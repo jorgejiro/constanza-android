@@ -10,6 +10,10 @@ Defines creation, editing, and archiving of `Habit` records and their attached `
 
 The system MUST allow creating a `Habit` with a name, optional colour, optional notes, and
 exactly one attached `Schedule` of any supported frequency kind.
+(Previously: also required an optional guiding question field, removed from the product because a
+habit's name already is the question. This annotation was itself deleted in error during that
+change's archive, on the mistaken reasoning that a main spec should carry no history — this repo's
+convention is the opposite, and every modified requirement here records what it previously said.)
 
 #### Scenario: Create a daily habit
 - GIVEN no existing habits
@@ -130,6 +134,12 @@ lightness band cannot express whole colour families at all.
 Every offered colour MUST clear the ratified non-text contrast floor against the app's surfaces. A
 freely chosen colour is exempt, because the person choosing it can see what they are choosing.
 
+(Previously: required exactly six colours, every one a member of the warm-dark palette. That
+constraint was the defect rather than the selection: confined to the accent's lightness band, whole
+families were unreachable — a pastel brown is beige and a pastel navy is just blue — and the two
+closest swatches measured only 23.9 apart. Free choice and the collapsed-row obligations did not
+exist.)
+
 The picker MUST open collapsed, showing a single row of colours plus the free-choice affordance,
 and MUST offer a way to reveal the rest. The colours in that collapsed row MUST be chosen for
 maximum mutual distinguishability rather than being the first N of the full set, and the default
@@ -159,7 +169,10 @@ A habit's persisted colour MUST survive unchanged when the offered palette chang
 selectable and visible in the picker even when it is no longer an offered colour. The system MUST
 NOT rewrite a habit's colour merely because the offered palette moved beneath it.
 
-This supersedes the earlier obligation to rewrite every persisted colour onto the new palette.
+(Previously: titled "Persisted Habit Colour Stays On-Palette Across A Palette Change" and required
+the exact opposite — every already-persisted colour MUST be rewritten onto the new palette, by a
+one-to-one mapping, so that no habit was left holding an off-palette colour.)
+
 That obligation existed because an off-palette colour was unreachable and therefore an orphan: a
 habit holding one could not be re-selected in a picker that did not contain it. Free choice removes
 that premise. An off-palette colour is now an ordinary, representable state, and rewriting a
