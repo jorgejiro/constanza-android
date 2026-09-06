@@ -130,6 +130,11 @@
     <string name="today_status_any_missed">Algo pendiente</string>
     <string name="today_status_all_skipped">Omitido</string>
     <string name="today_status_pending">Pendiente</string>
+    <!-- today-grouped-sections: cabeceras de sección sobre la lista de Hoy agrupada; .uppercase()
+         se aplica en el composable, así que se guardan en minúscula normal para localización. -->
+    <string name="today_section_now">Ahora</string>
+    <string name="today_section_later">Más tarde</string>
+    <string name="today_section_done">Hecho</string>
     <string name="today_expand">Mostrar horas</string>
     <string name="today_collapse">Ocultar horas</string>
 

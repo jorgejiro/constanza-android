@@ -13,6 +13,7 @@ import com.jjrapps.constanza.reminding.NotificationPermissionDecision
 import com.jjrapps.constanza.reminding.ReminderSettingsStore
 import com.jjrapps.constanza.scheduling.AlarmScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,9 +32,15 @@ import javax.inject.Inject
  *  `combine`'s largest typed overload takes five flows and this screen already had five sources;
  *  bundling the two banner flags keeps the outer `combine` typed rather than dropping to the
  *  vararg overload, which erases every source to `Any?` and costs a cast per element. */
+/** today-grouped-sections: [now] rides along in this same bundle rather than becoming a sixth
+ *  `combine` source, for the identical ceiling reason the other two fields already share one —
+ *  and it is refreshed the same `ON_RESUME` way task 6b.9's two banners already are, folded into
+ *  [TodayViewModel.refreshDate] rather than its own function (see that KDoc), since it is exactly
+ *  the same kind of ambient reading that can go stale while this screen is paused. */
 private data class PermissionBanners(
     val canScheduleExactAlarms: Boolean,
     val notificationPermission: NotificationPermissionDecision,
+    val now: Instant,
 )
 
 /** today-answered-slot-collapse, design.md decision 5: [expandedHabitIds] and [reopenedSlots] are
@@ -130,10 +137,17 @@ class TodayViewModel @Inject constructor(
     private val notificationPermissionDecision =
         MutableStateFlow(notificationPermission.decide(hasRequestedBefore = false))
 
+    /** today-grouped-sections: seeded at construction and re-read on `ON_RESUME` via
+     *  [refreshNow] — see [PermissionBanners]'s KDoc for why this does not tick every minute while
+     *  the screen sits foregrounded. [groupTodayRows] only ever needs a reading that is fresh
+     *  enough to be right the next time anything else recomposes this screen. */
+    private val nowState = MutableStateFlow(currentDateSource.now())
+
     private val permissionBanners = combine(
         canScheduleExactAlarms,
         notificationPermissionDecision,
-    ) { exactAlarms, notifications -> PermissionBanners(exactAlarms, notifications) }
+        nowState,
+    ) { exactAlarms, notifications, now -> PermissionBanners(exactAlarms, notifications, now) }
 
     private val expansionState = combine(
         expandedHabitIds,
@@ -163,8 +177,10 @@ class TodayViewModel @Inject constructor(
                 val slots = habitRepository.findSlotsFor(habit.id)
                 buildTodayHabitRow(habit, schedule, slots, snapshot)
             }
+            val sections = groupTodayRows(rows, view.date, currentDateSource.zone(), banners.now)
             TodayUiState(
                 rows = rows,
+                sections = sections,
                 expandedHabitIds = expansion.expandedHabitIds,
                 reopenedSlots = expansion.reopenedSlots,
                 zone = currentDateSource.zone(),
@@ -224,9 +240,16 @@ class TodayViewModel @Inject constructor(
      *  while the user is on a past day this still updates [TodayDate.clock], it simply does not
      *  move [TodayDate.viewed] until [showToday] re-attaches. A rollover that already fired while
      *  foregrounded is a no-op here — the timer already advanced [TodayDate.clock], and
-     *  `MutableStateFlow` conflates the identical value. */
+     *  `MutableStateFlow` conflates the identical value.
+     *
+     *  today-grouped-sections: also re-reads [nowState] here rather than behind its own public
+     *  function — this ViewModel is already at detekt's `TooManyFunctions` ceiling, and every
+     *  existing caller of this function wants both corrections at once anyway: an app backgrounded
+     *  long enough for the date to roll over is backgrounded long enough for `groupTodayRows`'s
+     *  NOW/LATER split to have gone stale too. */
     fun refreshDate() {
         dateState.update { it.copy(clock = currentDateSource.today()) }
+        nowState.value = currentDateSource.now()
     }
 
     /** today-past-day-correction, design.md decision 1: steps [TodayDate.viewed] one day earlier,
@@ -313,6 +336,11 @@ class TodayViewModel @Inject constructor(
 
 data class TodayUiState(
     val rows: List<TodayHabitRow> = emptyList(),
+    /** today-grouped-sections, design.md: [rows] grouped into "Ahora"/"Más tarde"/"Hecho" and
+     *  ordered within each — see [groupTodayRows]. A section absent from this list has zero rows
+     *  and renders nothing at all (no header, no divider, no reserved space); [rows] itself keeps
+     *  its own pre-grouping order so existing single-row assertions stay unaffected. */
+    val sections: List<TodaySection> = emptyList(),
     val expandedHabitIds: Set<Long> = emptySet(),
     /** today-answered-slot-collapse, design.md decision 1: which answered slots currently show
      *  their answer actions again instead of their status text and Change control. */

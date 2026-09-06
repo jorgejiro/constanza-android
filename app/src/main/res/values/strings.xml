@@ -140,6 +140,11 @@
     <string name="today_status_any_missed">Missed something</string>
     <string name="today_status_all_skipped">Skipped</string>
     <string name="today_status_pending">Pending</string>
+    <!-- today-grouped-sections: section headers above the grouped Today list; .uppercase() is
+         applied in the composable, so these stay normal-case for localisation. -->
+    <string name="today_section_now">Now</string>
+    <string name="today_section_later">Later</string>
+    <string name="today_section_done">Done</string>
     <string name="today_expand">Show times</string>
     <string name="today_collapse">Hide times</string>
 

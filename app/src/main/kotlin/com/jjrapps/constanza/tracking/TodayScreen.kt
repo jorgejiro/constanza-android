@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -37,6 +38,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.component.HabitColorDot
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.core.ui.theme.Dimens
 import com.jjrapps.constanza.core.ui.theme.Spacing
 import com.jjrapps.constanza.domain.model.EntryStatus
@@ -166,7 +168,11 @@ private val FAB_SCROLL_CLEARANCE = 88.dp
  *  `indented`) — so a row's status line hung 24dp to the LEFT of the name it belonged to, and the
  *  indented case disagreed with both. Measured at 360dp before the fix; that is what "mal alineada"
  *  meant. Resolves to 48dp today. */
-private val ROW_CONTENT_INSET = Spacing.lg + Dimens.HabitDotSlot + Spacing.sm
+// today-grouped-sections: `internal`, not `private` — [TodaySectionHeader]/[TodaySectionDivider]
+// in TodaySectionHeader.kt need this same one left edge, and moving them out of this file (rather
+// than growing it past detekt's file-level TooManyFunctions threshold) is exactly what
+// TodayDateBar.kt, TodayBanners.kt and TodayAddHabitAction.kt already did for the identical reason.
+internal val ROW_CONTENT_INSET = Spacing.lg + Dimens.HabitDotSlot + Spacing.sm
 
 /** today-answered-slot-collapse, design.md decision 5: one holder instead of two extra parameters
  *  on both [HabitRollupRow] and [SlotRow], which would otherwise push each past detekt's
@@ -253,8 +259,19 @@ private fun TodayContent(
             contentPadding = PaddingValues(bottom = FAB_SCROLL_CLEARANCE),
         ) {
             item { TodayPermissionBanners(state, onNotificationPermissionRequested) }
-            items(state.rows, key = { it.habitId }) { row ->
-                HabitRollupRow(row, row.habitId in state.expandedHabitIds, state.zone, onToggleExpanded, actions)
+            // today-grouped-sections, design.md: three ordered sections ("Ahora" / "Más tarde" /
+            // "Hecho"), each introduced by a header and, under it, a hairline rule that stops at
+            // ROW_CONTENT_INSET rather than running full-bleed. A section [state.sections] never
+            // carries with zero rows, so this loop never emits an empty section's header at all —
+            // the design's explicit "empty group renders nothing" rule, for free.
+            state.sections.forEach { section ->
+                val muted = section.kind == TodaySectionKind.DONE
+                item(key = "section-header-${section.kind}") { TodaySectionHeader(section.kind) }
+                item(key = "section-divider-${section.kind}") { TodaySectionDivider() }
+                items(section.rows, key = { it.habitId }) { row ->
+                    val expanded = row.habitId in state.expandedHabitIds
+                    HabitRollupRow(row, expanded, state.zone, onToggleExpanded, actions, muted)
+                }
             }
         }
     }
@@ -281,25 +298,37 @@ private fun TodayContent(
  *  shows no state whatsoever. It was written that way once during this change and nothing on screen
  *  or in the suite said so; `TodayComposeTest.aCollapsedMultiSlotRowStillNamesItsDayStatus` exists
  *  because of that. */
+/** [muted] is `true` for exactly one section, [TodaySectionKind.DONE] (today-grouped-sections,
+ *  design.md) — "Ahora" and "Más tarde" both render at full brightness, since a "Más tarde" row is
+ *  still answerable early and dimming it would be a false affordance. Threaded down to
+ *  [HabitRollupHeader] and [SlotRow] rather than a `Modifier.alpha()` on this whole `Column`: alpha
+ *  is all-or-nothing over a subtree and would wrongly dim the colour dot (identity, not state) and
+ *  the answer/Change buttons (live controls in every section) along with the text. */
 @Composable
+@Suppress("LongParameterList") // muted is the row-level emphasis flag every child below already threads.
 private fun HabitRollupRow(
     row: TodayHabitRow,
     expanded: Boolean,
     zone: ZoneId,
     onToggleExpanded: (Long) -> Unit,
     actions: SlotActions,
+    muted: Boolean,
 ) {
     val multiSlot = row.slots.size > 1
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        HabitRollupHeader(row, expanded, multiSlot, onToggleExpanded)
+    // today-grouped-sections: a muted row's own outer gap is 0dp rather than [Spacing.xs] (4dp) —
+    // there is no smaller `Spacing` tier, and a muted row needs to read tighter than a live one's
+    // own 4dp, not merely match it.
+    val rowVerticalPadding = if (muted) 0.dp else 4.dp
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = rowVerticalPadding)) {
+        HabitRollupHeader(row, expanded, multiSlot, onToggleExpanded, muted)
         if (!multiSlot) {
-            row.slots.firstOrNull()?.let { slot -> SlotRow(row, slot, zone, actions) }
+            row.slots.firstOrNull()?.let { slot -> SlotRow(row, slot, zone, actions, muted = muted) }
         } else if (expanded) {
             // No indent, deliberately, and this is where `indented = true` went: an indent here is a
             // second left edge, which is the defect rather than the fix. What distinguishes these
             // rows from one another instead is their reminder time, which `timeIsIdentity` promotes
             // to the front of the line — see [slotStatusText]'s decision 4.
-            row.slots.forEach { slot -> SlotRow(row, slot, zone, actions, timeIsIdentity = true) }
+            row.slots.forEach { slot -> SlotRow(row, slot, zone, actions, timeIsIdentity = true, muted = muted) }
         }
     }
 }
@@ -322,13 +351,19 @@ private fun HabitRollupHeader(
     expanded: Boolean,
     multiSlot: Boolean,
     onToggleExpanded: (Long) -> Unit,
+    muted: Boolean,
 ) {
+    // today-grouped-sections: the only two things [muted] ever changes on this line — never the
+    // colour dot (identity, not state) and never the expand control's own label colour.
+    val nameTopPadding = if (muted) Spacing.xs else Spacing.sm
+    val nameStyle = if (muted) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge
+    val textColor = if (muted) ConstanzaColors.OnBackgroundMuted else Color.Unspecified
     Row(
         // `end` padding: a long habit name — the reported case was a full sentence — otherwise runs
         // to the very edge of the screen with nothing between it and the bezel.
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.sm),
+            .padding(start = Spacing.lg, end = Spacing.lg, top = nameTopPadding),
         verticalAlignment = Alignment.Top,
     ) {
         HabitColorDot(row.colorArgb)
@@ -337,11 +372,12 @@ private fun HabitRollupHeader(
             // A multi-slot habit's own line has no answerable slot, so the day rollup is the only
             // state it can carry — and it has to carry it while collapsed. Demoted rather than given
             // its own line: it is a summary of the slot lines, not a peer of the habit name.
-            demotedSuffix(row.habitName, stringResource(dayStatusLabel(row.dayStatus)).takeIf { multiSlot }),
+            demotedSuffix(row.habitName, stringResource(dayStatusLabel(row.dayStatus)).takeIf { multiSlot }, muted),
             // `weight(1f)` for the same reason [SlotRow]'s status text carries one: without it the
             // name takes what it wants and the expand control is squeezed into the remainder.
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyLarge,
+            style = nameStyle,
+            color = textColor,
         )
         if (multiSlot) {
             val labelRes = if (expanded) R.string.today_collapse else R.string.today_expand
@@ -361,24 +397,33 @@ private fun HabitRollupHeader(
  *  The old parameter chose between a 32dp and a 16dp start padding and BOTH disagreed with the
  *  name's own 40dp edge one line above; every line now starts at [ROW_CONTENT_INSET]. The status
  *  text also drops from the inherited `bodyLarge` to `bodyMedium`, so a row reads name (16sp) then
- *  status (14sp) then time (11sp) — three steps down, in the order the eye should take them. */
+ *  status (14sp) then time (11sp) — three steps down, in the order the eye should take them.
+ *
+ *  today-grouped-sections, design.md: [muted] recolours only this row's own lead/suffix text — via
+ *  [slotStatusText]'s own `muted` pass-through, so the demoted time suffix dims WITH the lead
+ *  rather than staying at the brighter `onSurfaceVariant` — and tightens its bottom padding to
+ *  [Spacing.xs]. It never touches [AnswerButtons] or [ChangeButton]: both are live controls in
+ *  every section, in every row. */
 @Composable
+@Suppress("LongParameterList") // muted is the row-level emphasis flag HabitRollupRow threads down.
 private fun SlotRow(
     row: TodayHabitRow,
     slot: TodaySlot,
     zone: ZoneId,
     actions: SlotActions,
     timeIsIdentity: Boolean = false,
+    muted: Boolean = false,
 ) {
     val key = slot.keyIn(row.habitId)
     // A reopened slot is pending for display purposes, which is why `bypassSnooze` is derived from
     // this rather than from the stored status: the branch below and the sentence must agree.
     val pending = slot.status == EntryStatus.UNKNOWN || key in actions.reopenedKeys
-    val statusText = slotStatusText(slot, zone, timeIsIdentity, bypassSnooze = !pending)
+    val statusText = slotStatusText(slot, zone, timeIsIdentity, bypassSnooze = !pending, muted = muted)
+    val statusBottomPadding = if (muted) Spacing.xs else 8.dp
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = ROW_CONTENT_INSET, end = 16.dp, bottom = 8.dp),
+            .padding(start = ROW_CONTENT_INSET, end = 16.dp, bottom = statusBottomPadding),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -394,6 +439,7 @@ private fun SlotRow(
             statusText,
             modifier = Modifier.weight(1f).padding(end = Spacing.sm),
             style = MaterialTheme.typography.bodyMedium,
+            color = if (muted) ConstanzaColors.OnBackgroundMuted else Color.Unspecified,
         )
         if (pending) {
             AnswerButtons(onAnswer = { status -> actions.onAnswer(row.habitId, slot, status) })
