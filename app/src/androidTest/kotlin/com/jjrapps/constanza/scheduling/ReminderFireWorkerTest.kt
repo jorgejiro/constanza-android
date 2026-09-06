@@ -70,10 +70,16 @@ class ReminderFireWorkerTest {
     private suspend fun insertHabit(kind: String, timesPerWeek: Int? = null): Long =
         database.insertHabitWithSchedule(kind = kind, timesPerWeek = timesPerWeek, name = "Exercise")
 
-    private suspend fun insertArmedOccurrence(habitId: Long, scheduledDate: String, scheduledAt: Instant): Long =
+    private suspend fun insertArmedOccurrence(
+        habitId: Long,
+        scheduledDate: String,
+        scheduledAt: Instant,
+        slotId: Long = 0,
+    ): Long =
         database.reminderOccurrenceDao().upsert(
             ReminderOccurrenceEntity(
-                habitId = habitId, scheduledDate = scheduledDate, scheduledAtEpochMs = scheduledAt.toEpochMilli(),
+                habitId = habitId, slotId = slotId, scheduledDate = scheduledDate,
+                scheduledAtEpochMs = scheduledAt.toEpochMilli(),
                 state = "ARMED", snoozeUntilEpochMs = null, snoozeCount = 0, notifiedAtEpochMs = null,
                 resolveDeadlineMs = scheduledAt.toEpochMilli() + 24 * 3600 * 1000L,
             ),
@@ -123,6 +129,78 @@ class ReminderFireWorkerTest {
         database.entryDao().insert(completedEntry(habitId, "2026-09-01"))
         val now = Instant.parse("2026-09-02T08:00:00Z")
         val occId = insertArmedOccurrence(habitId, "2026-09-02", now)
+        buildWorker(occId, now).doWork()
+
+        coVerify(exactly = 0) { notificationPoster.postReminder(any(), any(), any()) }
+        assertEquals("SUPPRESSED", database.reminderOccurrenceDao().findById(occId)?.state)
+    }
+
+    /**
+     * The fire-time net under [OccurrencePlanner]'s own answered-slot guard. An occurrence can be
+     * armed before an answer exists and only reach this handler afterwards, and firing then would
+     * nag about a day the user has already settled.
+     *
+     * **The terminal state is half the assertion, not decoration.** `findUnresolved()` excludes
+     * exactly `RESOLVED`, `ABANDONED` and `SUPPRESSED`; leaving this occurrence `ARMED` would hand
+     * it to `OccurrenceResolver.sweepMidnight`, whose `writeMissed` upserts with
+     * `OnConflictStrategy.REPLACE` against `UNIQUE(habitId, date, slotId)` and would REPLACE the
+     * very `COMPLETED` row that made us suppress. Silence plus rewritten history is worse than the
+     * notification.
+     */
+    @Test
+    fun anAlreadyCompletedSlotSuppressesTheNotificationAndLandsOnATerminalState() = runBlocking {
+        val habitId = insertHabit(kind = "DAILY")
+        database.entryDao().insert(completedEntry(habitId, "2026-09-01"))
+        val now = Instant.parse("2026-09-01T08:00:00Z")
+        val occId = insertArmedOccurrence(habitId, "2026-09-01", now)
+        buildWorker(occId, now).doWork()
+
+        coVerify(exactly = 0) { notificationPoster.postReminder(any(), any(), any()) }
+        assertEquals("SUPPRESSED", database.reminderOccurrenceDao().findById(occId)?.state)
+        assertTrue(
+            "a suppressed-by-answer occurrence must be invisible to the midnight sweep",
+            database.reminderOccurrenceDao().findUnresolved().none { it.id == occId },
+        )
+    }
+
+    /** `SKIPPED` is settable only through a deliberate in-app action, so re-asking would override
+     *  a decision the user made on purpose. */
+    @Test
+    fun anAlreadySkippedSlotAlsoSuppressesTheNotification() = runBlocking {
+        val habitId = insertHabit(kind = "DAILY")
+        database.entryDao().insert(completedEntry(habitId, "2026-09-01").copy(status = "SKIPPED"))
+        val now = Instant.parse("2026-09-01T08:00:00Z")
+        val occId = insertArmedOccurrence(habitId, "2026-09-01", now)
+        buildWorker(occId, now).doWork()
+
+        coVerify(exactly = 0) { notificationPoster.postReminder(any(), any(), any()) }
+        assertEquals("SUPPRESSED", database.reminderOccurrenceDao().findById(occId)?.state)
+    }
+
+    /** habit-entry-tracking: Provisional-Missed Correction names an import as one of the three
+     *  paths that MUST be able to correct a `MISSED` into a `COMPLETED`. A `MISSED` row is a
+     *  provisional verdict awaiting an answer, so it must still fire. */
+    @Test
+    fun aMissedEntryStillFires() = runBlocking {
+        coEvery { notificationPoster.postReminder(any(), any(), any()) } returns true
+        val habitId = insertHabit(kind = "DAILY")
+        database.entryDao().insert(completedEntry(habitId, "2026-09-01").copy(status = "MISSED"))
+        val now = Instant.parse("2026-09-01T08:00:00Z")
+        val occId = insertArmedOccurrence(habitId, "2026-09-01", now)
+        buildWorker(occId, now).doWork()
+
+        coVerify { notificationPoster.postReminder(occId, "Exercise", 0) }
+        assertEquals("FIRED", database.reminderOccurrenceDao().findById(occId)?.state)
+    }
+
+    /** design.md D11's `0` sentinel: an in-app answer written before any reminder slot existed
+     *  carries `slotId = 0`, and the slot added afterwards has a different, freshly minted id. */
+    @Test
+    fun anAnswerUnderTheSlotSentinelSuppressesADifferentlyIdentifiedSlot() = runBlocking {
+        val habitId = insertHabit(kind = "DAILY")
+        database.entryDao().insert(completedEntry(habitId, "2026-09-01"))
+        val now = Instant.parse("2026-09-01T08:00:00Z")
+        val occId = insertArmedOccurrence(habitId, "2026-09-01", now, slotId = 42)
         buildWorker(occId, now).doWork()
 
         coVerify(exactly = 0) { notificationPoster.postReminder(any(), any(), any()) }

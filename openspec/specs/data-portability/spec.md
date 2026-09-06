@@ -19,6 +19,9 @@ The system MUST support exporting all `Habit`, `Schedule`, `ReminderSlot`, and `
 
 The system MUST support importing a previously exported file. Import MUST replace the entire existing dataset with the file's contents: it MUST NOT merge with existing data, and MUST NOT preserve any habit, schedule, slot, or entry that is absent from the imported file. Import MUST be preceded by an explicit confirmation step that states the action is destructive and irreversible, and MUST NOT proceed without that confirmation. Import MUST be atomic: a failed or rejected import MUST leave the existing dataset exactly as it was, with no partial replacement. A malformed or unreadable file MUST be rejected before any existing data is touched. Rejection feedback shown to the user MUST render in the app's resolved language (see `app-localization`). Because the import logic lives in a module deliberately kept Android-free with no `Context`, a rejection MUST be represented as a typed failure value identifying which failure occurred plus any interpolated arguments, never as a human-readable English message string carried in the failure itself; the Compose layer alone maps that typed value to a localized string.
 
+Import is not only a data write: replacing the dataset cancels the alarms the previous data owned and re-plans occurrences from scratch, so it also DECIDES the scheduling state the user is left in. The backup file carries `Entry` records and deliberately carries no occurrences, so every occurrence that exists after an import was created by that re-plan. The re-plan MUST therefore honour `reminder-delivery`'s Already-Answered Slots Stay Silent: importing MUST NOT resurrect a reminder for a slot the imported data already records as answered, and MUST NOT leave behind an unresolved occurrence that a later midnight sweep would resolve into a `MISSED` over that answer. A restore MUST return the user to the state their backup describes, not re-open a day they had already closed.
+(Previously: described the dataset replacement only; said nothing about the scheduling state import leaves behind, even though the replacement performs scheduling side effects.)
+
 #### Scenario: Import into an empty app restores all data
 - GIVEN an app with no habits
 - WHEN the user confirms importing a previously exported file
@@ -43,6 +46,13 @@ The system MUST support importing a previously exported file. Import MUST replac
 - GIVEN an app with several habits, schedules, slots, and entries
 - WHEN the user exports the dataset and immediately imports that same file after confirming the replace
 - THEN the resulting dataset is domain-equivalent to the dataset before export, record for record
+
+#### Scenario: Import does not resurrect a reminder for an already-answered slot
+- GIVEN a backup whose data records today's slot as `COMPLETED`, at a reminder time earlier than the
+  moment the import runs
+- WHEN the user confirms the import
+- THEN no reminder is armed or delivered for that slot today, and the restored `COMPLETED` entry is
+  still `COMPLETED` after the following midnight
 
 #### Scenario: Rejection feedback renders in the resolved language
 - GIVEN the language override is set to Español

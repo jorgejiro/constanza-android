@@ -124,7 +124,7 @@ class ImminentReminderSeed {
                 reminderSlotDao = database.reminderSlotDao(),
                 reminderOccurrenceDao = database.reminderOccurrenceDao(),
             )
-            val planner = OccurrencePlanner(daos, alarmScheduler, timeProvider, SEED_RESOLVE_DEADLINE_HOURS)
+            val planner = OccurrencePlanner(daos, database.entryDao(), alarmScheduler, timeProvider, SEED_RESOLVE_DEADLINE_HOURS)
 
             removePreviousSeeds(daos, alarmScheduler)
 

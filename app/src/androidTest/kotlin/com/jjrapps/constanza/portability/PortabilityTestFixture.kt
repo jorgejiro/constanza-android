@@ -42,6 +42,7 @@ class PortabilityTestFixture(context: Context, dataStoreFile: File) {
             database.reminderSlotDao(),
             database.reminderOccurrenceDao(),
         ),
+        database.entryDao(),
         alarmScheduler,
         timeProvider,
         RESOLVE_DEADLINE_HOURS,

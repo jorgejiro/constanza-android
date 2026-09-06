@@ -44,6 +44,9 @@ For a `TIMES_PER_DAY` habit, each `ReminderSlot` occurrence on a given date MUST
 
 At the local midnight boundary following a due occurrence's date, any `Entry` still `UNKNOWN` for that occurrence MUST transition to `MISSED`, with two exceptions. The transition MUST NOT apply to an occurrence with a live snooze, defined as `state = SNOOZED AND snoozeUntil > now`; the `Entry` MUST remain `UNKNOWN` while the snooze is live. The transition MUST NOT apply to any occurrence of an `N_TIMES_PER_WEEK` habit, because that schedule kind carries no determinate per-date obligation (see the occurrence-due predicate in `habit-scheduling`).
 
+That scope is a PROHIBITION, not only an obligation: the transition MUST NOT overwrite an `Entry` that already records an answer. An `Entry` recorded `COMPLETED` or `SKIPPED` MUST survive the midnight boundary unchanged, whatever state the corresponding occurrence is left in. The occurrence itself is still resolved so it stops being rescanned — only the dated `MISSED` row is withheld, exactly as the `N_TIMES_PER_WEEK` exception withholds it. An `Entry` recorded `MISSED` is NOT an answer for this purpose: it is a provisional verdict, so re-resolving the same date stays idempotent and the correction paths named in Provisional-Missed Correction stay open.
+(Previously: stated only that an `Entry` "still `UNKNOWN`" transitions to `MISSED`. Nothing forbade the write when the `Entry` was NOT `UNKNOWN`, and Provisional-Missed Correction ratifies only the one-way `MISSED → COMPLETED` direction, so the reverse write was unratified rather than prohibited. Implemented as an upsert that replaces on `(habitId, date, slotId)`, that gap let a restored `COMPLETED` be silently rewritten to `MISSED`.)
+
 #### Scenario: Unanswered slot becomes missed after midnight
 - GIVEN an occurrence due 2026-09-01, still `UNKNOWN` at 23:59, with no snooze outstanding
 - WHEN local midnight passes into 2026-09-02
@@ -53,6 +56,13 @@ At the local midnight boundary following a due occurrence's date, any `Entry` st
 - GIVEN an occurrence due 2026-09-01 with a live snooze (`snoozeUntil` after local midnight)
 - WHEN local midnight passes into 2026-09-02
 - THEN the 2026-09-01 `Entry` remains `UNKNOWN`, and no `MISSED` row is written
+
+#### Scenario: An answered entry is never overwritten at midnight
+- GIVEN an occurrence for 2026-09-01 left unresolved beside an `Entry` already recorded `COMPLETED`
+  for that habit, date and slot
+- WHEN local midnight passes into 2026-09-02
+- THEN the 2026-09-01 `Entry` is still `COMPLETED`, no `MISSED` row replaces it, and the occurrence
+  is still marked resolved
 
 #### Scenario: N_TIMES_PER_WEEK never receives a dated missed at midnight
 - GIVEN an N_TIMES_PER_WEEK habit with an unmet weekly quota
@@ -135,7 +145,7 @@ While displaying the **live-today view** — meaning the user has not deliberate
 **Date navigation:** from the live-today view, the user MAY navigate backward to any past date with no lower bound; a past date with nothing scheduled MUST render empty rather than an error. Forward navigation MUST NOT reach any date later than the current local date — the live-today view is the forward boundary. While viewing a past date, the add-habit affordance MUST be absent — absent rather than disabled — and a past date with nothing scheduled MUST present past-day empty-state text. These are two independent obligations, not one: the affordance's absence is not conditional on the empty state, and the text does not occupy the affordance's position. Any per-slot UI-only state, such as which slot is expanded or reopened, MUST NOT carry over from one displayed date to another.
 
 **Rollup precedence (ratified 2026-09-01, task 6b.10):** the collapsed status MUST lead with progress, not failure. A day with at least one `COMPLETED` slot and at least one `MISSED` slot MUST report a partially-completed status, never a missed-day status. A missed-day status MUST be reported only when a day has no `COMPLETED` slot at all and at least one `MISSED` slot. The full precedence, most to least specific: all slots `UNKNOWN` reports pending; all slots `COMPLETED` reports fully-completed; all slots `SKIPPED` reports fully-skipped; no `COMPLETED` slot and at least one `MISSED` slot reports missed; every other mix (including any `COMPLETED` slot alongside any `MISSED` slot) reports partial completion.
-(Previously: the local-date-tracking obligation was unconditional and covered only midnight rollover and resume, with no concept of a deliberately navigated-away date and no navigation surface at all.)
+(Previously: the local-date-tracking obligation was unconditional and covered only midnight rollover and resume, with no concept of a deliberately navigated-away date and no navigation surface at all. The past-day clause also read as one coupled obligation — the affordance absent and past-day text "in its place", "where the affordance would otherwise be" — which was literal while the add-habit button lived inside the empty state; once it became a floating action button in the corner, nothing stood in its place, so it is now stated as two independent obligations.)
 
 #### Scenario: Day rollup reports partial completion
 - GIVEN a 3-slot day with 2 `COMPLETED` and 1 `UNKNOWN`

@@ -68,6 +68,7 @@ class HabitRepositoryTestFixture(internal val context: Context) {
                 database.reminderSlotDao(),
                 database.reminderOccurrenceDao(),
             ),
+            database.entryDao(),
             alarmScheduler,
             timeProvider,
             RESOLVE_DEADLINE_HOURS,

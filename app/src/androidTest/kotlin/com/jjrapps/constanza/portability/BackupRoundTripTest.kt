@@ -10,7 +10,9 @@ import com.jjrapps.constanza.core.data.mapper.toDomain
 import com.jjrapps.constanza.core.data.mapper.toMask
 import com.jjrapps.constanza.domain.model.Schedule
 import com.jjrapps.constanza.reminding.SnoozeDuration
+import io.mockk.verify
 import java.time.DayOfWeek
+import java.time.Instant
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -23,6 +25,14 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 
 private const val SLOT_MINUTE_OF_DAY = 480
+
+/** [PortabilityTestFixture]'s clock is fixed at 2026-09-01T08:00:00Z, so 07:00 is unambiguously in
+ *  the past at import time — which is exactly when `setExactAndAllowWhileIdle` fires immediately. */
+private const val FIXTURE_TODAY = "2026-09-01"
+private const val PAST_SLOT_MINUTE_OF_DAY = 7 * 60
+
+private fun pastReminderInstantMillis(): Long =
+    Instant.parse("${FIXTURE_TODAY}T07:00:00Z").toEpochMilli()
 
 /**
  * Tasks 7.6/7.7 (data-portability: Round-Trip Fidelity; Import — Malformed file leaves data
@@ -111,6 +121,68 @@ class BackupRoundTripTest {
         )
 
         assertEquals(SnoozeDuration.THIRTY_MINUTES, fixture.settingsStore.currentSnoozeDuration())
+    }
+
+    /**
+     * **The structural gap that let the defect ship.** Every other assertion in this class is about
+     * data fidelity, yet `replaceAll`'s contract includes `alarmScheduler.cancel` and
+     * `occurrencePlanner.replanAll()` — it leaves SCHEDULING state behind, and nothing here ever
+     * looked at it.
+     *
+     * The backup carries entries, not occurrences (design.md §8.4), and import wipes
+     * `reminder_occurrences` by cascade before replanning. So a habit whose slot the user already
+     * completed today came back with no occurrence row, and the planner's only "leave it alone"
+     * gate was keyed on exactly that row. It armed a fresh `ARMED` occurrence for a reminder time
+     * already in the past — `setExactAndAllowWhileIdle` fires those immediately — and the stale row
+     * was then swept at midnight into a `MISSED` that REPLACED the restored `COMPLETED`.
+     *
+     * The fixture's clock is fixed at 08:00 UTC and the slot is at 07:00, so the reminder time is
+     * unambiguously in the past at import.
+     */
+    @Test
+    fun importDoesNotArmAReminderForASlotAlreadyCompletedToday() = runBlocking {
+        val habitId = fixture.database.habitDao().insert(habitEntity(name = "Meditate"))
+        fixture.database.scheduleDao().upsert(scheduleEntity(habitId, kind = "DAILY"))
+        val slotId = fixture.database.reminderSlotDao().insert(
+            ReminderSlotEntity(habitId = habitId, minuteOfDay = PAST_SLOT_MINUTE_OF_DAY, enabled = true),
+        )
+        fixture.database.entryDao().insert(
+            EntryEntity(
+                habitId = habitId, date = FIXTURE_TODAY, slotId = slotId, status = "COMPLETED",
+                value = null, answeredAt = "${FIXTURE_TODAY}T07:03:00Z", source = "NOTIFICATION",
+            ),
+        )
+
+        val json = fixture.exporter.serialize(fixture.exporter.buildBackup())
+        fixture.database.habitDao().deleteAll()
+
+        fixture.importer.replaceAll(fixture.importer.parseAndValidate(json))
+
+        val restored = fixture.database.habitDao().findAllSnapshot().single()
+        val restoredSlot = fixture.database.reminderSlotDao().findByHabitId(restored.id).single()
+        val todaysOccurrences = fixture.database.reminderOccurrenceDao()
+            .findByHabitId(restored.id)
+            .filter { it.scheduledDate == FIXTURE_TODAY }
+        assertTrue(
+            "an already-completed slot must not be re-armed by an import, got $todaysOccurrences",
+            todaysOccurrences.isEmpty(),
+        )
+        verify(exactly = 0) { fixture.alarmScheduler.schedule(any(), pastReminderInstantMillis()) }
+
+        // The restored answer itself must survive untouched — the notification was the symptom,
+        // rewritten history the defect.
+        val restoredEntry = fixture.database.entryDao().findByHabitAndDate(restored.id, FIXTURE_TODAY).single()
+        assertEquals("COMPLETED", restoredEntry.status)
+        assertEquals(restoredSlot.id, restoredEntry.slotId)
+
+        // Tomorrow is unaffected by today's answer and MUST still be armed, so this proves the
+        // guard is date-scoped rather than a blanket "this habit is done" switch.
+        assertTrue(
+            "future dates must still be planned",
+            fixture.database.reminderOccurrenceDao()
+                .findByHabitId(restored.id)
+                .any { it.scheduledDate > FIXTURE_TODAY && it.state == "ARMED" },
+        )
     }
 
     /** Task 7.7: unparseable text is rejected before any write, and the existing dataset — not

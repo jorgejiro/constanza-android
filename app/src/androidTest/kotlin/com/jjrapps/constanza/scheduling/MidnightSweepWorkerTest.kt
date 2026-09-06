@@ -11,6 +11,7 @@ import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.jjrapps.constanza.core.data.AppDatabase
+import com.jjrapps.constanza.core.data.entity.EntryEntity
 import com.jjrapps.constanza.core.data.entity.HabitEntity
 import com.jjrapps.constanza.core.data.entity.ReminderOccurrenceEntity
 import com.jjrapps.constanza.core.data.entity.ScheduleEntity
@@ -122,6 +123,57 @@ class MidnightSweepWorkerTest {
 
         assertTrue(database.entryDao().findByHabitAndDate(habitId, yesterday).isEmpty())
         assertEquals("SNOOZED", database.reminderOccurrenceDao().findById(occId)?.state)
+    }
+
+    /**
+     * **The severe half of the answered-slot defect, and the reason it deserved its own test.**
+     * A stale `ARMED` occurrence sitting beside an already-answered `Entry` did not merely produce
+     * an unwanted notification: `writeMissed` upserts with `OnConflictStrategy.REPLACE` against
+     * `UNIQUE(habitId, date, slotId)`, so the sweep REPLACED the answer with `MISSED`. A restore
+     * silently rewrote history.
+     *
+     * habit-entry-tracking: Midnight Transition scopes the transition to an `Entry` "still
+     * `UNKNOWN`", and Provisional-Missed Correction is one-way (`MISSED -> COMPLETED`) — nothing
+     * ratifies the reverse. The occurrence is still resolved so it stops being rescanned; only the
+     * dated row is withheld, exactly as the `N_TIMES_PER_WEEK` exception withholds it.
+     */
+    @Test
+    fun aCompletedEntryIsNeverOverwrittenByTheSweep() = runBlocking {
+        val habitId = insertHabitWithSchedule(kind = "DAILY")
+        database.entryDao().insert(
+            EntryEntity(
+                habitId = habitId, date = yesterday, slotId = 0, status = "COMPLETED", value = null,
+                answeredAt = "${yesterday}T09:00:00Z", source = "IN_APP",
+            ),
+        )
+        val occId = database.reminderOccurrenceDao().upsert(occurrence(habitId, "ARMED"))
+
+        buildWorker().doWork()
+
+        val entry = database.entryDao().findByHabitAndDate(habitId, yesterday).single()
+        assertEquals("COMPLETED", entry.status)
+        assertEquals("IN_APP", entry.source)
+        assertEquals("RESOLVED", database.reminderOccurrenceDao().findById(occId)?.state)
+    }
+
+    /** The same guard must not close Provisional-Missed Correction's import route: a `MISSED` row
+     *  is a provisional verdict awaiting an answer, so re-sweeping it stays idempotent. */
+    @Test
+    fun anExistingMissedEntryIsStillRewrittenBySweep() = runBlocking {
+        val habitId = insertHabitWithSchedule(kind = "DAILY")
+        database.entryDao().insert(
+            EntryEntity(
+                habitId = habitId, date = yesterday, slotId = 0, status = "MISSED", value = null,
+                answeredAt = "${yesterday}T09:00:00Z", source = "IN_APP",
+            ),
+        )
+        database.reminderOccurrenceDao().upsert(occurrence(habitId, "ARMED"))
+
+        buildWorker().doWork()
+
+        val entry = database.entryDao().findByHabitAndDate(habitId, yesterday).single()
+        assertEquals("MISSED", entry.status)
+        assertEquals("SWEEP", entry.source)
     }
 
     /** design.md D8: `dueOn` never returns `Required` for `N_TIMES_PER_WEEK`, so the midnight

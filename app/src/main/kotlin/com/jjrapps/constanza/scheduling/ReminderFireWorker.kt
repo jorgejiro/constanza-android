@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.jjrapps.constanza.core.data.dao.EntryDao
+import com.jjrapps.constanza.core.data.entity.ReminderOccurrenceEntity
 import com.jjrapps.constanza.core.data.mapper.toDomain
 import com.jjrapps.constanza.core.time.TimeProvider
 import com.jjrapps.constanza.domain.dueOn
@@ -28,6 +29,12 @@ private const val ENTRY_STATUS_COMPLETED = "COMPLETED"
  * [OccurrencePlanner] arms an alarm every day for `N_TIMES_PER_WEEK` because D7/D8 defer quota
  * suppression to fire time — this is the one place that suppression happens, so unlike the
  * planner's own always-zero progress, [currentWeekProgress] reads REAL entries for the week.
+ *
+ * [alreadyAnswered] is the second, narrower re-evaluation and the net under the planner's own
+ * answered-slot guard: an occurrence can be armed before an answer exists and only reach this
+ * handler afterwards, and firing then would nag about a day the user has already settled. Two
+ * layers rather than one because they fail differently — the planner's guard is what stops the
+ * unresolved row from existing at all, and this one catches whatever slipped past it.
  */
 class ReminderFireHandler @Inject constructor(
     private val daos: SchedulingDaos,
@@ -38,6 +45,10 @@ class ReminderFireHandler @Inject constructor(
     suspend fun fire(occurrenceId: Long) {
         val occ = daos.reminderOccurrenceDao.findById(occurrenceId) ?: return
         if (occ.state != STATE_ARMED) return // already answered/snoozed/resolved
+        if (alreadyAnswered(occ)) {
+            daos.reminderOccurrenceDao.upsert(occ.copy(state = STATE_SUPPRESSED))
+            return
+        }
         val habit = daos.habitDao.findById(occ.habitId) ?: return
         val schedule = daos.scheduleDao.findByHabitId(occ.habitId)?.toDomain() ?: return
         val scheduledDate = LocalDate.parse(occ.scheduledDate)
@@ -60,6 +71,22 @@ class ReminderFireHandler @Inject constructor(
         val notifiedAt = if (posted) timeProvider.now().toEpochMilli() else null
         daos.reminderOccurrenceDao.upsert(occ.copy(state = STATE_FIRED, notifiedAtEpochMs = notifiedAt))
     }
+
+    /**
+     * **`STATE_SUPPRESSED`, not `STATE_ARMED` and not `STATE_FIRED`, and that choice is the point.**
+     * `findUnresolved()` excludes exactly three states — `RESOLVED`, `ABANDONED`, `SUPPRESSED` —
+     * and leaving this occurrence in any other one hands it straight to
+     * `OccurrenceResolver.sweepMidnight`, whose `writeMissed` upserts `MISSED` against
+     * `UNIQUE(habitId, date, slotId)` with `OnConflictStrategy.REPLACE` and so would REPLACE the
+     * very `COMPLETED` row that made us suppress. Not posting while staying unresolved would trade
+     * a spurious notification for silently rewritten history, which is the worse half of the same
+     * defect. `SUPPRESSED` is the right one of the three: it already means "terminated at fire
+     * time without notifying" (D8's quota exit above uses it for exactly that), whereas `RESOLVED`
+     * is `EntryWriter`'s marker that an answer was written THROUGH this occurrence, which is not
+     * what happened here.
+     */
+    private suspend fun alreadyAnswered(occ: ReminderOccurrenceEntity): Boolean =
+        entryDao.findByHabitAndDate(occ.habitId, occ.scheduledDate).answerSlot(occ.slotId)
 
     private suspend fun currentWeekProgress(habitId: Long, date: LocalDate, weekStart: DayOfWeek): PeriodProgress {
         val weekBegin = startOfWeek(date, weekStart)
