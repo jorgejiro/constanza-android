@@ -2106,6 +2106,95 @@ carried_forward_open_items:
 
         The Monday-Friday default arrived correctly, so the request that
         started this item costs zero taps on real hardware, not just in theory.
+    - id: "no-all-habits-tracking-grid"
+      title: "There is no screen showing every habit's recent history at once"
+      status: open
+      severity: >
+        Missing capability, not a defect. Today answers "what do I do now"
+        for a single day. Nothing answers "how am I doing" across habits and
+        across days — the only history surface is per-habit Progress.
+      origin: >
+        Requested by the maintainer on 2026-09-05 with a screenshot of the Loop
+        Habit Tracker app: rows are habits, columns are recent days, each cell
+        carries a tick or a cross, and long-pressing a cell changes that day.
+        He also proposed the screen absorb "Manage habits", with a long-press
+        on a habit's name opening edit / archive / delete.
+      deferred: >
+        Deferred by the maintainer on 2026-09-06, after he began comparing how
+        other apps solve it. Not rejected — parked. The exploration below is
+        recorded so whoever picks it up does not start from zero.
+      what_the_exploration_established: >
+        Explored 2026-09-05; the full document is in Engram at
+        `sdd/habit-tracking-grid/explore`. The load-bearing findings:
+
+        THE CRUX IS THE CELL, NOT THE GRID. Loop is effectively binary.
+        `DayStatus` has SIX values — ALL_COMPLETED, PARTIAL, ANY_MISSED,
+        ALL_SKIPPED, NOT_DUE, PENDING — and two are traps. NOT_DUE must never
+        read like a miss, or the `weekday-only-schedule` fix is undone
+        visually. PARTIAL (a TimesPerDay habit with one slot done and two
+        missed) is honestly neither a tick nor a cross. PENDING is not a
+        failure either.
+
+        NOT_DUE HAS NEVER BEEN RENDERED ANYWHERE. `TodayModel` returns null
+        for it and the ViewModel's `mapNotNull` drops the row, so a not-due
+        habit simply does not appear on Today. There is no visual precedent to
+        copy. Worse, `TodayScreen.dayStatusLabel` maps PENDING and NOT_DUE to
+        the same string — dead code, since that branch is unreachable, but it
+        shows how easily they get conflated.
+
+        HALF THE WORK EXISTS. `DayRollup.rollupDay(...)` already computes a
+        day's status from its slots, with tests, and should be consumed rather
+        than re-derived. The write path for correcting a past day already
+        exists and is tested — `EntryWriter.answerInApp` with a null
+        occurrenceId on an arbitrary past date. The grid needs a new CALL SITE,
+        not a new write path.
+
+        WHAT IS GENUINELY NEW. Compose has no built-in two-axis synced-scroll
+        grid; a sticky name column beside horizontally-scrolling,
+        vertically-synced day cells is real layout work. At 360dp only about
+        6-7 columns fit at a legible cell size, so horizontal scroll is
+        mandatory. `EntryDao` has no "all habits, one date range" query — one
+        new ranged query avoids M independent reactive Flows.
+      recommendations_worth_keeping: >
+        1. CHANGE THE PROPOSED INTERACTION. Tap to toggle, long-press for the
+        fuller menu (SKIPPED, multi-slot detail). Nothing announces a
+        long-press, and a grid cell has no room for Yes/No/Skip, so
+        long-press-only would make correction undiscoverable from the grid
+        itself. Partially mitigated by Today's date bar already offering the
+        same correction with ordinary taps.
+
+        2. SPLIT THE DOUBLE FUNCTION. Ship the read-and-correct grid first,
+        absorb "Manage habits" as a smaller second change. The interaction
+        pattern is sound — the targets are spatially distinct — but absorbing
+        management means porting all of HabitListScreen's tested behaviour
+        (the Show-archived toggle, the overflow menu, the delete dialog with
+        its pluralized count, the archived-aware empty state) on top of an
+        entirely new layout, diluting review attention on the genuinely novel
+        part.
+
+        3. RENDER THE CELL VOCABULARY BEFORE CHOOSING. At least two
+        genuinely different approaches exist and the maintainer decides by
+        looking. Recommend on which keeps NOT_DUE unmistakable, never on
+        aesthetics: the option where NOT_DUE draws NOTHING cannot regress into
+        "a faded cross", whereas a hatch or a low-alpha outline can be
+        simplified into exactly that under pressure.
+      relationship_to_other_items: >
+        `today-rows-are-built-from-tables-the-screen-does-not-observe` is in
+        this area and is OPEN. Its own owner condition says it is not worth
+        pre-emptively refactoring for — this grid is the change that would
+        make it worth doing, since a grid is precisely the writer that breaks
+        that invariant. Whoever plans the grid should decide that item's
+        disposition explicitly rather than inheriting it.
+      sizing: >
+        700-1200+ lines for a first version including management absorption.
+        Chained PRs mandatory. Suggested slicing: (1) domain/data prerequisite,
+        (2) read-only grid rendering, (3) long-press write path,
+        (4) management absorption.
+      owner_condition: >
+        The maintainer's own decision to resume. He parked it while comparing
+        other apps; the useful lens for that comparison is that almost every
+        competitor is binary, so watch what they do — if anything — with a day
+        that was not due and with a day only half done.
 stack:
   status: ratified
   note: >
