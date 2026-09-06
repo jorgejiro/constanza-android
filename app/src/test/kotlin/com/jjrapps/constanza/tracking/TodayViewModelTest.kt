@@ -90,13 +90,18 @@ private fun occurrence(
  *  rollover test moves this — and [current] is a separate synchronous read for [today], moved
  *  independently to simulate [TodayViewModel.refreshDate]'s resume case, where the timer's own
  *  coroutine can be stale (backgrounded) while the real current date has already moved on. */
-private class FakeCurrentDateSource(initial: LocalDate, private val zone: ZoneId = ZONE) : CurrentDateSource {
+private class FakeCurrentDateSource(
+    initial: LocalDate,
+    private val zone: ZoneId = ZONE,
+    var instant: Instant = FIXED_INSTANT,
+) : CurrentDateSource {
     val emissions = MutableStateFlow(initial)
     var current: LocalDate = initial
 
     override fun dates(): Flow<LocalDate> = emissions
     override fun today(): LocalDate = current
     override fun zone(): ZoneId = zone
+    override fun now(): Instant = instant
 
     /** Moves both values together, for the ordinary case where the timer fires normally while the
      *  screen is displayed (task 3.2 / 3.3) — as opposed to [current] alone, for the backgrounded

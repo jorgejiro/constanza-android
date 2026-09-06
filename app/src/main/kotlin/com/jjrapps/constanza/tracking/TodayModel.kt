@@ -10,7 +10,9 @@ import com.jjrapps.constanza.domain.model.Habit
 import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
 import com.jjrapps.constanza.domain.rollupDay
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 
 private const val STATE_SNOOZED = "SNOOZED"
 private const val NO_SLOT = 0L
@@ -120,4 +122,98 @@ private fun toTodaySlot(
         occurrenceId = occurrence?.id,
         snoozedUntilEpochMs = occurrence?.snoozeUntilEpochMs.takeIf { occurrence?.state == STATE_SNOOZED },
     )
+}
+
+/** today-grouped-sections, design.md: the three ordered sections a grouped Today screen renders
+ *  its rows into. [DONE] is the only kind the UI mutes — see `TodayScreen.kt`'s rendering rule
+ *  that only the "Hecho" group recedes. */
+enum class TodaySectionKind { NOW, LATER, DONE }
+
+/** One non-empty run of [rows] under a single section header. [groupTodayRows] never emits a
+ *  [TodaySection] with an empty [rows] — a group with nothing in it renders no header, no
+ *  divider, no reserved space (design.md's explicit "zero rows renders nothing" rule). */
+data class TodaySection(val kind: TodaySectionKind, val rows: List<TodayHabitRow>)
+
+/**
+ * Groups and orders [rows] into the three sections a grouped Today screen shows (today-grouped-
+ * sections, design.md):
+ * - [TodaySectionKind.NOW] ("Ahora"): habits with at least one unanswered slot that is actionable
+ *   RIGHT NOW — the slot has no reminder time, or that time (a SNOOZED slot's own snooze time,
+ *   never its original one) is already behind [now]. Within the section, habits with no timed
+ *   now-actionable slot sort first, then the rest by that time ascending.
+ * - [TodaySectionKind.LATER] ("Más tarde"): habits with no now-actionable slot but at least one
+ *   unanswered slot still ahead of [now], ordered by that nearest future time ascending.
+ * - [TodaySectionKind.DONE] ("Hecho"): habits whose slots are ALL answered, ordered by time.
+ *
+ * Grouping is per HABIT, never per slot: a multi-slot habit keeps its one expandable row, and is
+ * placed by its single most actionable slot, in exactly this precedence — any unanswered slot
+ * that is overdue or untimed beats any unanswered future slot beats "every slot already answered".
+ * A section [groupTodayRows] would otherwise emit with no rows is omitted from the result
+ * entirely, per the design's explicit "empty group renders nothing" rule — never returned as an
+ * empty [TodaySection].
+ */
+fun groupTodayRows(
+    rows: List<TodayHabitRow>,
+    today: LocalDate,
+    zone: ZoneId,
+    now: Instant,
+): List<TodaySection> {
+    val placements = rows.map { row -> row to row.placement(today, zone, now) }
+    val nowRows = placements.mapNotNull { (row, p) -> (p as? RowPlacement.Now)?.let { row to it.minuteOfDay } }
+        .sortedWith(compareBy(nullsFirst<Int>()) { (_, minute) -> minute })
+        .map { (row, _) -> row }
+    val laterRows = placements.mapNotNull { (row, p) -> (p as? RowPlacement.Later)?.let { row to it.at } }
+        .sortedBy { (_, at) -> at }
+        .map { (row, _) -> row }
+    val doneRows = placements.mapNotNull { (row, p) -> (p as? RowPlacement.Done)?.let { row to it.minuteOfDay } }
+        .sortedWith(compareBy(nullsFirst<Int>()) { (_, minute) -> minute })
+        .map { (row, _) -> row }
+    return listOfNotNull(
+        section(TodaySectionKind.NOW, nowRows),
+        section(TodaySectionKind.LATER, laterRows),
+        section(TodaySectionKind.DONE, doneRows),
+    )
+}
+
+private fun section(kind: TodaySectionKind, rows: List<TodayHabitRow>): TodaySection? =
+    TodaySection(kind, rows).takeIf { rows.isNotEmpty() }
+
+/** [Now]/[Done] sort untimed ahead of timed (design.md: "habits with no time first, then by time
+ *  ascending") via [minuteOfDay]'s natural `nullsFirst` ordering; [Later]'s [at] is always a real
+ *  instant, since a slot with no future time cannot be "in the future" in the first place. */
+private sealed interface RowPlacement {
+    data class Now(val minuteOfDay: Int?) : RowPlacement
+    data class Later(val at: Instant) : RowPlacement
+    data class Done(val minuteOfDay: Int?) : RowPlacement
+}
+
+private fun TodayHabitRow.placement(today: LocalDate, zone: ZoneId, now: Instant): RowPlacement {
+    val unanswered = slots.filterNot { it.isAnswered() }
+    if (unanswered.isEmpty()) {
+        return RowPlacement.Done(slots.mapNotNull { it.minuteOfDay }.minOrNull())
+    }
+    val withActionableTime = unanswered.map { it to it.actionableInstant(today, zone) }
+    val overdueOrUntimed = withActionableTime.filter { (_, at) -> at == null || !at.isAfter(now) }
+    return if (overdueOrUntimed.isNotEmpty()) {
+        val untimed = overdueOrUntimed.any { (slot, _) -> slot.minuteOfDay == null }
+        val minute = overdueOrUntimed.mapNotNull { (slot, _) -> slot.minuteOfDay }.minOrNull()
+        RowPlacement.Now(minute.takeUnless { untimed })
+    } else {
+        // Every unanswered slot has an actionable time here (the `at == null` branch above is
+        // exactly what "overdue or untimed" catches), so `mapNotNull` never drops a candidate and
+        // `min()` is always defined.
+        RowPlacement.Later(withActionableTime.mapNotNull { (_, at) -> at }.min())
+    }
+}
+
+private fun TodaySlot.isAnswered(): Boolean = status != EntryStatus.UNKNOWN
+
+/** `null` means "no reminder time" (always actionable now); a SNOOZED slot's stored
+ *  [TodaySlot.snoozedUntilEpochMs] wins over its original [TodaySlot.minuteOfDay] — the design's
+ *  explicit "a SNOOZED slot counts by its snooze time, not its original time" rule — mirroring
+ *  [slotStatusText]'s own snooze precedence. */
+private fun TodaySlot.actionableInstant(today: LocalDate, zone: ZoneId): Instant? = when {
+    snoozedUntilEpochMs != null -> Instant.ofEpochMilli(snoozedUntilEpochMs)
+    minuteOfDay == null -> null
+    else -> today.atStartOfDay(zone).plusMinutes(minuteOfDay.toLong()).toInstant()
 }

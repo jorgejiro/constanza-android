@@ -11,6 +11,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.rememberTimeOfDayFormat
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.domain.model.DayStatus
 import com.jjrapps.constanza.domain.model.EntryStatus
 import java.time.Instant
@@ -91,6 +92,7 @@ internal fun slotStatusText(
     zone: ZoneId,
     timeIsIdentity: Boolean = false,
     bypassSnooze: Boolean = false,
+    muted: Boolean = false,
 ): AnnotatedString {
     val timeFormat = rememberTimeOfDayFormat()
     val time = slot.minuteOfDay?.let(timeFormat::format)
@@ -108,7 +110,7 @@ internal fun slotStatusText(
     return if (timeIsIdentity && time != null) {
         // The slot's own time still leads here even when snoozed, and the two times do not collide:
         // `15:00  Pendiente, aplazado hasta 21:30` names the slot and then what happened to it.
-        demotedSuffix(lead = time, suffix = status)
+        demotedSuffix(lead = time, suffix = status, muted = muted)
     } else {
         // A snoozed sentence ALREADY names a time — the one the reminder was pushed to — so trailing
         // the slot's original reminder time after it puts two unrelated times on one line in the
@@ -120,7 +122,7 @@ internal fun slotStatusText(
         // and dropping the trailing time here is what keeps the single time on that one line. Keep
         // both halves of that: put "Pendiente," back and it wraps again, or let the trailing time
         // through and `Aplazado hasta 21:30  21:00` is what lands.
-        demotedSuffix(lead = status, suffix = time.takeUnless { snoozed })
+        demotedSuffix(lead = status, suffix = time.takeUnless { snoozed }, muted = muted)
     }
 }
 
@@ -134,10 +136,17 @@ internal fun slotStatusText(
  * comment there for what happened the last time the status text and the button group disagreed about
  * width. One node also makes ONE wrapping decision instead of two that can disagree, and TalkBack
  * reads one sentence instead of stopping twice inside it.
+ *
+ * [muted] (today-grouped-sections, design.md) switches the suffix's own colour to
+ * [ConstanzaColors.OnBackgroundMuted] instead of the brighter `onSurfaceVariant` — the design's
+ * explicit rule that in a muted row the demoted suffix must dim WITH the lead text, never stay
+ * behind at its normal, brighter tone. [lead] itself carries no colour of its own here: it inherits
+ * whatever colour the caller's own `Text` was given, which is where the "muted" half of this pair
+ * actually comes from.
  */
 @Composable
-internal fun demotedSuffix(lead: String, suffix: String?): AnnotatedString {
-    val quiet = MaterialTheme.colorScheme.onSurfaceVariant
+internal fun demotedSuffix(lead: String, suffix: String?, muted: Boolean = false): AnnotatedString {
+    val quiet = if (muted) ConstanzaColors.OnBackgroundMuted else MaterialTheme.colorScheme.onSurfaceVariant
     return remember(lead, suffix, quiet) {
         buildAnnotatedString {
             append(lead)

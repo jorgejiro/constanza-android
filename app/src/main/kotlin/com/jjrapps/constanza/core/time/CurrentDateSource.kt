@@ -1,5 +1,6 @@
 package com.jjrapps.constanza.core.time
 
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
@@ -24,6 +25,13 @@ interface CurrentDateSource {
     fun today(): LocalDate
 
     fun zone(): ZoneId
+
+    /** today-grouped-sections: a synchronous read of the current instant, for the same reason
+     *  [today] exists — [com.jjrapps.constanza.tracking.TodayViewModel] needs one to decide whether
+     *  an unanswered slot's reminder time has already passed (`groupTodayRows`'s NOW/LATER split),
+     *  and reading [TimeProvider] directly here for exactly that would reopen the ninth-parameter
+     *  problem this interface already exists to avoid. */
+    fun now(): Instant
 }
 
 /** design.md decision 5, the whole invariant this class exists to hold: every emission is
@@ -51,6 +59,8 @@ class SelfReschedulingCurrentDateSource @Inject constructor(
     override fun today(): LocalDate = timeProvider.today()
 
     override fun zone(): ZoneId = timeProvider.zone()
+
+    override fun now(): Instant = timeProvider.now()
 }
 
 /** Visible to [MidnightDateSourceTest][com.jjrapps.constanza.core.time.MidnightDateSourceTest]
