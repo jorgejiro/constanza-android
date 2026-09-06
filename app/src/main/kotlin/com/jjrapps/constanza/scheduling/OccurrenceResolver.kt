@@ -144,7 +144,21 @@ class OccurrenceResolver @Inject constructor(
         return dueOn(schedule, scheduledDate, ZERO_PROGRESS) == Due.Required
     }
 
+    /**
+     * habit-entry-tracking: Midnight Transition scopes this write to an `Entry` "still `UNKNOWN`",
+     * and Provisional-Missed Correction is a strictly one-way `MISSED -> COMPLETED` contract —
+     * nothing in the suite authorises the reverse. The write itself never honoured that scope:
+     * [entryDao].upsert is `OnConflictStrategy.REPLACE` against `UNIQUE(habitId, date, slotId)`, so
+     * a stale `ARMED` occurrence sitting beside an already-answered entry did not add a `MISSED`
+     * next to it — it REPLACED the answer with one. A restore silently rewrote history.
+     *
+     * The occurrence still transitions to `RESOLVED`/`ABANDONED` in the caller: only the dated row
+     * is withheld, exactly as the `N_TIMES_PER_WEEK` exception above withholds it. `MISSED` is not
+     * treated as answered here, so re-sweeping an already-`MISSED` date stays idempotent and the
+     * import correction path Provisional-Missed Correction requires stays open.
+     */
     private suspend fun writeMissed(occ: ReminderOccurrenceEntity, now: Instant) {
+        if (entryDao.findByHabitAndDate(occ.habitId, occ.scheduledDate).answerSlot(occ.slotId)) return
         entryDao.upsert(
             EntryEntity(
                 habitId = occ.habitId,
