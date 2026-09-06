@@ -65,12 +65,13 @@ private const val LAST_MINUTE_OF_DAY = MINUTES_PER_DAY - 1
  * value is for.
  *
  * On-palette for the same reason as `ImminentReminderSeed`'s: this fixture writes to the app's REAL
- * database file. The previous value here (`0xFFF57C00`, a Material 2 amber) was worse than a stale
- * legacy colour — it is not a key in `HabitColorRemap.LEGACY_TO_CURRENT` either, so no version of
- * this app ever offered it and `MIGRATION_1_2` would pass it through untouched forever. Pink is the
- * palette's counterpart for the orange family (the migration's one family change).
+ * database file, so it tracks the current palette. The previous value here (`0xFFFFA8DC`) was the
+ * warm-dark pastel pink, retired by the standard-palette change; the one before that (`0xFFF57C00`,
+ * a Material 2 amber) was worse than a stale palette colour, since it is not a key in
+ * `HabitColorRemap.LEGACY_TO_CURRENT` either, so no version of this app ever offered it and
+ * `MIGRATION_1_2` would pass it through untouched forever.
  */
-private const val SEED_COLOR_ARGB = 0xFFFFA8DC.toInt()
+private const val SEED_COLOR_ARGB = 0xFFF48FB1.toInt()
 
 /** Grep this in logcat to read back everything the seed wrote. Deliberately distinct from
  *  `ConstanzaSeed` and `ConstanzaState`, so this fixture's output can be filtered on its own. */

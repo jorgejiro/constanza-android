@@ -45,13 +45,14 @@ private const val MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR
 /**
  * `HabitColor.TEAL` — a visible teal, so the seeded habit is also identifiable in any future UI.
  *
- * This must stay an on-palette value. The fixture writes to the app's REAL database file, and the
- * previous value here (`0xFF00897B`, the legacy Material 2 teal) is a key in
- * `HabitColorRemap.LEGACY_TO_CURRENT` — precisely the state `MIGRATION_1_2` exists to remove, and a
- * colour the app itself can no longer produce. Seeding it would have planted v1 data into a v2
- * database that the migration has already run past.
+ * This must stay an on-palette value, tracking the palette rather than being frozen: the previous
+ * value here (`0xFF5DD6C7`) was the warm-dark pastel teal, which the standard-palette change
+ * retired. The fixture writes to the app's REAL database file, so seeding a colour the picker no
+ * longer offers would leave a habit sitting on the custom swatch for no reason — and the value
+ * before that (`0xFF00897B`, the legacy Material 2 teal) would have been worse still, since it is a
+ * key in `HabitColorRemap.LEGACY_TO_CURRENT`, precisely the state `MIGRATION_1_2` exists to remove.
  */
-private const val SEED_COLOR_ARGB = 0xFF5DD6C7.toInt()
+private const val SEED_COLOR_ARGB = 0xFF009688.toInt()
 
 /** Grep this in logcat to read back everything the seed wrote. */
 private const val TAG = "ConstanzaSeed"

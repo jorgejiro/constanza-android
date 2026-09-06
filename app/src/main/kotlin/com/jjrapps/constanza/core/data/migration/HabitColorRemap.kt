@@ -13,8 +13,21 @@ package com.jjrapps.constanza.core.data.migration
  * written. If a future re-tone changes `HabitColor.VIOLET`, a palette-referencing `Migration(1,2)`
  * would silently start writing a value that never existed at version 2, and
  * `AppDatabaseMigrationTest` would still pass while the two migrations disagreed about what v2
- * means. `HabitColorRemapTest` asserts every right-hand value is a *current* `HabitPalette`
- * member, so drift is caught by a test rather than trusted.
+ * means. That has now actually happened — see below — which is why the literal-ints rule was worth
+ * writing down before it was needed.
+ *
+ * **Version 3 does not remap, and the reason is a feature, not an omission.** The palette this map
+ * writes into (the six warm-dark pastels) has been replaced by twenty-three standard colour families
+ * plus a free custom colour. No third entry is added here and no `Migration(2,3)` rewrites colours,
+ * because the premise of the whole exercise is gone: a habit holding a colour that is not one of
+ * the offered presets is no longer orphaned, it simply opens on the picker's custom swatch showing
+ * its own colour. The six pastels below are exactly such colours. `Habit.colorArgb` has always been
+ * a plain `Int` end to end — Room column, domain model, backup field, `NotificationPoster.setColor`
+ * — so nothing about storage changes either.
+ *
+ * `HabitColorRemapTest` therefore pins both sides of this map to literals rather than asserting the
+ * right-hand values are current palette members, which is the assertion that used to guard drift
+ * and would now be asserting something false.
  */
 internal object HabitColorRemap {
 

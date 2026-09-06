@@ -3,17 +3,10 @@
 package com.jjrapps.constanza.habit
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -21,7 +14,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -37,19 +29,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
-import com.jjrapps.constanza.core.ui.theme.Dimens
-import com.jjrapps.constanza.core.ui.theme.HabitPalette
 
 /**
  * Tasks 6a.1 (non-schedule half)/6a.2/6a.3 — container. [habitId] is `null` for creation, an
@@ -230,11 +218,9 @@ private fun HabitEditorForm(
                 .padding(top = 8.dp)
                 .then(focusRestoring(FIELD_NOTES, focusedFieldId)),
         )
-        Text(
-            stringResource(R.string.habit_editor_color_label),
-            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
-        )
-        ColorSwatchRow(selected = state.colorArgb, onColorChange = actions.onColorChange)
+        // The label is inside HabitColorPicker, not here: it shares its line with the expander that
+        // opens the rest of the palette, and a heading with a control on it is one component.
+        HabitColorPicker(selected = state.colorArgb, onColorChange = actions.onColorChange)
         Text(
             stringResource(R.string.habit_editor_schedule_label),
             modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
@@ -372,21 +358,4 @@ private fun EditorNameField(
             .fillMaxWidth()
             .then(focusRestoring(FIELD_NAME, focusedFieldId)),
     )
-}
-
-@Composable
-private fun ColorSwatchRow(selected: Int, onColorChange: (Int) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        HabitPalette.ARGB.forEach { swatch ->
-            val borderColor = if (swatch == selected) MaterialTheme.colorScheme.primary else Color.Transparent
-            Row(
-                modifier = Modifier
-                    .size(Dimens.Swatch)
-                    .clip(CircleShape)
-                    .background(Color(swatch))
-                    .border(Dimens.SwatchBorder, borderColor, CircleShape)
-                    .clickable { onColorChange(swatch) },
-            ) {}
-        }
-    }
 }

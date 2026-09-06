@@ -42,6 +42,47 @@
     <string name="habit_editor_name_error">A name is required</string>
     <string name="habit_editor_notes_label">Notes (optional)</string>
     <string name="habit_editor_color_label">Colour</string>
+
+    <!-- habit-management: the colour picker's standard palette. Every swatch carries its colour's
+         name as its accessible label, because colour is never this app's sole recognition channel
+         (see HabitColorDot's KDoc). Names are the ordinary ones a person would use, which is the
+         point of the palette: someone picking "Red" should get a red. Listed here in the grid's
+         own scattered order, so this table and HabitColor read the same way round. -->
+    <string name="habit_color_teal">Teal</string>
+    <string name="habit_color_purple">Purple</string>
+    <string name="habit_color_olive">Olive</string>
+    <string name="habit_color_cyan">Cyan</string>
+    <string name="habit_color_violet">Violet</string>
+    <string name="habit_color_brown">Brown</string>
+    <string name="habit_color_pink">Pink</string>
+    <string name="habit_color_green">Green</string>
+    <string name="habit_color_lilac">Lilac</string>
+    <string name="habit_color_red">Red</string>
+    <string name="habit_color_silver">Silver</string>
+    <string name="habit_color_yellow">Yellow</string>
+    <string name="habit_color_amber">Amber</string>
+    <string name="habit_color_light_blue">Light blue</string>
+    <string name="habit_color_peach">Peach</string>
+    <string name="habit_color_indigo">Indigo</string>
+    <string name="habit_color_orange">Orange</string>
+    <string name="habit_color_mint">Mint</string>
+    <string name="habit_color_blue_grey">Blue grey</string>
+    <string name="habit_color_lime">Lime</string>
+    <string name="habit_color_blue">Blue</string>
+    <string name="habit_color_light_green">Light green</string>
+    <string name="habit_color_magenta">Magenta</string>
+    <string name="habit_color_custom">Custom colour</string>
+
+    <!-- habit-management: the free colour picker behind the custom swatch. -->
+    <!-- habit-management: the colour picker shows one row by default; this opens the rest. -->
+    <string name="habit_editor_color_show_more">More</string>
+    <string name="habit_editor_color_show_fewer">Fewer</string>
+
+    <string name="habit_editor_color_custom_title">Custom colour</string>
+    <string name="habit_editor_color_custom_confirm">Use this colour</string>
+    <string name="habit_editor_color_hue">Hue</string>
+    <string name="habit_editor_color_saturation">Saturation</string>
+    <string name="habit_editor_color_brightness">Brightness</string>
     <string name="habit_editor_save">Save</string>
 
     <!-- habit-management: leaving the editor without saving (carried-forward item

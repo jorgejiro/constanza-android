@@ -23,7 +23,8 @@ import java.time.Instant
 
 private const val WAIT_TIMEOUT_MS = 5_000L
 private const val HABIT_NAME = "Stretch"
-private const val HABIT_COLOR_ARGB = 0xFF8FC5FF.toInt() // HabitColor.BLUE, arbitrary for this test
+private const val HABIT_COLOR_ARGB = 0xFF2196F3.toInt() // HabitColor.BLUE, arbitrary for this test
+private const val OTHER_HABIT_COLOR_ARGB = 0xFF4CAF50.toInt() // HabitColor.GREEN, arbitrary for this test
 
 /**
  * Task 4.7 (habit-management: Habit Colour Visible Where Habits Are Listed). Renders the real
@@ -71,7 +72,7 @@ class HabitColorDotComposeTest {
     @Test
     fun theDotRendersOnTheHabitListScreenAndDistinguishesTwoHabits() = runBlocking {
         fixture.habitRepository.create(habitWithColor("Read", HABIT_COLOR_ARGB), Schedule.Daily())
-        fixture.habitRepository.create(habitWithColor("Journal", 0xFF8BDB95.toInt()), Schedule.Daily())
+        fixture.habitRepository.create(habitWithColor("Journal", OTHER_HABIT_COLOR_ARGB), Schedule.Daily())
         val viewModel = fixture.habitListViewModel()
 
         composeTestRule.setContent {
