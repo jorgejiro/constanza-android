@@ -155,8 +155,8 @@ internal fun ReminderTimeField(
  *    `PeriodSelectorSelected*LabelTextColor` entries; nothing else in either token table is
  *    tertiary). Those two roles WERE the ones `core/ui/theme/Theme.kt` audited as unbound, and
  *    surfacing them would have dropped M3's stock violet into the warm ramp. So they are now bound
- *    there, to the same `SurfaceSelected`/`Accent` pair the hour/minute selector already uses, and
- *    that file's audit says so. No colour is overridden here for the period selector: the fix
+ *    there, to the same `SurfaceSelected`/`ChromeInteractive` pair the hour/minute selector already
+ *    uses, and that file's audit says so. No colour is overridden here for the period selector: the fix
  *    belongs in the theme, because the next component to render a tertiary role should inherit it
  *    rather than repeat it.
  *
@@ -217,10 +217,10 @@ private fun ReminderTimePickerDialog(
         // their content roles (`onPrimaryContainer`, `onSurface`) both to OnBackground — so the
         // hour box and the minute box render pixel-identical and nothing on screen says which half
         // you are about to edit. Repointing the selected half's text at `primary` restores that
-        // distinction with the app's own accent rather than a new colour value, and a selection
-        // indicator is exactly what ConstanzaColors.Accent's KDoc reserves the accent FOR. The
-        // container tones are deliberately left alone: two amber-filled boxes would shout where
-        // one amber numeral is enough.
+        // distinction with the app's own achromatic control tone rather than a new colour value,
+        // and a selection indicator is exactly what ConstanzaColors.ChromeInteractive's KDoc says
+        // it draws. The container tones are deliberately left alone: two filled boxes would shout
+        // where one numeral is enough.
         val colors = TimePickerDefaults.colors(
             timeSelectorSelectedContentColor = MaterialTheme.colorScheme.primary,
         )

@@ -203,15 +203,6 @@ class HabitPaletteTest {
         }
     }
 
-    /** Spec `Accent Reserved For Chrome`: the accent must not be selectable as a habit colour. */
-    @Test
-    fun `the chrome accent is not offered as a habit colour`() {
-        assertFalse(
-            HabitPalette.contains(ConstanzaColors.Accent.toArgb()),
-            "the accent must not be selectable as a habit identity colour",
-        )
-    }
-
     /** [HabitPalette.contains] is what tells the editor whether to select a preset or the custom
      *  swatch, so both of its answers are asserted rather than only the interesting one. */
     @Test

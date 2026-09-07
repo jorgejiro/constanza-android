@@ -58,9 +58,6 @@ import com.jjrapps.constanza.R
  * [labelRes] is not decoration. This is a radio group of twenty-four circles, and colour is never
  * this app's sole recognition channel (`HabitColorDot`'s KDoc, design.md decision 6), so every
  * swatch carries its colour's name as its accessible label rather than relying on the fill alone.
- *
- * `ConstanzaColors.Accent` (`#E8A860`) is deliberately absent: spec `Accent Reserved For Chrome`.
- * `HabitPaletteTest` asserts the exclusion rather than trusting this sentence.
  */
 enum class HabitColor(val argb: Int, @param:StringRes val labelRes: Int) {
     // The visible row (see HabitPalette.VISIBLE). These five come first because the collapsed

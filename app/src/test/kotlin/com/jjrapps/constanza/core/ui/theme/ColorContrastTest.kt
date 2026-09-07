@@ -45,17 +45,22 @@ class ColorContrastTest {
     }
 
     @Test
-    fun `the accent clears the floor against the background`() {
-        assertRatioAtLeast(ConstanzaColors.Accent, ConstanzaColors.Background, CONTRAST_FLOOR, "Accent on Background")
+    fun `chrome interactive clears the floor against the background`() {
+        assertRatioAtLeast(
+            ConstanzaColors.ChromeInteractive,
+            ConstanzaColors.Background,
+            CONTRAST_FLOOR,
+            "ChromeInteractive on Background",
+        )
     }
 
     @Test
-    fun `the accent clears the floor against the selected surface`() {
+    fun `chrome interactive clears the floor against the selected surface`() {
         assertRatioAtLeast(
-            ConstanzaColors.Accent,
+            ConstanzaColors.ChromeInteractive,
             ConstanzaColors.SurfaceSelected,
             CONTRAST_FLOOR,
-            "Accent on SurfaceSelected",
+            "ChromeInteractive on SurfaceSelected",
         )
     }
 
@@ -148,8 +153,13 @@ class ColorContrastTest {
     }
 
     @Test
-    fun `text on the accent is legible`() {
-        assertRatioAtLeast(ConstanzaColors.OnAccent, ConstanzaColors.Accent, CONTRAST_FLOOR, "OnAccent on Accent")
+    fun `text on chrome interactive is legible`() {
+        assertRatioAtLeast(
+            ConstanzaColors.OnChromeInteractive,
+            ConstanzaColors.ChromeInteractive,
+            CONTRAST_FLOOR,
+            "OnChromeInteractive on ChromeInteractive",
+        )
     }
 
     // ------------------------------------------------------------------------------------------

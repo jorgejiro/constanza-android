@@ -68,8 +68,8 @@ internal fun OnboardingScaffold(
 }
 
 /** design.md §12: active `primary`, inactive `outline` — a pager dot is a selection indicator,
- *  chrome per `ConstanzaColors.Accent`'s own KDoc, reached here through the M3 role, never the
- *  token directly. Renders only when [OnboardingUiState.showsProgress] is true (screen count > 1):
+ *  chrome per `ConstanzaColors.ChromeInteractive`'s own KDoc, reached here through the M3 role,
+ *  never the token directly. Renders only when [OnboardingUiState.showsProgress] is true (screen count > 1):
  *  a one-of-one indicator would tell the user there is somewhere else to go when there is not
  *  (design.md §7).
  *

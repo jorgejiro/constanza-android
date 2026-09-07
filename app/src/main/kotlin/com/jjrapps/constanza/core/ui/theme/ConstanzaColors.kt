@@ -21,8 +21,8 @@ internal object ConstanzaColors {
     private const val SURFACE_SELECTED_ARGB = 0xFF261C13.toInt()
     private const val DIVIDER_ARGB = 0xFF28231E.toInt()
     private const val CONTROL_STROKE_ARGB = 0xFF7A6B5D.toInt()
-    private const val ACCENT_ARGB = 0xFFE8A860.toInt()
-    private const val ON_ACCENT_ARGB = 0xFF20140A.toInt()
+    private const val CHROME_INTERACTIVE_ARGB = 0xFFC4BCB6.toInt()
+    private const val ON_CHROME_INTERACTIVE_ARGB = 0xFF20140A.toInt()
     private const val ON_BACKGROUND_ARGB = 0xFFEFEAE6.toInt()
     private const val ON_BACKGROUND_VARIANT_ARGB = 0xFFC4BCB6.toInt()
     private const val ON_BACKGROUND_MUTED_ARGB = 0xFF887E76.toInt()
@@ -73,14 +73,22 @@ internal object ConstanzaColors {
     val ControlStroke = Color(CONTROL_STROKE_ARGB)
 
     /**
-     * The single saturated colour in the app's chrome: app bars, selection indicators, primary
-     * controls. Reserved for chrome only — never offered as a habit colour (spec `Accent Reserved
-     * For Chrome`), because the shipped orange habit swatch sat 1.7° of hue from this exact accent.
+     * The tone that draws anything a user can operate: button labels, filled controls, selection
+     * indicators. Deliberately achromatic, because the habit's own colour is the app's only chroma
+     * now — a chrome accent would compete with it for attention.
+     *
+     * Shares its value with [OnBackgroundVariant] today (`#C4BCB6`) but is its own token, not an
+     * alias or a reference to it, for exactly the reason the [Divider]/[ControlStroke] split
+     * documented further up this file exists: one token doing two jobs is how that earlier defect
+     * happened, and a future re-tone of secondary *text* must not silently move every *control*.
+     *
+     * Clears the 3:1 non-text floor on all four surface tones as a control fill: 10.44:1 on
+     * [Background], 9.94:1 on [Surface], 9.35:1 on [SurfaceRaised] and 8.92:1 on [SurfaceSelected].
      */
-    val Accent = Color(ACCENT_ARGB)
+    val ChromeInteractive = Color(CHROME_INTERACTIVE_ARGB)
 
-    /** Dark enough to read on top of [Accent]. */
-    val OnAccent = Color(ON_ACCENT_ARGB)
+    /** Dark enough to read on top of [ChromeInteractive]: 9.62:1. */
+    val OnChromeInteractive = Color(ON_CHROME_INTERACTIVE_ARGB)
 
     /** oklch(0.94 0.008 62) — primary text. */
     val OnBackground = Color(ON_BACKGROUND_ARGB)

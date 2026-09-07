@@ -84,11 +84,12 @@ object ConstanzaControlDefaults {
      * unselected chips gained a visible 3.81:1 stroke, the *selected* chip became the faintest in the
      * row, which is precisely backwards. Raising the fill is not available: 3:1 against the
      * background needs luminance >= 0.111 and would turn the chip into a light slab. So the selected
-     * chip keeps its fill and gains an accent stroke at 9.50:1 against the background — a selection
-     * indicator being exactly what [ConstanzaColors.Accent]'s own KDoc reserves the accent for.
+     * chip keeps its fill and gains a stroke at 10.44:1 against the background — a selection
+     * indicator being exactly what [ConstanzaColors.ChromeInteractive]'s own KDoc says it draws.
+     * This is not an accent stroke: [ConstanzaColors.ChromeInteractive] is achromatic.
      *
-     * Both states carry a stroke of the same width, differing only in colour (amber vs warm grey,
-     * 2.49:1 apart), so the row keeps a stable geometry and nothing reflows as the selection moves.
+     * Both states carry a stroke of the same width, differing only in colour (two achromatic tones,
+     * 2.74:1 apart), so the row keeps a stable geometry and nothing reflows as the selection moves.
      */
     @Composable
     fun filterChipBorder(selected: Boolean): BorderStroke = FilterChipDefaults.filterChipBorder(
