@@ -82,7 +82,14 @@ class TodayAddHabitE2ETest {
         compose.onNodeWithContentDescription(string(R.string.action_back)).performClick()
 
         awaitText(string(R.string.today_title))
-        compose.onNodeWithText(string(R.string.habit_list_title)).assertDoesNotExist()
+        // today-one-line-row: `today_manage_habits` (Today's own top-bar button, "Habits") and
+        // `habit_list_title` (the habit list screen's own title) render as the identical string in
+        // English now — asserting the LATTER's absence stopped proving "we are not on the habit
+        // list", since Today's own button satisfies that exact text match while we are correctly
+        // sitting on Today. Asserting Today's own title instead is unambiguous either way: the two
+        // screens never render simultaneously, so proving we ARE on Today is exactly equivalent to
+        // proving we are NOT on the habit list, without leaning on a string the redesign renamed.
+        compose.onNodeWithText(string(R.string.today_title)).assertExists()
         compose.onNodeWithTag(TODAY_ADD_HABIT_FAB_TEST_TAG).assertExists()
     }
 
@@ -108,7 +115,10 @@ class TodayAddHabitE2ETest {
         compose.onNodeWithText(string(R.string.habit_editor_save)).performScrollTo().performClick()
 
         awaitText(string(R.string.today_title))
-        compose.onNodeWithText(string(R.string.habit_list_title)).assertDoesNotExist()
+        // See theAddHabitFabOpensTheEditorAndBackingOutReturnsToToday's own comment for why this
+        // asserts Today's own title rather than the habit list's, which now renders identically
+        // to Today's "Habits" button.
+        compose.onNodeWithText(string(R.string.today_title)).assertExists()
 
         awaitText(CREATED_HABIT)
         compose.onNodeWithTag(TODAY_ADD_HABIT_FAB_TEST_TAG).assertExists()

@@ -167,15 +167,23 @@
          column is 109dp wide and this is the longest string that can land in it. -->
     <string name="today_slot_pending_snoozed_until">Snoozed until %1$s</string>
 
-    <!-- habit-entry-tracking: in-app Entry write path, SKIPPED is in-app only (task 6b.2). -->
+    <!-- habit-entry-tracking: in-app Entry write path, SKIPPED is in-app only (task 6b.2).
+         today-one-line-row: today_answer_skip ("Omitir") is gone — the row no longer offers a
+         third answer control at all, only these two pills. Skip is still reachable, through the
+         change dialog's third option, which reuses today_slot_skipped ("Omitido"/"Skipped")
+         instead — a status label rather than an imperative, matching that dialog's past-tense
+         framing of an already-made choice. -->
     <string name="today_answer_yes">Yes</string>
     <string name="today_answer_no">No</string>
-    <string name="today_answer_skip">Skip</string>
+    <!-- today-one-line-row: each pill's own accessible label — the visible "Yes"/"No" alone
+         carries no habit context for TalkBack, and a screen full of identical bare "Yes" pills
+         would announce identically for every habit. -->
+    <string name="today_answer_yes_a11y">Answer yes for %1$s</string>
+    <string name="today_answer_no_a11y">Answer no for %1$s</string>
 
-    <!-- today-answered-slot-collapse: an answered slot's one route to change its answer. The
-         visible label is deliberately identical on every row (design.md decision 3) — the
-         discriminator lives in the accessible label below, not on screen. -->
-    <string name="today_slot_change">Change</string>
+    <!-- today-one-line-row: an answered slot's row is itself the tap target now that "Cambiar" is
+         gone — see ChangeAnswerDialog in TodayChangeAnswerDialog.kt. today_slot_change_a11y is
+         still what names that action for TalkBack, unchanged from today-answered-slot-collapse. -->
     <string name="today_slot_change_a11y">Change answer for %1$s, %2$s</string>
 
     <!-- design §12/§13.1: non-blocking exact-alarm banner (task 6b.9). -->

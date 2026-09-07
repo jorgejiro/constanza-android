@@ -277,10 +277,11 @@ class TodayViewModelTest {
      *  the one scheduled for TOMORROW).
      *
      *  today-past-day-correction, task 2.14 / design.md decision 3: this is also the vehicle for
-     *  the ONE assertion Decision 3's "a live-edge rollover leaves the expansion sets alone"
-     *  justification was resting on with no coverage at all — [expandedHabitIds] and
-     *  [TodayUiState.reopenedSlots] are populated BEFORE the rollover and asserted UNCHANGED after
-     *  it, proving [clearPresentedSlotState] is never reached by the [init] collector. */
+     *  the ONE assertion Decision 3's "a live-edge rollover leaves the expansion alone"
+     *  justification was resting on with no coverage at all — [expandedHabitIds] is populated
+     *  BEFORE the rollover and asserted UNCHANGED after it, proving the [init] collector never
+     *  clears presented state on its own. `reopenedSlots`, this test's original second half, is
+     *  gone with today-one-line-row — see [TodayUiState]'s own KDoc for why. */
     @Test
     fun `crossing midnight while displayed re-subscribes EntryDao and moves both the rollup and the occurrence filter`() =
         runTest {
@@ -307,9 +308,6 @@ class TodayViewModelTest {
                 viewModel.toggleExpanded(HABIT_ID)
                 val expandedState = awaitItem()
                 assertEquals(setOf(HABIT_ID), expandedState.expandedHabitIds)
-                viewModel.requestChange(onToday.slots.first().keyIn(HABIT_ID))
-                val reopenedState = awaitItem()
-                assertEquals(setOf(onToday.slots.first().keyIn(HABIT_ID)), reopenedState.reopenedSlots)
 
                 currentDateSource.advanceTo(TOMORROW)
 
@@ -324,11 +322,6 @@ class TodayViewModelTest {
                     setOf(HABIT_ID),
                     onTomorrow.expandedHabitIds,
                     "a live-edge midnight rollover must leave expandedHabitIds alone",
-                )
-                assertEquals(
-                    setOf(onToday.slots.first().keyIn(HABIT_ID)),
-                    onTomorrow.reopenedSlots,
-                    "a live-edge midnight rollover must leave reopenedSlots alone",
                 )
             }
         }
@@ -639,26 +632,28 @@ class TodayViewModelTest {
         }
     }
 
-    /** today-past-day-correction, task 2.10 / design.md decision 3. Populate both presented-state
-     *  sets first, then navigate: a navigation that actually changes [TodayDate.viewed] must clear
-     *  both. */
+    /** today-past-day-correction, task 2.10 / design.md decision 3. Populate the presented
+     *  expansion state first, then navigate: a navigation that actually changes
+     *  [TodayDate.viewed] must clear it.
+     *
+     *  today-one-line-row: this test used to populate a second presented-state set,
+     *  `reopenedSlots`, alongside [expandedHabitIds] and assert both cleared — that set is gone,
+     *  see [TodayUiState]'s own KDoc for why. */
     @Test
     fun `both expansion sets are empty after a navigation that changes the viewed date`() = runTest {
         val viewModel = buildViewModel(entriesByDate = mapOf(TODAY to emptyList(), YESTERDAY to emptyList()))
-        val onToday = viewModel.uiState.first { it.rows.isNotEmpty() }.rows.single()
+        viewModel.uiState.first { it.rows.isNotEmpty() }
         viewModel.toggleExpanded(HABIT_ID)
-        viewModel.requestChange(onToday.slots.first().keyIn(HABIT_ID))
-        viewModel.uiState.first { it.expandedHabitIds.isNotEmpty() && it.reopenedSlots.isNotEmpty() }
+        viewModel.uiState.first { it.expandedHabitIds.isNotEmpty() }
 
         viewModel.showPreviousDay()
 
         val onYesterday = viewModel.uiState.first { it.date == YESTERDAY }
         assertTrue(onYesterday.expandedHabitIds.isEmpty())
-        assertTrue(onYesterday.reopenedSlots.isEmpty())
     }
 
     /** today-past-day-correction, task 2.11 / design.md decision 3. A clock tick while navigated
-     *  away must neither clear the presented-state sets NOR cause a second subscription to
+     *  away must neither clear the presented expansion state NOR cause a second subscription to
      *  [EntryDao.observeByDate] for the navigated-to date — [dateView]'s `distinctUntilChanged`
      *  must swallow the tick entirely, since it does not move [TodayDate.viewed]. */
     @Test
@@ -666,11 +661,10 @@ class TodayViewModelTest {
         val currentDateSource = FakeCurrentDateSource(TODAY)
         val entryDao = entryDaoStub(mapOf(TODAY to emptyList(), YESTERDAY to emptyList(), TOMORROW to emptyList()))
         val viewModel = buildViewModel(currentDateSource = currentDateSource, entryDao = entryDao)
-        val onToday = viewModel.uiState.first { it.rows.isNotEmpty() }.rows.single()
+        viewModel.uiState.first { it.rows.isNotEmpty() }
 
         viewModel.showPreviousDay()
         viewModel.toggleExpanded(HABIT_ID)
-        viewModel.requestChange(onToday.slots.first().keyIn(HABIT_ID))
         viewModel.uiState.first { it.date == YESTERDAY && it.expandedHabitIds.isNotEmpty() }
 
         currentDateSource.advanceTo(TOMORROW)

@@ -51,10 +51,11 @@ private const val LONG_HABIT_NAME = "Hacer ejercicios de movilidad en la primera
  * fit on a phone next to a long habit name, and the slot's status must be copy rather than a Kotlin
  * constant.
  *
- * Defect 1 was reported as "Skip" wrapping mid-word to "Ski / p". That is asserted here relatively
- * rather than against a pixel constant: "Yes" is three characters and cannot wrap at any plausible
- * width, so it is the reference height a single-line button has on this device, and "Skip" must
- * match it. A wrapped label makes its button taller, and nothing else about the row does.
+ * Defect 1 was originally reported as "Skip" wrapping mid-word to "Ski / p", compared against
+ * "Yes"'s reference height. today-one-line-row deletes the "Skip" pending control (and the
+ * text-driven `TextButton`s it wrapped) outright, replacing it with two fixed-size pills that
+ * cannot wrap at all — see `theAnswerPillsStayOnScreenNextToALongHabitNameOnAPhone` for what
+ * survives of that defect.
  *
  * today-status-icons folds in the slice that replaced the answered-slot status WORD with a glyph:
  * the scheduled-time and answered-copy scenarios below were rewritten against that design rather
@@ -83,8 +84,24 @@ class TodaySlotRowComposeTest {
 
     private fun text(resId: Int) = ApplicationProvider.getApplicationContext<Context>().getString(resId)
 
+    private fun changeDescription(habitName: String, answeredStatusText: String) =
+        ApplicationProvider.getApplicationContext<Context>()
+            .getString(R.string.today_slot_change_a11y, habitName, answeredStatusText)
+
+    /**
+     * today-one-line-row: the original defect here was "Skip" wrapping mid-word next to a long
+     * habit name, comparing button heights — that premise is gone along with the "Skip" pending
+     * control itself (deleted from the row) and the text-driven `TextButton`s it wrapped inside.
+     * [TodayAnswerPills] paints a fixed 46x28dp box (`Dimens.AnswerPillWidth`/`AnswerPillHeight`),
+     * so neither pill can ever wrap — there is no longer a label long enough to test that with.
+     *
+     * What survives from the original defect is its other half: answer controls must not run past
+     * the screen's right edge next to a long name. The habit name carries `weight(1f)` precisely so
+     * IT wraps under length pressure rather than squeezing the pills — this proves that still holds
+     * for the reported name.
+     */
     @Test
-    fun theAnswerLabelsStayOnOneLineNextToALongHabitNameOnAPhone() = runBlocking {
+    fun theAnswerPillsStayOnScreenNextToALongHabitNameOnAPhone(): Unit = runBlocking {
         fixture.seedHabitWithEnabledSlot(name = LONG_HABIT_NAME, minuteOfDay = MORNING_MINUTE)
         viewModel.awaitRows(1)
 
@@ -92,42 +109,30 @@ class TodaySlotRowComposeTest {
 
         composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).assertIsDisplayed()
         composeTestRule.onNodeWithText(text(R.string.today_answer_no)).assertIsDisplayed()
-        composeTestRule.onNodeWithText(text(R.string.today_answer_skip)).assertIsDisplayed()
 
-        val yes = composeTestRule.onNodeWithText(text(R.string.today_answer_yes))
-            .fetchSemanticsNode().boundsInRoot
-        val skip = composeTestRule.onNodeWithText(text(R.string.today_answer_skip))
-            .fetchSemanticsNode().boundsInRoot
-
+        val no = composeTestRule.onNodeWithText(text(R.string.today_answer_no)).fetchSemanticsNode().boundsInRoot
         assertTrue(
-            "\"${text(R.string.today_answer_skip)}\" wrapped: it is ${skip.height}px tall against " +
-                "\"${text(R.string.today_answer_yes)}\"'s ${yes.height}px, and a single-line label " +
-                "cannot be taller than another single-line label in the same row",
-            skip.height <= yes.height,
-        )
-        assertTrue(
-            "the answer buttons ran past the right edge of a ${PHONE_WIDTH_DP}dp screen",
-            skip.right <= composeTestRule.onRoot().fetchSemanticsNode().boundsInRoot.right,
+            "the answer pills ran past the right edge of a ${PHONE_WIDTH_DP}dp screen",
+            no.right <= composeTestRule.onRoot().fetchSemanticsNode().boundsInRoot.right,
         )
     }
 
     /**
      * today-status-icons, point 3: on a single-slot habit [TodaySlot.minuteOfDay] renders nothing
      * at all any more — not even demoted — because the row's name and (once answered) its status
-     * glyph already say everything it has to say. This replaces
-     * `theSlotTimeReadsInTheDeviceHourCycle`, which asserted the opposite of this on the identical
-     * single-slot shape; that premise is exactly what today-status-icons retired.
+     * glyph already say everything it has to say. today-one-line-row extends this: a PENDING
+     * single-slot row shows only its two answer pills, no status word at all — "Pendiente" is gone
+     * from the row entirely — so this now asserts the pills are what proves the row is pending,
+     * rather than a status word that no longer renders.
      */
     @Test
-    fun theSlotTimeIsAbsentOnASingleSlotHabit() = runBlocking {
+    fun theSlotTimeIsAbsentOnASingleSlotHabit(): Unit = runBlocking {
         fixture.seedHabitWithEnabledSlot(name = LONG_HABIT_NAME, minuteOfDay = MORNING_MINUTE)
         viewModel.awaitRows(1)
 
         setPhoneSizedContent()
 
-        // Exact match, not substring: if a time were still appended after a gap, this node's text
-        // would no longer equal the bare word and this assertion would fail.
-        composeTestRule.onNodeWithText(text(R.string.today_slot_pending)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).assertIsDisplayed()
         composeTestRule
             .onNodeWithText(expectedTimeOnDevice(inTwentyFourHour = "08:00", inTwelveHour = "8:00 AM"), substring = true)
             .assertDoesNotExist()
@@ -140,14 +145,13 @@ class TodaySlotRowComposeTest {
      * still render, per today-status-icons point 3, and it still has to respect the device's own
      * hour-cycle setting.
      *
-     * today-row-alignment: the sentence is `<time><gap><status>` here — the time leads — because a
-     * multi-slot slot's own reminder time is its identity, the opposite order from a single-slot
-     * row. See `slotStatusText`'s decision 4 for why the two orders are deliberate.
-     * [TODAY_SLOT_STATUS_GAP] is read from the screen rather than re-typed as three invisible
-     * spaces so this assertion cannot quietly rot into a whitespace mismatch.
+     * today-one-line-row: the time is now its own bare `Text` node (`TodaySlotTrailing`), rendered
+     * ahead of the answer pills rather than joined into one status sentence with a demoted status
+     * word — there is no longer a status word to join it to on a pending row. Asserted as an exact
+     * node rather than a joined string.
      */
     @Test
-    fun theSlotTimeReadsInTheDeviceHourCycleOnAMultiSlotHabit() = runBlocking {
+    fun theSlotTimeReadsInTheDeviceHourCycleOnAMultiSlotHabit(): Unit = runBlocking {
         val slots = listOf(
             ReminderSlot(id = 0, habitId = 0, minuteOfDay = MORNING_MINUTE, enabled = true),
             ReminderSlot(id = 0, habitId = 0, minuteOfDay = EVENING_MINUTE, enabled = true),
@@ -159,9 +163,7 @@ class TodaySlotRowComposeTest {
         composeTestRule.onNodeWithText(text(R.string.today_expand)).performClick()
         val shown = expectedTimeOnDevice(inTwentyFourHour = "08:00", inTwelveHour = "8:00 AM")
 
-        composeTestRule
-            .onNodeWithText("$shown$TODAY_SLOT_STATUS_GAP${text(R.string.today_slot_pending)}")
-            .assertIsDisplayed()
+        composeTestRule.onNodeWithText(shown).assertIsDisplayed()
         composeTestRule
             .onNodeWithText(
                 unexpectedTimeOnDevice(inTwentyFourHour = "08:00", inTwelveHour = "8:00 AM"),
@@ -174,7 +176,7 @@ class TodaySlotRowComposeTest {
      *  `contentDescription`, which reads as copy, rather than by `EntryStatus.COMPLETED.name` ever
      *  reaching the screen in any form — as text, or as an accessible label. */
     @Test
-    fun anAnsweredSlotReadsAsCopyRatherThanTheEnumConstant() = runBlocking {
+    fun anAnsweredSlotReadsAsCopyRatherThanTheEnumConstant(): Unit = runBlocking {
         fixture.seedHabitWithEnabledSlot(name = LONG_HABIT_NAME, minuteOfDay = MORNING_MINUTE)
         viewModel.awaitRows(1)
 
@@ -191,9 +193,13 @@ class TodaySlotRowComposeTest {
      * today-status-icons, point 1: each of the three answered states renders its own glyph, and the
      * glyph's `contentDescription` is the existing status string resource — never blank — since the
      * glyph is now the ONLY carrier of that state on screen.
+     *
+     * today-one-line-row: reopening between each answer now goes through the row's own change
+     * dialog rather than a "Cambiar" `TextButton` — [changeDescription] builds the exact label that
+     * opens it, same shape [TodayAnsweredSlotComposeTest] already establishes.
      */
     @Test
-    fun eachAnsweredStatusRendersItsOwnGlyphWithANonEmptyContentDescription() = runBlocking {
+    fun eachAnsweredStatusRendersItsOwnGlyphWithANonEmptyContentDescription(): Unit = runBlocking {
         fixture.seedHabitWithEnabledSlot(name = LONG_HABIT_NAME, minuteOfDay = MORNING_MINUTE)
         viewModel.awaitRows(1)
         setPhoneSizedContent()
@@ -204,15 +210,15 @@ class TodaySlotRowComposeTest {
         assertTrue(completedLabel.isNotBlank())
         composeTestRule.onNodeWithContentDescription(completedLabel).assertExists()
 
-        composeTestRule.onNodeWithText(text(R.string.today_slot_change)).performClick()
+        composeTestRule.onNodeWithContentDescription(changeDescription(LONG_HABIT_NAME, completedLabel)).performClick()
         composeTestRule.onNodeWithText(text(R.string.today_answer_no)).performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.MISSED)
         val missedLabel = text(R.string.today_slot_missed)
         assertTrue(missedLabel.isNotBlank())
         composeTestRule.onNodeWithContentDescription(missedLabel).assertExists()
 
-        composeTestRule.onNodeWithText(text(R.string.today_slot_change)).performClick()
-        composeTestRule.onNodeWithText(text(R.string.today_answer_skip)).performClick()
+        composeTestRule.onNodeWithContentDescription(changeDescription(LONG_HABIT_NAME, missedLabel)).performClick()
+        composeTestRule.onNodeWithText(text(R.string.today_slot_skipped)).performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.SKIPPED)
         val skippedLabel = text(R.string.today_slot_skipped)
         assertTrue(skippedLabel.isNotBlank())
@@ -228,7 +234,7 @@ class TodaySlotRowComposeTest {
      * occurrence in the same transaction).
      */
     @Test
-    fun aSnoozedPendingSlotShowsItsAplazadoTextAndNoStatusGlyph() = runBlocking {
+    fun aSnoozedPendingSlotShowsItsAplazadoTextAndNoStatusGlyph(): Unit = runBlocking {
         val seeded = fixture.seedHabitWithEnabledSlot(name = "Journal", minuteOfDay = MORNING_MINUTE)
         val today = fixture.timeProvider.today().toString()
         fixture.database.reminderOccurrenceDao().upsert(

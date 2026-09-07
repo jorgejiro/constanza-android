@@ -90,7 +90,6 @@ class TodayRealRenderTest {
                                 state = state,
                                 onToggleExpanded = {},
                                 onAnswer = { _, _, _ -> },
-                                onRequestChange = {},
                                 onManageHabits = {},
                             )
                         }

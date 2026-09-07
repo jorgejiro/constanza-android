@@ -2,8 +2,6 @@ package com.jjrapps.constanza.tracking
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -12,59 +10,39 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.core.ui.theme.Dimens
-import com.jjrapps.constanza.core.ui.theme.Spacing
 import com.jjrapps.constanza.domain.model.EntryStatus
 
 /**
- * today-status-icons: what an answered Today slot renders instead of the status WORD
- * [slotStatusText] used to draw for it — "Hecho"/"No hecho"/"Omitido" become a glyph, because a
- * green tick or a red cross carries the same information at a glance and a repeated row of answered
- * habits used to read as a wall of near-identical sentences.
+ * today-status-icons: what an answered Today slot renders instead of the status WORD it used to
+ * draw for it — "Hecho"/"No hecho"/"Omitido" become a glyph, because a green tick or a red cross
+ * carries the same information at a glance and a repeated row of answered habits used to read as a
+ * wall of near-identical sentences.
  *
- * [SlotRow] only reaches this for a slot that is actually answered (`COMPLETED`/`MISSED`/`SKIPPED`
- * and not reopened) — a pending or snoozed slot keeps [slotStatusText]'s sentence and its
- * [AnswerButtons] instead, which is why [EntryStatus.UNKNOWN] has no branch below.
+ * `SlotRow`/`SingleSlotRow` only reach this for a slot that is actually answered
+ * (`COMPLETED`/`MISSED`/`SKIPPED`) — a pending or snoozed slot shows [TodayAnswerPills] instead,
+ * which is why [EntryStatus.UNKNOWN] has no branch below.
  *
- * [time] is the habit's scheduled slot time, already gated by the caller to `null` on a single-slot
- * habit (today-status-icons, point 3: [TodayHabitRow.slots]'s own size is that gate, not
- * `timeIsIdentity` — see `SlotRow`'s own comment) — that time is metadata a single-slot row's name
- * and glyph already make redundant, but on a multi-slot habit it is still the only thing telling one
- * slot from its siblings, so it renders here exactly as [slotStatusText] used to render it for the
- * identical case.
+ * today-one-line-row: this used to also draw the habit's scheduled slot time beside the glyph, and
+ * `muted`-recolour it. Both now belong to the caller (`TodaySlotTrailing` in `TodayScreen.kt`),
+ * which renders time once, uniformly, ahead of EITHER this glyph or the pending pills — the exact
+ * shape `TodayOneLineRowPrototype`'s own `Trailing` composable already established. This function is
+ * left with the one thing only it can draw: the glyph itself.
  */
 @Composable
-internal fun AnsweredStatusRow(
-    status: EntryStatus,
-    time: String?,
-    muted: Boolean,
-    modifier: Modifier = Modifier,
-) {
+internal fun AnsweredStatusRow(status: EntryStatus, modifier: Modifier = Modifier) {
     val description = stringResource(slotStatusLabel(status))
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        if (time != null) {
-            Text(
-                time,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (muted) ConstanzaColors.OnBackgroundMuted else Color.Unspecified,
-            )
-            Spacer(modifier = Modifier.width(Spacing.sm))
-        }
-        // The glyph is the ONLY carrier of the state now that the word is gone, so its own
-        // contentDescription — not a wrapping row's — takes the existing status string resource
-        // (via [slotStatusLabel]) rather than leaving TalkBack with nothing where a word used to be.
-        StatusGlyph(status, modifier = Modifier.semantics { contentDescription = description })
-    }
+    // The glyph is the ONLY carrier of the state now that the word is gone, so its own
+    // contentDescription — not a wrapping row's — takes the existing status string resource
+    // (via [slotStatusLabel]) rather than leaving TalkBack with nothing where a word used to be.
+    StatusGlyph(status, modifier = modifier.semantics { contentDescription = description })
 }
 
 @Composable

@@ -41,6 +41,12 @@ private const val RESOLVE_DEADLINE_MS = 24L * 60 * 60 * 1_000
  * class proves the fix — habit-entry-tracking's Slot Independence and Day-Level Rollup and Per-Slot
  * Display, MODIFIED requirements — end to end through the real [TodayRoute] UI, never a mocked
  * argument capture.
+ *
+ * today-one-line-row rewrites HOW an answered slot is changed: "Cambiar" (a separate `TextButton`
+ * that revealed the row's old Yes/No/Skip buttons again) is gone. An answered slot's own row is the
+ * tap target now, and tapping it opens [ChangeAnswerDialog] rather than reopening inline pills — so
+ * every scenario below that used to tap "Cambiar" now taps the row itself, by its own
+ * `today_slot_change_a11y` accessible label, and picks an option from the dialog instead.
  */
 @RunWith(AndroidJUnit4::class)
 class TodayAnsweredSlotComposeTest {
@@ -89,75 +95,80 @@ class TodayAnsweredSlotComposeTest {
      * sibling slot collapsed") and the answered-text scenario ("An answered slot names its specific
      * answer and offers one route, without colour") together: each slot is answered a different
      * way, each collapse is asserted against its sibling's untouched state, one slot is reopened and
-     * re-answered, and the other two are checked unaffected at every step.
+     * re-answered through [ChangeAnswerDialog], and the other two are checked unaffected at every
+     * step.
+     *
+     * today-one-line-row: this used to answer the third slot with Skip directly on the pending row.
+     * That route is gone (`TodayComposeTest.skippingInAppPersistsSkippedOnTheAnsweredSlotAndDate`
+     * covers Skip's own two-step route through the change dialog); every slot here is answered
+     * Yes/No instead, which is enough to prove sibling independence without duplicating that
+     * coverage.
      */
     @Test
-    fun answeringEachSlotCollapsesItLeavesSiblingsUntouchedAndReopeningReAnswersOnlyThatSlot() = runBlocking {
+    fun answeringEachSlotCollapsesItLeavesSiblingsUntouchedAndReopeningReAnswersOnlyThatSlot(): Unit = runBlocking {
         seedThreeSlotHabit()
         expandRow()
 
-        // All three pending: three full sets of answer actions on screen.
+        // All three pending: three full sets of answer pills on screen.
         assertEquals(3, composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).fetchSemanticsNodes().size)
 
         // Slot 0 -> Yes (Done). Answered slots always sit first among the remaining pending ones,
-        // since an answered slot drops its own Yes/No/Skip nodes — deterministic without needing a
+        // since an answered slot drops its own pending pills — deterministic without needing a
         // node index that survives the collapse.
         composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes))[0].performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.COMPLETED)
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_completed)).assertExists()
-        assertEquals(1, composeTestRule.onAllNodesWithText(text(R.string.today_slot_change)).fetchSemanticsNodes().size)
         assertEquals(2, composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).fetchSemanticsNodes().size)
 
-        // Slot 1 -> No (Missed). Slot 0's Done glyph and Change control are untouched by this.
+        // Slot 1 -> No (Missed). Slot 0's Done glyph is untouched by this.
         composeTestRule.onAllNodesWithText(text(R.string.today_answer_no))[0].performClick()
         viewModel.awaitSlotStatus(slotIndex = 1, status = EntryStatus.MISSED)
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_missed)).assertExists()
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_completed)).assertExists()
-        assertEquals(2, composeTestRule.onAllNodesWithText(text(R.string.today_slot_change)).fetchSemanticsNodes().size)
 
-        // Slot 2 -> Skip (Skipped). No answer actions remain anywhere on the row.
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_skip))[0].performClick()
-        viewModel.awaitSlotStatus(slotIndex = 2, status = EntryStatus.SKIPPED)
-        composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_skipped)).assertExists()
+        // Slot 2 -> Yes (Done). No pending pills remain anywhere on the row.
+        composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes))[0].performClick()
+        viewModel.awaitSlotStatus(slotIndex = 2, status = EntryStatus.COMPLETED)
         composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).assertCountEquals(0)
         composeTestRule.onAllNodesWithText(text(R.string.today_answer_no)).assertCountEquals(0)
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_skip)).assertCountEquals(0)
-        assertEquals(3, composeTestRule.onAllNodesWithText(text(R.string.today_slot_change)).fetchSemanticsNodes().size)
+        assertEquals(2, composeTestRule.onAllNodesWithContentDescription(text(R.string.today_slot_completed)).fetchSemanticsNodes().size)
 
-        // Reopen slot 0 only: its own answer actions come back; slots 1 and 2 keep their answered
-        // glyph and their own untouched Change control — the sibling-independence assertion itself.
-        composeTestRule.onAllNodesWithText(text(R.string.today_slot_change))[0].performClick()
-        composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).assertExists()
-        composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_missed)).assertExists()
-        composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_skipped)).assertExists()
-        assertEquals(2, composeTestRule.onAllNodesWithText(text(R.string.today_slot_change)).fetchSemanticsNodes().size)
-
-        // Re-answering slot 0 (this time No) re-collapses it: the reopened buttons are gone again,
-        // its own text now reads Missed, and nothing about slots 1/2 changed a second time.
+        // Reopen slot 0 only, by its own distinct row description (time-led, since this is a
+        // multi-slot habit — today-row-alignment), and answer No instead: its glyph changes; slots
+        // 1 and 2 keep their own untouched state — the sibling-independence assertion itself.
+        val morning = expectedTimeOnDevice(inTwentyFourHour = "08:00", inTwelveHour = "8:00 AM")
+        composeTestRule.onNodeWithContentDescription(
+            changeDescription("Stretch", "$morning ${text(R.string.today_slot_completed)}"),
+        ).performClick()
         composeTestRule.onNodeWithText(text(R.string.today_answer_no)).performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.MISSED)
+
+        // Slot 1 is ALSO Missed at this point (from the earlier step above) — asserting a single
+        // "Missed" glyph exists would be ambiguous and was, in fact, wrong: run on a real device
+        // this failed with "found 2 nodes", the two siblings' merged content descriptions BOTH
+        // containing "Missed" (the row's own change-dialog sentence merges with the glyph's own
+        // description — `Modifier.clickable`'s `shouldMergeDescendantSemantics`). The count-based
+        // assertion below is what actually proves the reopen worked: two Missed glyphs now, not one.
+        assertEquals(2, composeTestRule.onAllNodesWithContentDescription(text(R.string.today_slot_missed)).fetchSemanticsNodes().size)
+        composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_completed)).assertExists()
         composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).assertCountEquals(0)
         composeTestRule.onAllNodesWithText(text(R.string.today_answer_no)).assertCountEquals(0)
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_skip)).assertCountEquals(0)
-        assertEquals(3, composeTestRule.onAllNodesWithText(text(R.string.today_slot_change)).fetchSemanticsNodes().size)
     }
 
     /**
      * Scenario: "The change route is reachable without a gesture and names its own slot." Each
-     * slot's Change control carries a `TextButton` — reachable by an ordinary [performClick], no
-     * swipe or other gesture — and its accessible label differs from every sibling's, asserted here
-     * by exact match against each slot's own expected sentence rather than only counting nodes.
+     * slot's whole row carries the click action now (today-one-line-row) — reachable by an
+     * ordinary [performClick], no swipe or other gesture — and its accessible label differs from
+     * every sibling's, asserted here by exact match against each slot's own expected sentence
+     * rather than only counting nodes.
      *
      * today-row-alignment: these are multi-slot rows, so each sentence leads with its own reminder
      * time — that time is what tells the three siblings apart, and it is precisely what this test
-     * exists to prove is distinct. The join is a single space rather than the old em dash because
-     * the label is SPOKEN: the screen renders the two halves separated by `TODAY_SLOT_STATUS_GAP`
-     * and collapses that back to one space before handing it to `today_slot_change_a11y`, since
-     * typographic padding is not a word. Kept as exact matches, not substrings — the whole point is
-     * that no two labels coincide, and a substring match cannot say that.
+     * exists to prove is distinct. Kept as exact matches, not substrings — the whole point is that
+     * no two labels coincide, and a substring match cannot say that.
      */
     @Test
-    fun eachChangeControlHasAnAccessibleLabelDistinctFromItsSiblings() = runBlocking {
+    fun eachChangeControlHasAnAccessibleLabelDistinctFromItsSiblings(): Unit = runBlocking {
         seedThreeSlotHabit("Stretch")
         expandRow()
 
@@ -165,8 +176,8 @@ class TodayAnsweredSlotComposeTest {
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.COMPLETED)
         composeTestRule.onAllNodesWithText(text(R.string.today_answer_no))[0].performClick()
         viewModel.awaitSlotStatus(slotIndex = 1, status = EntryStatus.MISSED)
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_skip))[0].performClick()
-        viewModel.awaitSlotStatus(slotIndex = 2, status = EntryStatus.SKIPPED)
+        composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes))[0].performClick()
+        viewModel.awaitSlotStatus(slotIndex = 2, status = EntryStatus.COMPLETED)
 
         val morning = expectedTimeOnDevice(inTwentyFourHour = "08:00", inTwelveHour = "8:00 AM")
         val midday = expectedTimeOnDevice(inTwentyFourHour = "12:00", inTwelveHour = "12:00 PM")
@@ -174,23 +185,29 @@ class TodayAnsweredSlotComposeTest {
         val descriptions = listOf(
             changeDescription("Stretch", "$morning ${text(R.string.today_slot_completed)}"),
             changeDescription("Stretch", "$midday ${text(R.string.today_slot_missed)}"),
-            changeDescription("Stretch", "$evening ${text(R.string.today_slot_skipped)}"),
+            changeDescription("Stretch", "$evening ${text(R.string.today_slot_completed)}"),
         )
         assertEquals(3, descriptions.toSet().size)
-        descriptions.forEach { description ->
+        descriptions.forEachIndexed { index, description ->
             assertEquals(1, composeTestRule.onAllNodesWithContentDescription(description).fetchSemanticsNodes().size)
+            // Each row's own distinct label opens ITS OWN dialog, not always the same one: reopen
+            // it and flip that one slot to Missed, proving the route reached exactly that slot,
+            // before moving on to the next row's own distinct label.
             composeTestRule.onNodeWithContentDescription(description).performClick()
+            composeTestRule.onNodeWithText(text(R.string.today_answer_no)).performClick()
+            viewModel.awaitSlotStatus(slotIndex = index, status = EntryStatus.MISSED)
         }
-        // All three reopened by their own distinct route; nothing was reached through a shared one.
-        assertEquals(3, composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).fetchSemanticsNodes().size)
+        // All three now read Missed — reached through three distinct routes, never a shared one.
+        assertEquals(
+            3,
+            composeTestRule.onAllNodesWithContentDescription(text(R.string.today_slot_missed)).fetchSemanticsNodes().size,
+        )
     }
 
     /**
      * Scenario: "A single-slot habit remains independently answerable" combined with
-     * today-answered-slot-collapse's own reopen mechanics. [TodaySlotKey]'s `slotId` is `null` here
-     * — a habit with no enabled reminder slot has exactly one due occurrence with a null slot
-     * identifier (design.md decision 1) — so this proves the reopen/re-collapse round trip holds
-     * for that null shape too, not only for a non-null `slotId`.
+     * today-answered-slot-collapse's own reopen mechanics, now through [ChangeAnswerDialog] rather
+     * than an inline "Cambiar" button.
      */
     @Test
     fun aHabitWithNoReminderTimeReopensAndRecollapsesItsSingleNullSlot(): Unit = runBlocking {
@@ -201,30 +218,36 @@ class TodayAnsweredSlotComposeTest {
         composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.COMPLETED)
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_completed)).assertExists()
-        composeTestRule.onNodeWithText(text(R.string.today_slot_change)).assertExists()
         composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).assertCountEquals(0)
 
-        composeTestRule.onNodeWithText(text(R.string.today_slot_change)).performClick()
+        composeTestRule.onNodeWithContentDescription(
+            changeDescription("Read", text(R.string.today_slot_completed)),
+        ).performClick()
         composeTestRule.onNodeWithText(text(R.string.today_answer_no)).assertExists()
 
         composeTestRule.onNodeWithText(text(R.string.today_answer_no)).performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.MISSED)
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_missed)).assertExists()
         composeTestRule.onAllNodesWithText(text(R.string.today_answer_no)).assertCountEquals(0)
-        composeTestRule.onNodeWithText(text(R.string.today_slot_change)).assertExists()
+        // Recollapsed with its OWN new change route, proving the row offers one again.
+        composeTestRule.onNodeWithContentDescription(
+            changeDescription("Read", text(R.string.today_slot_missed)),
+        ).assertExists()
     }
 
     /**
-     * design.md decision 2: `slotStatusText`'s pending branch prefers the snooze sentence whenever
-     * `snoozedUntilEpochMs != null` (`TodayScreen.kt`) — checked ahead of the status itself, by its
-     * own comment. Without the bypass this exact test would render "Pending, snoozed until 09:00"
-     * over a slot that is already `COMPLETED`, a literal spec failure. This constructs that state
-     * directly at the data layer — an `Entry` already resolved for the slot, while its
-     * `reminder_occurrences` row is still `SNOOZED` and unresolved — since answering through the UI
-     * always resolves the occurrence in the same transaction and could never reproduce it.
+     * design.md decision 2: `slotStatusText`'s pending branch used to prefer the snooze sentence
+     * whenever `snoozedUntilEpochMs != null`, checked ahead of the status itself — that whole
+     * status-text machinery is gone with today-one-line-row (a pending row shows only its answer
+     * pills), but the snooze bypass this test exists to prove still applies at the data layer: an
+     * `Entry` already resolved for the slot must never let a stale `SNOOZED` occurrence resurrect a
+     * pending presentation over it. This constructs that state directly at the data layer — an
+     * `Entry` already resolved for the slot, while its `reminder_occurrences` row is still `SNOOZED`
+     * and unresolved — since answering through the UI always resolves the occurrence in the same
+     * transaction and could never reproduce it.
      */
     @Test
-    fun anAnsweredSlotNeverRendersTheSnoozeSentenceEvenWhileItsOccurrenceIsStillSnoozed() = runBlocking {
+    fun anAnsweredSlotNeverRendersTheSnoozeSentenceEvenWhileItsOccurrenceIsStillSnoozed(): Unit = runBlocking {
         val seeded = fixture.seedHabitWithEnabledSlot(name = "Journal", minuteOfDay = MORNING_MINUTE)
         val today = fixture.timeProvider.today().toString()
         val now = fixture.timeProvider.now().toString()
@@ -259,7 +282,9 @@ class TodayAnsweredSlotComposeTest {
 
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_completed)).assertExists()
-        composeTestRule.onNodeWithText(text(R.string.today_slot_change)).assertExists()
+        composeTestRule.onNodeWithContentDescription(
+            changeDescription("Journal", text(R.string.today_slot_completed)),
+        ).assertExists()
         val snoozedPrefix = text(R.string.today_slot_pending_snoozed_until).substringBefore("%")
         composeTestRule.onNodeWithText(snoozedPrefix, substring = true).assertDoesNotExist()
         assertFalse(composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).fetchSemanticsNodes().isNotEmpty())

@@ -56,7 +56,7 @@ class TodayComposeTest {
     private fun text(resId: Int) = ApplicationProvider.getApplicationContext<Context>().getString(resId)
 
     @Test
-    fun answeringOneSlotLeavesTheSiblingSlotUnknown() = runBlocking {
+    fun answeringOneSlotLeavesTheSiblingSlotUnknown(): Unit = runBlocking {
         val slots = listOf(
             ReminderSlot(id = 0, habitId = 0, minuteOfDay = MORNING_MINUTE, enabled = true),
             ReminderSlot(id = 0, habitId = 0, minuteOfDay = EVENING_MINUTE, enabled = true),
@@ -77,8 +77,11 @@ class TodayComposeTest {
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_completed)).assertExists()
         composeTestRule.onNodeWithText(EntryStatus.COMPLETED.name, substring = true).assertDoesNotExist()
 
-        // The sibling slot's own row still reads pending — never touched by the first slot's answer.
-        composeTestRule.onNodeWithText(text(R.string.today_slot_pending), substring = true).assertExists()
+        // today-one-line-row: "Pendiente" is gone from every row — a slot offering an answer pill
+        // is pending by definition — so the sibling slot's untouched state is proven by its own Sí
+        // pill still being on screen instead, exactly one now that the first slot's has collapsed
+        // into a glyph.
+        composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).assertExists()
 
         val entries = fixture.database.entryDao().findByHabitId(habitId)
         assertEquals(1, entries.size)
@@ -155,14 +158,26 @@ class TodayComposeTest {
      * already covered by `:domain`'s `StreakCalculatorTest` ("a skipped day bridges a streak without
      * lengthening it", "only missed breaks the streak, skipped and unknown pass through unaffected"),
      * so it is not duplicated here.
+     *
+     * today-one-line-row: "Omitir" no longer sits on the pending row at all (design brief: "not
+     * answering already amounts to skipping, so it does not earn permanent space on every pending
+     * row"). The route to [EntryStatus.SKIPPED] is now two steps — answer No first, then reopen the
+     * row's own change dialog and pick "Omitido" — rather than one tap; [ChangeAnswerDialog] still
+     * offers it, which is exactly what this test now exercises end to end.
      */
     @Test
-    fun skippingInAppPersistsSkippedOnTheAnsweredSlotAndDate() = runBlocking {
+    fun skippingInAppPersistsSkippedOnTheAnsweredSlotAndDate(): Unit = runBlocking {
         val (habitId, slotId) = fixture.seedHabitWithEnabledSlot(name = "Journal", minuteOfDay = EVENING_MINUTE)
         viewModel.awaitRows(1)
 
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
-        composeTestRule.onNodeWithText(text(R.string.today_answer_skip)).performClick()
+        composeTestRule.onNodeWithText(text(R.string.today_answer_no)).performClick()
+        viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.MISSED)
+
+        val changeDescription = ApplicationProvider.getApplicationContext<Context>()
+            .getString(R.string.today_slot_change_a11y, "Journal", text(R.string.today_slot_missed))
+        composeTestRule.onNodeWithContentDescription(changeDescription).performClick()
+        composeTestRule.onNodeWithText(text(R.string.today_slot_skipped)).performClick()
         // Again the localised label rather than the enum constant; see the sibling test above.
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.SKIPPED)
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_skipped)).assertExists()

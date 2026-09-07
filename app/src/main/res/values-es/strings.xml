@@ -153,13 +153,14 @@
     <!-- habit-entry-tracking: in-app Entry write path, SKIPPED is in-app only (task 6b.2). -->
     <string name="today_answer_yes">Sí</string>
     <string name="today_answer_no">No</string>
-    <string name="today_answer_skip">Omitir</string>
+    <string name="today_answer_yes_a11y">Responder sí a %1$s</string>
+    <string name="today_answer_no_a11y">Responder no a %1$s</string>
 
     <!-- today-answered-slot-collapse: %1$s is the habit name, %2$s is the answered-status text
          (see TodayScreen.kt). Spanish word order legitimately reorders the two arguments while
          keeping both positional indices — this is the exact case D9's StringResourceParityTest
-         checks a multiset for, not a sequence. -->
-    <string name="today_slot_change">Cambiar</string>
+         checks a multiset for, not a sequence. today_slot_change ("Cambiar") is gone with
+         ChangeButton (today-one-line-row) — the row itself is the tap target now. -->
     <string name="today_slot_change_a11y">Cambiar respuesta de %2$s para %1$s</string>
 
     <!-- design §12/§13.1: non-blocking exact-alarm banner (task 6b.9). -->

@@ -49,6 +49,20 @@ object Spacing {
  * slot (`material-icons-core` ships no minus/remove glyph) — sized to approximate the visual width
  * `Icons.Filled.Check`/`Close` actually draw inside that same square, since Material's vector
  * glyphs do not fill their full viewport.
+ *
+ * [AnswerPillWidth]/[AnswerPillHeight] (today-one-line-row) are the pending Today slot's Sí/No
+ * pills, straight from the owner-approved `TodayOneLineRowPrototype`. The same paint/hit split
+ * [Swatch]/[SwatchTouchTarget] already established applies here: 46x28dp is the pill's own PAINT,
+ * below the 48dp minimum touch target on its short 28dp side, so [AnswerPillTouchTarget] is the
+ * square hit box the pill is centred inside rather than a size the pill itself ever draws at.
+ *
+ * [MinTouchTarget] (today-one-line-row, vertical-rhythm correction) is the standard 48dp Android
+ * accessible minimum, same value as [SwatchTouchTarget]/[AnswerPillTouchTarget] but named
+ * generically because it is applied to a whole Today ROW now, not one small control inside it: an
+ * answered row's line is itself the tap target that opens the change dialog, and text/glyph
+ * content alone measures well under 48dp on a muted (Contestados) row. A pending row takes the
+ * identical floor so both row types settle at the same minimum for the same reason, rather than
+ * merely by coincidence of their own content heights.
  */
 object Dimens {
     val Swatch = 40.dp
@@ -61,4 +75,8 @@ object Dimens {
     val StatusGlyph = 18.dp
     val StatusGlyphDashWidth = 12.dp
     val StatusGlyphDashHeight = 2.dp
+    val AnswerPillWidth = 46.dp
+    val AnswerPillHeight = 28.dp
+    val AnswerPillTouchTarget = 48.dp
+    val MinTouchTarget = 48.dp
 }
