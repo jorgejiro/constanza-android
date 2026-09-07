@@ -26,6 +26,8 @@ internal object ConstanzaColors {
     private const val ON_BACKGROUND_ARGB = 0xFFEFEAE6.toInt()
     private const val ON_BACKGROUND_VARIANT_ARGB = 0xFFC4BCB6.toInt()
     private const val ON_BACKGROUND_MUTED_ARGB = 0xFF887E76.toInt()
+    private const val STATUS_COMPLETED_ARGB = 0xFF5FA867.toInt()
+    private const val STATUS_MISSED_ARGB = 0xFFE07B74.toInt()
 
     /** oklch(0.155 0.014 62) — every screen sits on this. */
     val Background = Color(BACKGROUND_ARGB)
@@ -98,4 +100,41 @@ internal object ConstanzaColors {
 
     /** oklch(0.60 0.018 62) — muted labels and units. */
     val OnBackgroundMuted = Color(ON_BACKGROUND_MUTED_ARGB)
+
+    /**
+     * The tick glyph on an answered [com.jjrapps.constanza.domain.model.EntryStatus.COMPLETED]
+     * Today slot (today-status-icons), replacing the word "Hecho" that used to carry the same
+     * information. Not sourced from the same oklch warm ramp as the tokens above — chosen against
+     * measurement instead, the same way [HabitPalette]'s contrast band was.
+     *
+     * Clears WCAG 2.1 SC 1.4.11's 3:1 non-text floor on all four surface tones: 6.78:1 on
+     * [Background], 6.45:1 on [Surface], 6.07:1 on [SurfaceRaised], 5.79:1 on [SurfaceSelected].
+     * [ColorContrastTest] asserts all four rather than trusting this paragraph.
+     *
+     * Deliberately sits just below [HabitPalette]'s own `[7:1, 11:1]` contrast band (its floor is
+     * 6.98:1): a habit's identity colour, painted on its own name, must read a shade louder than a
+     * state glyph sitting next to it, not compete with it.
+     *
+     * Not `#6EC276`, the more obvious brighter green (8.97:1 on [Background]): that measures only
+     * ΔE 14.0 from the habit palette's [HabitColor.GREEN] (7.03:1, ΔE from a true Green 500) —
+     * below the palette's own 16.1 minimum pairwise separation, so a green habit's name and its own
+     * tick would have read as one colour. `#5FA867` is ΔE 17.6 from [HabitColor.GREEN], clear of
+     * that floor.
+     */
+    val StatusCompleted = Color(STATUS_COMPLETED_ARGB)
+
+    /**
+     * The cross glyph on an answered [com.jjrapps.constanza.domain.model.EntryStatus.MISSED] Today
+     * slot (today-status-icons), replacing the word "No hecho"/"Missed".
+     *
+     * Clears WCAG 2.1 SC 1.4.11's 3:1 non-text floor on all four surface tones: 6.75:1 on
+     * [Background], 6.43:1 on [Surface], 6.04:1 on [SurfaceRaised], 5.77:1 on [SurfaceSelected].
+     * [ColorContrastTest] asserts all four rather than trusting this paragraph.
+     *
+     * Deliberately sits just below [HabitPalette]'s own `[7:1, 11:1]` band, for the same reason
+     * [StatusCompleted] does: identity should read a shade louder than state.
+     *
+     * ΔE 24.2 from its nearest habit-palette neighbour, [HabitColor.PINK].
+     */
+    val StatusMissed = Color(STATUS_MISSED_ARGB)
 }

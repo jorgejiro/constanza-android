@@ -43,17 +43,6 @@ private data class PermissionBanners(
     val now: Instant,
 )
 
-/** today-answered-slot-collapse, design.md decision 5: [expandedHabitIds] and [reopenedSlots] are
- *  bundled for the identical reason [PermissionBanners] is — the screen-wide `combine` below is
- *  already at its five-typed-source ceiling, so a sixth source is folded into an existing shape
- *  rather than dropping to the vararg overload, which erases every source to `Any?`. Both flags
- *  are presented state only, never persisted, since neither means anything once the day rolls
- *  over — the same reasoning [expandedHabitIds] already carried alone. */
-private data class ExpansionState(
-    val expandedHabitIds: Set<Long>,
-    val reopenedSlots: Set<TodaySlotKey>,
-)
-
 /** Task 6b.1 (habit-entry-tracking: Day-Level Rollup and Per-Slot Display). [expandedHabitIds]
  *  is presented state only — which multi-slot rows the user opened — never persisted, since it is
  *  meaningless once the day rolls over. [answer] is the ONLY write path this screen uses; it
@@ -123,10 +112,6 @@ class TodayViewModel @Inject constructor(
 
     private val expandedHabitIds = MutableStateFlow<Set<Long>>(emptySet())
 
-    /** today-answered-slot-collapse, design.md decision 1. Cleared per-slot by [answer], never
-     *  otherwise, and dies with this ViewModel — see [ExpansionState]'s KDoc and the design's note
-     *  on why `rememberSaveable` would restore a reopened slot against the wrong day. */
-    private val reopenedSlots = MutableStateFlow<Set<TodaySlotKey>>(emptySet())
     private val canScheduleExactAlarms = MutableStateFlow(alarmScheduler.canScheduleExactAlarms())
 
     /** Seeded from the synchronous half of the decision only. `hasRequestedBefore` needs a suspend
@@ -149,11 +134,6 @@ class TodayViewModel @Inject constructor(
         nowState,
     ) { exactAlarms, notifications, now -> PermissionBanners(exactAlarms, notifications, now) }
 
-    private val expansionState = combine(
-        expandedHabitIds,
-        reopenedSlots,
-    ) { expanded, reopened -> ExpansionState(expanded, reopened) }
-
     /** today-midnight-rollover, design.md decision 2 (extended by today-past-day-correction,
      *  decision 1): [dateView] is a KEY outside the `combine`, never a sixth source inside it — the
      *  `combine` below keeps exactly the same five typed sources it always had. A rollover, a
@@ -168,9 +148,9 @@ class TodayViewModel @Inject constructor(
             habitRepository.observeAll(),
             entryDao.observeByDate(view.date.toString()),
             reminderOccurrenceDao.observeUnresolved(),
-            expansionState,
+            expandedHabitIds,
             permissionBanners,
-        ) { habits, entriesToday, unresolved, expansion, banners ->
+        ) { habits, entriesToday, unresolved, expanded, banners ->
             val snapshot = TodaySnapshot(entriesToday, unresolved, view.date)
             val rows = habits.filterNot { it.archived }.mapNotNull { habit ->
                 val schedule = habitRepository.findScheduleFor(habit.id) ?: return@mapNotNull null
@@ -181,8 +161,7 @@ class TodayViewModel @Inject constructor(
             TodayUiState(
                 rows = rows,
                 sections = sections,
-                expandedHabitIds = expansion.expandedHabitIds,
-                reopenedSlots = expansion.reopenedSlots,
+                expandedHabitIds = expanded,
                 zone = currentDateSource.zone(),
                 date = view.date,
                 isPastDay = view.isPastDay,
@@ -207,26 +186,21 @@ class TodayViewModel @Inject constructor(
         if (habitId in it) it - habitId else it + habitId
     }
 
-    /** today-answered-slot-collapse, design.md decision 1: reveals [slot]'s answer actions again.
-     *  Called only from the Change control on an answered slot. */
-    fun requestChange(key: TodaySlotKey) = reopenedSlots.update { it + key }
-
-    /** Removing [slot]'s key happens synchronously, BEFORE the write coroutine is launched
-     *  (design.md decision 4) — waiting for the Room round-trip would let the reopened buttons
-     *  linger for a frame after the tap that is meant to collapse them. If the write itself fails,
-     *  the slot still collapses back to its previous status with its own Change control intact, so
-     *  nothing here is unrecoverable.
-     *
-     *  today-midnight-rollover, design.md decision 3: writes against [uiState]'s CURRENT `date`,
+    /** today-midnight-rollover, design.md decision 3: writes against [uiState]'s CURRENT `date`,
      *  never [dateState] read directly and never a fresh clock read. Both of those can already
      *  have advanced past the date this row was drawn against by the time the user taps it; reading
      *  `uiState.value.date` instead makes "the date written" and "the date the tapped row belongs
      *  to" the same value by construction — this is the fix for the In-App Answer Date Attribution
      *  requirement. On a past day, `uiState.value.date` is the NAVIGATED-TO date, so an answer
      *  there credits that date regardless of what [TodayDate.clock] is at the moment of the tap
-     *  (habit-entry-tracking: In-App Answer Date Attribution). */
+     *  (habit-entry-tracking: In-App Answer Date Attribution).
+     *
+     *  today-one-line-row: the only presentation-state write [answer] used to make —
+     *  `reopenedSlots.update { it - slot.keyIn(habitId) }` — is gone along with `reopenedSlots`
+     *  itself. That set existed only to re-show a reopened slot's answer buttons after "Cambiar";
+     *  the change dialog now answers directly through this same function and dismisses itself, so
+     *  there is no reopened presentation state left to clear. */
     fun answer(habitId: Long, slot: TodaySlot, status: InAppEntryStatus) {
-        reopenedSlots.update { it - slot.keyIn(habitId) }
         val date = uiState.value.date
         viewModelScope.launch {
             entryWriter.answerInApp(habitId, date, slot.slotId, status, slot.occurrenceId)
@@ -260,7 +234,6 @@ class TodayViewModel @Inject constructor(
     fun showPreviousDay() {
         val previous = dateState.value.viewed.minusDays(1)
         expandedHabitIds.value = emptySet()
-        reopenedSlots.value = emptySet()
         dateState.update { it.copy(navigated = previous) }
     }
 
@@ -279,12 +252,10 @@ class TodayViewModel @Inject constructor(
         if (next >= current.clock) {
             if (current.navigated != null) {
                 expandedHabitIds.value = emptySet()
-                reopenedSlots.value = emptySet()
                 dateState.update { it.copy(navigated = null) }
             }
         } else {
             expandedHabitIds.value = emptySet()
-            reopenedSlots.value = emptySet()
             dateState.update { it.copy(navigated = next) }
         }
     }
@@ -296,7 +267,6 @@ class TodayViewModel @Inject constructor(
     fun showToday() {
         if (dateState.value.navigated != null) {
             expandedHabitIds.value = emptySet()
-            reopenedSlots.value = emptySet()
             dateState.update { it.copy(navigated = null) }
         }
     }
@@ -342,9 +312,6 @@ data class TodayUiState(
      *  its own pre-grouping order so existing single-row assertions stay unaffected. */
     val sections: List<TodaySection> = emptyList(),
     val expandedHabitIds: Set<Long> = emptySet(),
-    /** today-answered-slot-collapse, design.md decision 1: which answered slots currently show
-     *  their answer actions again instead of their status text and Change control. */
-    val reopenedSlots: Set<TodaySlotKey> = emptySet(),
     val zone: ZoneId = ZoneId.of("UTC"),
     /** today-midnight-rollover, design.md decisions 2-3: the date this state's [rows] and
      *  [TodaySnapshot] were built against — never re-derived from the clock at the point of use.

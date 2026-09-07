@@ -171,6 +171,45 @@ class ColorContrastTest {
     }
 
     // ------------------------------------------------------------------------------------------
+    // today-status-icons: the two answered-slot glyph tints, asserted the same way the habit
+    // palette above is — a real computed ratio on every surface the glyph can sit on, not a
+    // hand-typed number trusted from a KDoc paragraph.
+    // ------------------------------------------------------------------------------------------
+
+    @Test
+    fun `the completed status glyph clears the non-text floor on every surface it can sit on`() {
+        surfacesGlyphsSitOn().forEach { (name, surface) ->
+            assertRatioAtLeast(ConstanzaColors.StatusCompleted, surface, NON_TEXT_FLOOR, "StatusCompleted on $name")
+        }
+    }
+
+    @Test
+    fun `the missed status glyph clears the non-text floor on every surface it can sit on`() {
+        surfacesGlyphsSitOn().forEach { (name, surface) ->
+            assertRatioAtLeast(ConstanzaColors.StatusMissed, surface, NON_TEXT_FLOOR, "StatusMissed on $name")
+        }
+    }
+
+    /**
+     * Both status glyphs must also sit BELOW the habit palette's own `[7:1, 11:1]` band floor
+     * (6.98:1) on [ConstanzaColors.Background] — identity should read a shade louder than state,
+     * the same rule [ColorContrastTest]'s class doc records for both tokens.
+     */
+    @Test
+    fun `both status glyphs read quieter than the habit palette's own contrast floor`() {
+        val paletteFloor = HabitColor.entries.minOf { contrastRatio(it.composeColor, ConstanzaColors.Background) }
+        listOf("StatusCompleted" to ConstanzaColors.StatusCompleted, "StatusMissed" to ConstanzaColors.StatusMissed)
+            .forEach { (name, color) ->
+                val ratio = contrastRatio(color, ConstanzaColors.Background)
+                assertTrue(
+                    actual = ratio < paletteFloor,
+                    message = "$name measured %.2f:1 on Background, not below the habit palette's own %.2f:1 floor"
+                        .format(ratio, paletteFloor),
+                )
+            }
+    }
+
+    // ------------------------------------------------------------------------------------------
     // WCAG 2.1 SC 1.4.11 Non-text Contrast — user-interface components and their states.
     //
     // Everything above this line asserts SC 1.4.3, which is about *text*. That is why nothing above
@@ -454,6 +493,16 @@ class ColorContrastTest {
     private fun List<Pair<String, Color>>.distinctSurfaces(): List<Pair<String, Color>> =
         groupBy { (_, color) -> color }
             .map { (color, roles) -> roles.joinToString("/") { (name, _) -> name } to color }
+
+    /** The four [ConstanzaColors] surface tones an answered Today slot's status glyph can sit on
+     *  (`SlotRow`'s row background, whichever of [ConstanzaColors.Background]/[ConstanzaColors.Surface]/
+     *  [ConstanzaColors.SurfaceRaised]/[ConstanzaColors.SurfaceSelected] the screen underneath it is). */
+    private fun surfacesGlyphsSitOn(): List<Pair<String, Color>> = listOf(
+        "Background" to ConstanzaColors.Background,
+        "Surface" to ConstanzaColors.Surface,
+        "SurfaceRaised" to ConstanzaColors.SurfaceRaised,
+        "SurfaceSelected" to ConstanzaColors.SurfaceSelected,
+    )
 
     private fun assertRatioAtLeast(foreground: Color, background: Color, minimum: Double, label: String) {
         val ratio = contrastRatio(foreground, background)

@@ -62,6 +62,21 @@ class TodayPastDayComposeTest {
 
     private fun text(resId: Int) = ApplicationProvider.getApplicationContext<Context>().getString(resId)
 
+    private fun changeDescription(habitName: String, answeredStatusText: String) =
+        ApplicationProvider.getApplicationContext<Context>()
+            .getString(R.string.today_slot_change_a11y, habitName, answeredStatusText)
+
+    /** The same enum-to-copy mapping `slotStatusLabel` uses in `app/src/main`, restated here rather
+     *  than called: `internal` visibility from `app/src/main` is not reliably exposed to
+     *  `app/src/androidTest` in this project's AGP setup (see `TodayOneLineRowPrototype`'s own
+     *  KDoc for the identical reason it duplicates colour literals instead of importing them). */
+    private fun statusLabelText(status: EntryStatus): String = when (status) {
+        EntryStatus.COMPLETED -> text(R.string.today_slot_completed)
+        EntryStatus.MISSED -> text(R.string.today_slot_missed)
+        EntryStatus.SKIPPED -> text(R.string.today_slot_skipped)
+        EntryStatus.UNKNOWN -> text(R.string.today_slot_pending)
+    }
+
     private suspend fun writePastEntry(habitId: Long, slotId: Long, date: String, status: EntryStatus) {
         fixture.database.entryDao().upsert(
             EntryEntity(
@@ -93,8 +108,12 @@ class TodayPastDayComposeTest {
 
     /**
      * Scenario 12 (design.md's testing strategy table) / task 5.1: navigate back, a force-resolved
-     * `MISSED` slot shows Missed + Change; Change -> Yes -> Done. The write is asserted against the
-     * PAST date's `Entry`, never today's — the load-bearing proof the whole change exists for.
+     * `MISSED` slot shows Missed + its own change route; reopen it -> Yes -> Done. The write is
+     * asserted against the PAST date's `Entry`, never today's — the load-bearing proof the whole
+     * change exists for.
+     *
+     * today-one-line-row: the row's own change-dialog route replaces the old "Cambiar"
+     * `TextButton`.
      */
     @Test
     fun navigatingToAPastMissedSlotShowsMissedAndCorrectingItWritesThePastDate(): Unit = runBlocking {
@@ -109,13 +128,15 @@ class TodayPastDayComposeTest {
             state.date == pastDate && state.rows.singleOrNull()?.slots?.getOrNull(0)?.status == EntryStatus.MISSED
         }
 
-        composeTestRule.onNodeWithText(text(R.string.today_slot_missed), substring = true).assertExists()
-        composeTestRule.onNodeWithText(text(R.string.today_slot_change)).performClick()
+        composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_missed)).assertExists()
+        composeTestRule.onNodeWithContentDescription(
+            changeDescription(HABIT_NAME, text(R.string.today_slot_missed)),
+        ).performClick()
         composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).performClick()
         viewModel.awaitState("slot 0 completed on $pastDate") { state ->
             state.date == pastDate && state.rows.singleOrNull()?.slots?.getOrNull(0)?.status == EntryStatus.COMPLETED
         }
-        composeTestRule.onNodeWithText(text(R.string.today_slot_completed), substring = true).assertExists()
+        composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_completed)).assertExists()
 
         val pastEntry = fixture.database.entryDao().findByHabitAndDate(seeded.habitId, pastDate.toString()).single()
         assertEquals(EntryStatus.COMPLETED.name, pastEntry.status)
@@ -175,9 +196,13 @@ class TodayPastDayComposeTest {
     /**
      * Task 5.4 / design.md's flagged coverage gap: "any past slot is freely re-editable to any
      * status" is not restricted to `MISSED -> COMPLETED`. Drives one past slot through
-     * `COMPLETED -> MISSED -> SKIPPED` twice via the Change control, exactly the JVM shape
+     * `COMPLETED -> MISSED -> SKIPPED` twice via the row's own change dialog, exactly the JVM shape
      * `TodayViewModelTest`'s 2.15 already proved at the ViewModel level — this is that same claim
      * proved through the real screen.
+     *
+     * today-one-line-row: [changeSlotTo] now reopens through the row's own accessible label rather
+     * than a shared "Cambiar" `TextButton`, so it has to know the CURRENT status to build that
+     * label — [current] threads that through the whole `repeat` chain.
      */
     @Test
     fun aPastSlotIsFreelyReEditableThroughEveryStatusTwiceInARow(): Unit = runBlocking {
@@ -192,21 +217,30 @@ class TodayPastDayComposeTest {
             state.date == pastDate && state.rows.singleOrNull()?.slots?.getOrNull(0)?.status == EntryStatus.COMPLETED
         }
 
+        var current = EntryStatus.COMPLETED
         repeat(2) {
-            changeSlotTo(R.string.today_answer_no, EntryStatus.MISSED, pastDate)
-            changeSlotTo(R.string.today_answer_skip, EntryStatus.SKIPPED, pastDate)
-            changeSlotTo(R.string.today_answer_yes, EntryStatus.COMPLETED, pastDate)
+            current = changeSlotTo(current, R.string.today_answer_no, EntryStatus.MISSED, pastDate)
+            current = changeSlotTo(current, R.string.today_slot_skipped, EntryStatus.SKIPPED, pastDate)
+            current = changeSlotTo(current, R.string.today_answer_yes, EntryStatus.COMPLETED, pastDate)
         }
 
         val pastEntry = fixture.database.entryDao().findByHabitAndDate(seeded.habitId, pastDate.toString()).single()
         assertEquals(EntryStatus.COMPLETED.name, pastEntry.status)
     }
 
-    private suspend fun changeSlotTo(answerLabelRes: Int, expected: EntryStatus, pastDate: LocalDate) {
-        composeTestRule.onNodeWithText(text(R.string.today_slot_change)).performClick()
-        composeTestRule.onNodeWithText(text(answerLabelRes)).performClick()
+    private suspend fun changeSlotTo(
+        current: EntryStatus,
+        optionLabelRes: Int,
+        expected: EntryStatus,
+        pastDate: LocalDate,
+    ): EntryStatus {
+        composeTestRule.onNodeWithContentDescription(
+            changeDescription(HABIT_NAME, statusLabelText(current)),
+        ).performClick()
+        composeTestRule.onNodeWithText(text(optionLabelRes)).performClick()
         viewModel.awaitState("slot 0 reading $expected on $pastDate") { state ->
             state.date == pastDate && state.rows.singleOrNull()?.slots?.getOrNull(0)?.status == expected
         }
+        return expected
     }
 }

@@ -43,7 +43,7 @@ import com.jjrapps.constanza.core.ui.theme.HabitPalette
 import com.jjrapps.constanza.core.ui.theme.Spacing
 import com.jjrapps.constanza.core.ui.theme.contrastingInk
 
-/** Six per row puts the twenty-two presets and the custom swatch across four rows: 6 * 48dp
+/** Six per row puts the twenty-one presets and the custom swatch across four rows: 6 * 48dp
  *  plus five 4dp gaps is 308dp, inside the 328dp a 360dp-wide phone leaves after the form's own
  *  padding. `FlowRow` still wraps to fewer on a narrower screen or a large display scale, and the
  *  grid order's separation guarantee is written for this width — see [HabitColor]'s KDoc. */
@@ -62,9 +62,9 @@ fun habitColorSwatchTestTag(argb: Int): String = "habit_color_swatch_%08X".forma
 
 /**
  * The habit colour picker: one row of five well-separated presets plus the custom wheel, and an
- * expander on the heading that opens the full twenty-two-colour grid.
+ * expander on the heading that opens the full twenty-one-colour grid.
  *
- * **Collapsed by default, always — including when editing an existing habit.** Twenty-three circles
+ * **Collapsed by default, always — including when editing an existing habit.** Twenty-two circles
  * is four rows, and four rows of colour in the middle of a form pushes the schedule section and the
  * save button down far enough to cost more than the choice is worth. It measurably did: the
  * always-open grid put `Save` outside the viewport on the tallest schedule kind and broke
@@ -73,7 +73,7 @@ fun habitColorSwatchTestTag(argb: Int): String = "habit_color_swatch_%08X".forma
  * **The last circle of the visible row does double duty**, and that is what keeps a selection on
  * screen in every state. It opens the free picker, and it renders whatever colour the row cannot:
  * a custom colour, or a preset currently folded away. Opening the editor on a habit whose colour is
- * one of the seventeen hidden presets therefore shows that colour, ticked, in the last circle rather
+ * one of the sixteen hidden presets therefore shows that colour, ticked, in the last circle rather
  * than showing a row with nothing selected in it.
  *
  * The drawing order is [HabitPalette.ORDERED]'s, arranged so no two neighbouring cells look alike;

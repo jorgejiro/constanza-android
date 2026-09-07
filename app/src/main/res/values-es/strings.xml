@@ -61,7 +61,6 @@
     <string name="habit_color_indigo">Índigo</string>
     <string name="habit_color_orange">Naranja</string>
     <string name="habit_color_mint">Menta</string>
-    <string name="habit_color_blue_grey">Gris azulado</string>
     <string name="habit_color_lime">Lima</string>
     <string name="habit_color_blue">Azul</string>
     <string name="habit_color_light_green">Verde claro</string>
@@ -115,7 +114,9 @@
 
     <!-- habit-entry-tracking: Today screen, expandable per-habit rollup rows (task 6b.1, OA-2). -->
     <string name="today_title">Hoy</string>
-    <string name="today_manage_habits">Gestionar hábitos</string>
+    <!-- today-status-icons: acortado desde "Gestionar hábitos" ahora que Ajustes es un icono de
+         engranaje a su lado en vez de un segundo botón de texto. -->
+    <string name="today_manage_habits">Hábitos</string>
     <string name="today_empty">No hay nada pendiente hoy.</string>
     <string name="today_add_habit">Añadir hábito</string>
     <!-- today-past-day-correction: los controles de navegación de la barra de fecha y el estado
@@ -133,27 +134,33 @@
          se aplica en el composable, así que se guardan en minúscula normal para localización. -->
     <string name="today_section_now">Ahora</string>
     <string name="today_section_later">Más tarde</string>
-    <string name="today_section_done">Hecho</string>
+    <!-- today-status-icons: esta sección siempre ha incluido cualquier slot contestado, también
+         los perdidos — groupTodayRows solo distingue contestado de pendiente — así que "Hecho" ya
+         no tenía sentido en cuanto una cruz roja podía aparecer dentro. -->
+    <string name="today_section_done">Contestados</string>
     <string name="today_expand">Mostrar horas</string>
     <string name="today_collapse">Ocultar horas</string>
 
     <!-- reminder-response: pending/snoozed rendering by reading reminder_occurrences (task 6b.3, design D3). -->
     <string name="today_slot_pending">Pendiente</string>
     <string name="today_slot_completed">Hecho</string>
-    <string name="today_slot_missed">Perdido</string>
+    <!-- today-status-icons: "Perdido" era una traducción literal de "Missed" que no dice nada en
+         español sobre un hábito; "No hecho" nombra lo que de verdad pasó. -->
+    <string name="today_slot_missed">No hecho</string>
     <string name="today_slot_skipped">Omitido</string>
     <string name="today_slot_pending_snoozed_until">Aplazado hasta %1$s</string>
 
     <!-- habit-entry-tracking: in-app Entry write path, SKIPPED is in-app only (task 6b.2). -->
     <string name="today_answer_yes">Sí</string>
     <string name="today_answer_no">No</string>
-    <string name="today_answer_skip">Omitir</string>
+    <string name="today_answer_yes_a11y">Responder sí a %1$s</string>
+    <string name="today_answer_no_a11y">Responder no a %1$s</string>
 
     <!-- today-answered-slot-collapse: %1$s is the habit name, %2$s is the answered-status text
          (see TodayScreen.kt). Spanish word order legitimately reorders the two arguments while
          keeping both positional indices — this is the exact case D9's StringResourceParityTest
-         checks a multiset for, not a sequence. -->
-    <string name="today_slot_change">Cambiar</string>
+         checks a multiset for, not a sequence. today_slot_change ("Cambiar") is gone with
+         ChangeButton (today-one-line-row) — the row itself is the tap target now. -->
     <string name="today_slot_change_a11y">Cambiar respuesta de %2$s para %1$s</string>
 
     <!-- design §12/§13.1: non-blocking exact-alarm banner (task 6b.9). -->

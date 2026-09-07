@@ -27,10 +27,10 @@ import com.jjrapps.constanza.R
  *
  * ## What this re-tone measures
  *
- * 22 presets, contrast band **6.98:1 – 11.05:1** on [ConstanzaColors.Background], spread **1.58x**
- * (was 3.02x). Global minimum pairwise ΔE **16.1** ([TEAL]/[MINT]) — *better* than the 15.0 the
- * previous palette had. Minimum ΔE between grid-adjacent cells (across **and** down) **68.7**
- * ([BLUE_GREY]/[MAGENTA]) — better than the 66.1 the previous palette measured. [HabitPalette.VISIBLE]
+ * 21 presets, contrast band **6.98:1 – 11.05:1** on [ConstanzaColors.Background], spread **1.58x**
+ * (was 3.02x). Global minimum pairwise ΔE **16.1** ([MINT]/[TEAL]) — *better* than the 15.0 the
+ * previous palette had. Minimum ΔE between grid-adjacent cells (across **and** down) **69.8**
+ * ([LIME]/[BROWN]) — better than the 68.7 the 22-colour grid measured. [HabitPalette.VISIBLE]
  * row minimum pairwise ΔE **56.7**. `HabitPaletteTest` asserts every one of these rather than
  * trusting this paragraph.
  *
@@ -61,11 +61,19 @@ import com.jjrapps.constanza.R
  * (more colours; specifically red, brown, lilac and deep blue) while harmony was asked for once, as
  * a preference.
  *
+ * ## Why BLUE_GREY was retired
+ *
+ * `BLUE_GREY` (`#849FAC`) is retired, taking this palette from 22 presets to 21 — the same reasoning
+ * that retired `SILVER` before it: as a coloured name, a near-neutral colour is indistinguishable
+ * from neutral body text, so it stopped being a colour. `#849FAC` cleared the contrast band at
+ * 7.01:1 — that was never the problem — but painted on a habit's name, sitting among genuinely
+ * coloured names, it reads as grey text on a disabled row rather than as an identity anyone picked.
+ *
  * ## Why the declaration order looks shuffled
  *
  * It is the grid order, and it is scattered on purpose — chosen to maximise separation between
  * cells that sit next to each other. No two cells adjacent in the six-wide grid — across **or**
- * down — are near in colour: the smallest such gap is ΔE 68.7, against the ΔE 23.9 pair the original
+ * down — are near in colour: the smallest such gap is ΔE 69.8, against the ΔE 23.9 pair the original
  * pastel palette's neighbours measured. `HabitPaletteTest` asserts that rather than trusting this
  * paragraph. A hue-sorted order would put every near-neighbour side by side, which is exactly the
  * arrangement being avoided.
@@ -73,7 +81,7 @@ import com.jjrapps.constanza.R
  * The first five are [HabitPalette.VISIBLE], the row shown before the grid is expanded, and they are
  * first so that expanding adds rows underneath instead of rearranging what is already on screen.
  *
- * [labelRes] is not decoration. This is a radio group of twenty-three circles (22 presets plus the
+ * [labelRes] is not decoration. This is a radio group of twenty-two circles (21 presets plus the
  * custom wheel), and colour is never this app's sole recognition channel (design.md decision 6) —
  * the colour overhaul makes the point sharper rather than retiring it: the habit's *name* is now
  * itself the non-colour channel a swatch's colour is checked against, so every swatch still carries
@@ -86,25 +94,24 @@ enum class HabitColor(val argb: Int, @param:StringRes val labelRes: Int) {
     LIGHT_BLUE(0xFF03A9F4.toInt(), R.string.habit_color_light_blue), // Light Blue 500, 7.43:1
     AMBER(0xFFF5B907.toInt(), R.string.habit_color_amber), // Amber 500, 11.01:1
 
-    LILAC(0xFFB992FF.toInt(), R.string.habit_color_lilac), // Deep Purple 300, 8.02:1
-    OLIVE(0xFFA19F25.toInt(), R.string.habit_color_olive), // Lime 800, 6.98:1
-    BLUE_GREY(0xFF849FAC.toInt(), R.string.habit_color_blue_grey), // Blue Grey 400, 7.01:1
-    MAGENTA(0xFFFC6799.toInt(), R.string.habit_color_magenta), // Pink 300, 7.02:1
+    PINK(0xFFF48FB1.toInt(), R.string.habit_color_pink), // Pink 200, 8.76:1
     MINT(0xFF55D7B8.toInt(), R.string.habit_color_mint), // Teal A200, 10.98:1
-    BLUE(0xFF469DFF.toInt(), R.string.habit_color_blue), // Blue 500, 7.01:1
-
-    PEACH(0xFFE9BA75.toInt(), R.string.habit_color_peach), // Orange 200, 10.93:1
     INDIGO(0xFF8896E3.toInt(), R.string.habit_color_indigo), // Indigo 300, 7.00:1
     YELLOW(0xFFDEC233.toInt(), R.string.habit_color_yellow), // Yellow 500, 11.05:1
-    CYAN(0xFF00ABBD.toInt(), R.string.habit_color_cyan), // Cyan 700, 7.04:1
-    ORANGE(0xFFFF9800.toInt(), R.string.habit_color_orange), // Orange 500, 9.07:1
-    TEAL(0xFF00AE9D.toInt(), R.string.habit_color_teal), // Teal 500, 7.02:1
+    MAGENTA(0xFFFC6799.toInt(), R.string.habit_color_magenta), // Pink 300, 7.02:1
+    LIME(0xFFB1CA33.toInt(), R.string.habit_color_lime), // Lime 600, 10.58:1
 
+    TEAL(0xFF00AE9D.toInt(), R.string.habit_color_teal), // Teal 500, 7.02:1
     PURPLE(0xFFD477E4.toInt(), R.string.habit_color_purple), // Purple 300, 7.04:1
     LIGHT_GREEN(0xFF7CB342.toInt(), R.string.habit_color_light_green), // Light Green 600, 7.80:1
-    PINK(0xFFF48FB1.toInt(), R.string.habit_color_pink), // Pink 200, 8.76:1
-    LIME(0xFFB1CA33.toInt(), R.string.habit_color_lime), // Lime 600, 10.58:1
+    CYAN(0xFF00ABBD.toInt(), R.string.habit_color_cyan), // Cyan 700, 7.04:1
+    ORANGE(0xFFFF9800.toInt(), R.string.habit_color_orange), // Orange 500, 9.07:1
     BROWN(0xFFB0958B.toInt(), R.string.habit_color_brown), // Brown 300, 7.00:1
+
+    BLUE(0xFF469DFF.toInt(), R.string.habit_color_blue), // Blue 500, 7.01:1
+    OLIVE(0xFFA19F25.toInt(), R.string.habit_color_olive), // Lime 800, 6.98:1
+    LILAC(0xFFB992FF.toInt(), R.string.habit_color_lilac), // Deep Purple 300, 8.02:1
+    PEACH(0xFFE9BA75.toInt(), R.string.habit_color_peach), // Orange 200, 10.93:1
 }
 
 /**
@@ -144,7 +151,7 @@ object HabitPalette {
      */
     val VISIBLE: List<HabitColor> = ORDERED.take(VISIBLE_COUNT)
 
-    /** The remaining seventeen the expander reveals, in grid order below [VISIBLE]. */
+    /** The remaining sixteen the expander reveals, in grid order below [VISIBLE]. */
     val COLLAPSED_REMAINDER: List<HabitColor> = ORDERED.drop(VISIBLE_COUNT)
 
     /**

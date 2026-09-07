@@ -9,12 +9,14 @@ import com.jjrapps.constanza.core.data.entity.ScheduleEntity
 import com.jjrapps.constanza.core.data.mapper.toDomain
 import com.jjrapps.constanza.core.data.migration.AppMigrations
 import com.jjrapps.constanza.core.data.migration.HabitColorRemap
+import com.jjrapps.constanza.core.data.migration.HabitColorRetireRemap
 import com.jjrapps.constanza.core.data.migration.HabitColorRetoneRemap
 import com.jjrapps.constanza.core.data.migration.PreMigrationSnapshotWriter
 import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.core.ui.theme.HABIT_BAND_CEILING
 import com.jjrapps.constanza.core.ui.theme.HABIT_BAND_FLOOR
 import com.jjrapps.constanza.core.ui.theme.HABIT_BAND_TOLERANCE
+import com.jjrapps.constanza.core.ui.theme.HabitColor
 import com.jjrapps.constanza.core.ui.theme.contrastRatio
 import com.jjrapps.constanza.domain.model.Schedule
 import java.io.File
@@ -43,6 +45,10 @@ private const val CLAMPED_SILVER_ARGB = 0xFFC2C2C2.toInt()
  *  legible band (1.48:1 against `ConstanzaColors.Background`), the same case `HabitColorBandTest`
  *  pins on the JVM side. */
 private const val OUT_OF_BAND_CUSTOM_ARGB = 0xFF1A237E.toInt()
+
+/** The retired `BLUE_GREY` preset (Blue Grey 400) — literal rather than `HabitColor.BLUE_GREY`,
+ *  which no longer exists, for the same reason [HabitColorRetireRemap]'s own KDoc gives. */
+private const val RETIRED_BLUE_GREY_ARGB = 0xFF849FAC.toInt()
 
 /**
  * Task 3.7 (base harness), **extended** by task 2.11 and task 3.5 — never recreated (correction
@@ -73,6 +79,9 @@ class AppDatabaseMigrationTest {
 
     /** Same reasoning as [migration1To2]: a fresh instance per test. */
     private fun migration4To5() = AppMigrations.migration4To5(PreMigrationSnapshotWriter(targetFilesDir))
+
+    /** Same reasoning as [migration1To2]: a fresh instance per test. */
+    private fun migration5To6() = AppMigrations.migration5To6(PreMigrationSnapshotWriter(targetFilesDir))
 
     @Test
     fun version1SchemaCreatesFromTheCheckedInExport() {
@@ -383,5 +392,48 @@ class AppDatabaseMigrationTest {
                 "VALUES (?, ?, ?, NULL, 0, NULL, ?, 0)",
             arrayOf<Any>(id, "Habit $id", colorArgb, "2026-01-01T08:00:00Z"),
         )
+    }
+
+    /**
+     * The colour overhaul's third habit-colour repaint (`AppMigrations.migration5To6`), tested the
+     * same way [migration4To5RetonesEveryLegacyPresetAndClampsTheRest] tests the second one: seed
+     * real rows, run the real migration, then read the post-migration VALUES back rather than merely
+     * trusting `runMigrationsAndValidate` returned without throwing.
+     *
+     * Two cases: a habit stored on the retired `BLUE_GREY` preset (`#849FAC`) comes out on
+     * [HabitColor.CYAN] (`#00ABBD`) — the one entry [HabitColorRetireRemap.LEGACY_TO_CURRENT]
+     * carries — and a habit already stored on a current preset that did not move
+     * ([HabitColor.CYAN] itself) survives byte-identical, proving the migration does not touch rows
+     * it has no reason to.
+     */
+    @Test
+    fun migration5To6RetiresBlueGreyAndLeavesOtherPresetsUntouched() {
+        val blueGreyHabitId = 1L
+        val cyanHabitId = 2L
+        val expectedCyan = HabitColorRetireRemap.LEGACY_TO_CURRENT.getValue(RETIRED_BLUE_GREY_ARGB)
+
+        migrationTestHelper.createDatabase(TEST_DB_NAME, version = 5).use { db ->
+            seedHabitV4(db, id = blueGreyHabitId, colorArgb = RETIRED_BLUE_GREY_ARGB)
+            seedHabitV4(db, id = cyanHabitId, colorArgb = HabitColor.CYAN.argb)
+        }
+
+        val migratedDb = migrationTestHelper.runMigrationsAndValidate(TEST_DB_NAME, 6, true, migration5To6())
+
+        migratedDb.query("SELECT id, colorArgb FROM habits ORDER BY id").use { cursor ->
+            assertTrue("expected the retired-BLUE_GREY row", cursor.moveToNext())
+            assertEquals(blueGreyHabitId, cursor.getLong(0))
+            assertEquals("BLUE_GREY must be retired onto CYAN", expectedCyan, cursor.getInt(1))
+
+            assertTrue("expected the untouched CYAN row", cursor.moveToNext())
+            assertEquals(cyanHabitId, cursor.getLong(0))
+            assertEquals(
+                "a current preset that did not move must survive byte-identical",
+                HabitColor.CYAN.argb,
+                cursor.getInt(1),
+            )
+        }
+
+        val snapshotFile = File(targetFilesDir, "pre-migration/pre-migration-v5.sql")
+        assertTrue("expected the v5 pre-migration snapshot file to exist at $snapshotFile", snapshotFile.exists())
     }
 }
