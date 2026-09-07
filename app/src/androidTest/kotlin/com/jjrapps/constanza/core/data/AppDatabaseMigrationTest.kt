@@ -1,5 +1,6 @@
 package com.jjrapps.constanza.core.data
 
+import androidx.compose.ui.graphics.Color
 import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -8,7 +9,13 @@ import com.jjrapps.constanza.core.data.entity.ScheduleEntity
 import com.jjrapps.constanza.core.data.mapper.toDomain
 import com.jjrapps.constanza.core.data.migration.AppMigrations
 import com.jjrapps.constanza.core.data.migration.HabitColorRemap
+import com.jjrapps.constanza.core.data.migration.HabitColorRetoneRemap
 import com.jjrapps.constanza.core.data.migration.PreMigrationSnapshotWriter
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
+import com.jjrapps.constanza.core.ui.theme.HABIT_BAND_CEILING
+import com.jjrapps.constanza.core.ui.theme.HABIT_BAND_FLOOR
+import com.jjrapps.constanza.core.ui.theme.HABIT_BAND_TOLERANCE
+import com.jjrapps.constanza.core.ui.theme.contrastRatio
 import com.jjrapps.constanza.domain.model.Schedule
 import java.io.File
 import java.time.DayOfWeek
@@ -24,6 +31,18 @@ private const val TEST_DB_NAME = "migration-test"
 /** An int with no counterpart in [HabitColorRemap.LEGACY_TO_CURRENT] — must survive the migration
  *  unchanged (the `WHERE colorArgb IN (...)` guard in `AppMigrations.MIGRATION_1_2`). */
 private const val UNMAPPED_COLOR_ARGB = 0x00123456
+
+/** The retired `SILVER` preset (Grey 300) — literal rather than `HabitColor.SILVER`, which no longer
+ *  exists, for the same reason [HabitColorRetoneRemap]'s own KDoc gives. */
+private const val RETIRED_SILVER_ARGB = 0xFFE0E0E0.toInt()
+
+/** [HabitColorRetoneRemap]'s measured fall-through result for [RETIRED_SILVER_ARGB]. */
+private const val CLAMPED_SILVER_ARGB = 0xFFC2C2C2.toInt()
+
+/** An arbitrary custom colour no version of this palette ever offered — navy, well outside the
+ *  legible band (1.48:1 against `ConstanzaColors.Background`), the same case `HabitColorBandTest`
+ *  pins on the JVM side. */
+private const val OUT_OF_BAND_CUSTOM_ARGB = 0xFF1A237E.toInt()
 
 /**
  * Task 3.7 (base harness), **extended** by task 2.11 and task 3.5 — never recreated (correction
@@ -51,6 +70,9 @@ class AppDatabaseMigrationTest {
 
     /** Same reasoning as [migration1To2]: a fresh instance per test. */
     private fun migration3To4() = AppMigrations.migration3To4(PreMigrationSnapshotWriter(targetFilesDir))
+
+    /** Same reasoning as [migration1To2]: a fresh instance per test. */
+    private fun migration4To5() = AppMigrations.migration4To5(PreMigrationSnapshotWriter(targetFilesDir))
 
     @Test
     fun version1SchemaCreatesFromTheCheckedInExport() {
@@ -292,6 +314,74 @@ class AppDatabaseMigrationTest {
             "INSERT INTO habits (id, name, colorArgb, notes, archived, archivedAt, createdAt, sortOrder) " +
                 "VALUES (?, ?, 0, NULL, 0, NULL, ?, 0)",
             arrayOf<Any>(id, "Habit $id", "2026-01-01T08:00:00Z"),
+        )
+    }
+
+    /**
+     * The colour overhaul's second habit-colour repaint (`AppMigrations.migration4To5`), tested the
+     * same way [migration1To2RewritesEveryLegacyColourToItsCurrentCounterpart] tests the first one:
+     * seed real rows, run the real migration, then read the post-migration VALUES back rather than
+     * merely trusting `runMigrationsAndValidate` returned without throwing.
+     *
+     * Three cases in one seeded database, matching every fall-through [HabitColorRetoneRemap.normalize]
+     * defines: every one of the 17 explicitly-remapped legacy presets comes out holding its retoned
+     * counterpart; the retired `SILVER` preset — deliberately absent from
+     * [HabitColorRetoneRemap.LEGACY_TO_CURRENT] — comes out `#C2C2C2` via the contrast clamp
+     * fall-through; and an arbitrary out-of-band custom colour (never any version of this palette)
+     * comes out somewhere inside the legible band rather than at an exact pinned hex, since the clamp's
+     * own contract ([clampToHabitBand]'s KDoc) is "inside the band", not "this exact byte".
+     */
+    @Test
+    fun migration4To5RetonesEveryLegacyPresetAndClampsTheRest() {
+        val legacyToExpected = HabitColorRetoneRemap.LEGACY_TO_CURRENT.toList()
+        val retiredSilverId = (legacyToExpected.size + 1).toLong()
+        val outOfBandId = (legacyToExpected.size + 2).toLong()
+
+        migrationTestHelper.createDatabase(TEST_DB_NAME, version = 4).use { db ->
+            legacyToExpected.forEachIndexed { index, (legacyColor, _) ->
+                seedHabitV4(db, id = index + 1L, colorArgb = legacyColor)
+            }
+            seedHabitV4(db, id = retiredSilverId, colorArgb = RETIRED_SILVER_ARGB)
+            seedHabitV4(db, id = outOfBandId, colorArgb = OUT_OF_BAND_CUSTOM_ARGB)
+        }
+
+        val migratedDb = migrationTestHelper.runMigrationsAndValidate(TEST_DB_NAME, 5, true, migration4To5())
+
+        migratedDb.query("SELECT id, colorArgb FROM habits ORDER BY id").use { cursor ->
+            legacyToExpected.forEachIndexed { index, (_, expectedColor) ->
+                assertTrue("expected a row for legacy seed index $index", cursor.moveToNext())
+                assertEquals((index + 1).toLong(), cursor.getLong(0))
+                assertEquals("legacy colour at row ${index + 1} was not retoned", expectedColor, cursor.getInt(1))
+            }
+
+            assertTrue("expected the retired-SILVER row", cursor.moveToNext())
+            assertEquals(retiredSilverId, cursor.getLong(0))
+            assertEquals(
+                "SILVER must fall through to the contrast clamp",
+                CLAMPED_SILVER_ARGB,
+                cursor.getInt(1),
+            )
+
+            assertTrue("expected the out-of-band custom colour row", cursor.moveToNext())
+            assertEquals(outOfBandId, cursor.getLong(0))
+            val clampedRatio = contrastRatio(Color(cursor.getInt(1)), ConstanzaColors.Background)
+            assertTrue(
+                "an out-of-band custom colour must land inside the legible band, measured %.2f:1".format(clampedRatio),
+                clampedRatio in (HABIT_BAND_FLOOR - HABIT_BAND_TOLERANCE)..(HABIT_BAND_CEILING + HABIT_BAND_TOLERANCE),
+            )
+        }
+
+        val snapshotFile = File(targetFilesDir, "pre-migration/pre-migration-v4.sql")
+        assertTrue("expected the v4 pre-migration snapshot file to exist at $snapshotFile", snapshotFile.exists())
+    }
+
+    /** A `version = 4` `habits` row, parameterised by [colorArgb] — the `habits` table shape is
+     *  unchanged from [seedHabitV3]'s version-3 one (`migration3To4` only touches `schedules`). */
+    private fun seedHabitV4(db: SupportSQLiteDatabase, id: Long, colorArgb: Int) {
+        db.execSQL(
+            "INSERT INTO habits (id, name, colorArgb, notes, archived, archivedAt, createdAt, sortOrder) " +
+                "VALUES (?, ?, ?, NULL, 0, NULL, ?, 0)",
+            arrayOf<Any>(id, "Habit $id", colorArgb, "2026-01-01T08:00:00Z"),
         )
     }
 }

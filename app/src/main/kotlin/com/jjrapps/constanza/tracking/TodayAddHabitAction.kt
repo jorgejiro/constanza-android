@@ -32,7 +32,7 @@ import com.jjrapps.constanza.core.ui.theme.Spacing
  * Non-visual hook for Today's add-habit FAB. The button carries an icon rather than a label, so
  * `R.string.today_add_habit` reaches the tree only as a `contentDescription`; a tag is still the
  * finder tests use, for the same reason as
- * [com.jjrapps.constanza.core.ui.component.HABIT_COLOR_DOT_TEST_TAG] — a tag adds no accessibility
+ * [com.jjrapps.constanza.habit.REMINDER_TIME_MODE_TOGGLE_TEST_TAG] — a tag adds no accessibility
  * announcement, so nothing a screen reader says changes because of it.
  */
 const val TODAY_ADD_HABIT_FAB_TEST_TAG = "today_add_habit_fab"

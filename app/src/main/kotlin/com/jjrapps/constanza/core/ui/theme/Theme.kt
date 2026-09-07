@@ -67,8 +67,8 @@ import androidx.compose.runtime.Composable
  * **`secondary` reuses existing tones rather than introduce new hex values** (design.md decision 1's
  * "no new colour values" spirit, applied to a role addition instead of a token addition).
  * `secondary`/`onSecondary` collapse onto `primary`/`onPrimary`, mirroring the sibling app's
- * identical choice: this app has exactly one saturated accent (spec `Accent Reserved For Chrome`),
- * so a distinct "secondary" hue would contradict that requirement.
+ * identical choice: this app's chrome is achromatic — the habit's own colour is the app's only
+ * chroma — so a distinct "secondary" hue would contradict that.
  *
  * **`onPrimaryContainer` no longer mirrors `onSecondaryContainer`/`onSurface` — corrected here, same
  * root cause as the `outline` split one paragraph up.** `primaryContainer` and
@@ -76,19 +76,22 @@ import androidx.compose.runtime.Composable
  * another, so any M3 component that tells a selected part from an unselected one using those two
  * pairs rendered both parts pixel-identical. That is not hypothetical: it is what M3's time-picker
  * selector did on a real screenshot, leaving nothing on screen to say which of the hour/minute
- * halves was being edited. `onPrimaryContainer` now reads [ConstanzaColors.Accent] — a selection
- * indicator is precisely what that token's own KDoc reserves the accent for.
+ * halves was being edited. `onPrimaryContainer` now reads [ConstanzaColors.ChromeInteractive] — a
+ * selection indicator is precisely what that token's own KDoc says it draws.
  *
  * The container *fill* is deliberately left at [ConstanzaColors.SurfaceSelected] rather than split
  * too, and the reason is arithmetic rather than taste: for a selected fill to clear 3:1 against
  * `surfaceContainerHighest` (relative luminance 0.0092) it would need luminance >= 0.1276, which in
  * this ramp is a light grey slab — brighter than the control stroke and far outside a deliberately
  * quiet dark app. No fill-carried distinction exists here at that strength, so the distinction is
- * carried by the content tone. Note the honest limit of that: amber-on-dark versus off-white-on-dark
- * is a ~1.7:1 *luminance* difference and reads mainly by hue. SC 1.4.11 imposes no state-to-state
- * ratio and both tones clear their own container by more than 4.5:1, so this is conformant, but a
- * component that must distinguish two states for a user who cannot separate those hues should add a
- * non-colour cue of its own rather than lean on this pair alone.
+ * carried by the content tone. Note the honest limit of that: [ConstanzaColors.ChromeInteractive]
+ * against [ConstanzaColors.OnBackground] is a 1.57:1 *luminance* difference, and with the chrome
+ * achromatic that difference is now the whole signal — no hue is left to carry any of it. The amber
+ * this replaced measured 1.72:1 on the same pair but separated mainly by hue, so the brightness step
+ * is barely changed while the hue step is gone entirely. SC 1.4.11 imposes no state-to-state ratio
+ * and both tones clear their own container by more than 4.5:1, so this is conformant, but a
+ * component that must distinguish two states should add a non-colour cue of its own rather than
+ * lean on this pair alone.
  *
  * **`tertiaryContainer`/`onTertiaryContainer` are bound as of fix/time-format-consistency, and the
  * audit below no longer lists them.** They used to be audited as unbound on the grounds that
@@ -100,19 +103,33 @@ import androidx.compose.runtime.Composable
  * entries, read from the resolved artifact's sources). Left unbound, a US phone set to 12-hour
  * would have put M3's stock violet in the middle of the warm ramp.
  *
- * They take the same `SurfaceSelected`/`Accent` pair as `primaryContainer`/`onPrimaryContainer`, and
- * for the same reason: both are "this half of a two-part selector is the one you picked", the AM/PM
- * toggle sitting a few dp from the hour/minute selector inside the same dialog, and two different
- * treatments for one idea in one dialog would be noise. The selection is carried by the *content*
- * tone rather than the fill, which is the trade `onPrimaryContainer`'s paragraph above already
- * spells out and which the period selector survives better than most: M3 strokes the whole toggle
- * with `outline` ([ConstanzaColors.ControlStroke], 3.41:1 on the dialog's `surfaceContainerHigh`),
- * so the component's own boundary is never in question — only which half is active, and that reads
- * amber against off-white.
+ * **They no longer take the same content tone as `primaryContainer`/`onPrimaryContainer`, and that
+ * asymmetry is forced rather than chosen.** Both roles mean "this half of a two-part selector is the
+ * one you picked", the AM/PM toggle sitting a few dp from the hour/minute selector inside the same
+ * dialog, so one treatment for one idea is what you would want — and it is how these were bound
+ * while the chrome still had an accent. It stopped being reachable when the accent went, because M3
+ * gives the two selectors *different unselected baselines*: the hour/minute half that is not being
+ * edited draws in `onSurface` ([ConstanzaColors.OnBackground]), while the unselected AM/PM label
+ * draws in `onSurfaceVariant` ([ConstanzaColors.OnBackgroundVariant]). One accent could differ from
+ * both of those at once, by hue. An achromatic tone cannot: brightness is the only axis left, so
+ * each selected tone has to step away from *its own* sibling, and the two siblings sit at different
+ * brightnesses. Hence `onPrimaryContainer` steps down to [ConstanzaColors.ChromeInteractive] while
+ * `onTertiaryContainer` steps up to [ConstanzaColors.OnBackground].
  *
- * `tertiary`/`onTertiary` follow `secondary`/`onSecondary` onto the accent pair. Nothing renders
- * them today; they are bound anyway so that no member of this family can put a violet on screen
- * later, which is exactly the failure this change had to go back and fix.
+ * Both land on the same 1.57:1 luminance separation from the half they must be told apart from, and
+ * the AM/PM pair is the one that gains: amber against `onSurfaceVariant` measured 1.10:1 and was very
+ * nearly pure hue, which is exactly the distinction that would have vanished here.
+ * `ColorContrastTest` pins both pairs apart rather than trusting this paragraph.
+ *
+ * The selection is still carried by the *content* tone rather than the fill, which is the trade
+ * `onPrimaryContainer`'s paragraph above already spells out and which the period selector survives
+ * better than most: M3 strokes the whole toggle with `outline` ([ConstanzaColors.ControlStroke],
+ * 3.41:1 on the dialog's `surfaceContainerHigh`), so the component's own boundary is never in
+ * question — only which half is active.
+ *
+ * `tertiary`/`onTertiary` follow `secondary`/`onSecondary` onto the achromatic pair. Nothing
+ * renders them today; they are bound anyway so that no member of this family can put a violet on
+ * screen later, which is exactly the failure this change had to go back and fix.
  *
  * **Audited and deliberately left at M3's default — stated here so no future omission is silent:**
  * - `error`/`onError`/`errorContainer`/`onErrorContainer` — only `colorScheme.error` is read
@@ -149,18 +166,18 @@ internal val DarkColors = darkColorScheme(
     surfaceContainerHighest = ConstanzaColors.SurfaceSelected,
     outline = ConstanzaColors.ControlStroke,
     outlineVariant = ConstanzaColors.Divider,
-    primary = ConstanzaColors.Accent,
-    onPrimary = ConstanzaColors.OnAccent,
+    primary = ConstanzaColors.ChromeInteractive,
+    onPrimary = ConstanzaColors.OnChromeInteractive,
     primaryContainer = ConstanzaColors.SurfaceSelected,
-    onPrimaryContainer = ConstanzaColors.Accent,
-    secondary = ConstanzaColors.Accent,
-    onSecondary = ConstanzaColors.OnAccent,
+    onPrimaryContainer = ConstanzaColors.ChromeInteractive,
+    secondary = ConstanzaColors.ChromeInteractive,
+    onSecondary = ConstanzaColors.OnChromeInteractive,
     secondaryContainer = ConstanzaColors.SurfaceSelected,
     onSecondaryContainer = ConstanzaColors.OnBackground,
-    tertiary = ConstanzaColors.Accent,
-    onTertiary = ConstanzaColors.OnAccent,
+    tertiary = ConstanzaColors.ChromeInteractive,
+    onTertiary = ConstanzaColors.OnChromeInteractive,
     tertiaryContainer = ConstanzaColors.SurfaceSelected,
-    onTertiaryContainer = ConstanzaColors.Accent,
+    onTertiaryContainer = ConstanzaColors.OnBackground,
 )
 
 /**

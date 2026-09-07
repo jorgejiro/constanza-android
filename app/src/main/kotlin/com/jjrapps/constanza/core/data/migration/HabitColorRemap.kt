@@ -17,7 +17,7 @@ package com.jjrapps.constanza.core.data.migration
  * writing down before it was needed.
  *
  * **Version 3 does not remap, and the reason is a feature, not an omission.** The palette this map
- * writes into (the six warm-dark pastels) has been replaced by twenty-three standard colour families
+ * writes into (the six warm-dark pastels) has been replaced by twenty-two standard colour families
  * plus a free custom colour. No third entry is added here and no `Migration(2,3)` rewrites colours,
  * because the premise of the whole exercise is gone: a habit holding a colour that is not one of
  * the offered presets is no longer orphaned, it simply opens on the picker's custom swatch showing

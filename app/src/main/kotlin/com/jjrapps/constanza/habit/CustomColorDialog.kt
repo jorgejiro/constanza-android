@@ -38,6 +38,7 @@ import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.theme.Dimens
 import com.jjrapps.constanza.core.ui.theme.Hsv
 import com.jjrapps.constanza.core.ui.theme.Spacing
+import com.jjrapps.constanza.core.ui.theme.clampToHabitBand
 import com.jjrapps.constanza.core.ui.theme.contrastingInk
 import com.jjrapps.constanza.core.ui.theme.hsvOf
 
@@ -81,6 +82,14 @@ internal fun hueSpectrum(): List<Color> =
  * Greyscale is why they must be separate at all: `hsvOf` cannot recover a hue from a grey, so a
  * picker that re-derived its sliders from the composed colour each frame would snap the hue slider
  * to zero the moment saturation reached it.
+ *
+ * **The committed (and previewed) colour is [clampToHabitBand]`(current)`, never `current` itself.**
+ * The three sliders keep their full unrestricted range — nothing about what the user can *move* is
+ * limited — but this colour is about to be painted on a habit's name text (see [clampToHabitBand]'s
+ * KDoc), so what actually reaches [onConfirm] must sit in the legible band. Clamping the preview to
+ * the same value the confirm button commits, rather than showing the raw mix, is what keeps this from
+ * being a surprise: a user who drags to an unreadable navy sees the colour they will actually get
+ * before they tap confirm, not after.
  */
 @Composable
 internal fun CustomColorDialog(initialArgb: Int, onConfirm: (Int) -> Unit, onDismiss: () -> Unit) {
@@ -89,6 +98,7 @@ internal fun CustomColorDialog(initialArgb: Int, onConfirm: (Int) -> Unit, onDis
     var saturation by rememberSaveable { mutableFloatStateOf(initial.saturation) }
     var brightness by rememberSaveable { mutableFloatStateOf(initial.value) }
     val current = Hsv(hue, saturation, brightness).toArgb()
+    val committed = clampToHabitBand(current)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -96,7 +106,7 @@ internal fun CustomColorDialog(initialArgb: Int, onConfirm: (Int) -> Unit, onDis
         title = { Text(stringResource(R.string.habit_editor_color_custom_title)) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
-                CustomColorPreview(argb = current)
+                CustomColorPreview(argb = committed)
                 GradientSlider(
                     label = stringResource(R.string.habit_editor_color_hue),
                     fraction = hue / FULL_TURN_DEGREES,
@@ -128,7 +138,7 @@ internal fun CustomColorDialog(initialArgb: Int, onConfirm: (Int) -> Unit, onDis
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(current) },
+                onClick = { onConfirm(committed) },
                 modifier = Modifier.testTag(HABIT_COLOR_CUSTOM_CONFIRM_TEST_TAG),
             ) {
                 Text(stringResource(R.string.habit_editor_color_custom_confirm))

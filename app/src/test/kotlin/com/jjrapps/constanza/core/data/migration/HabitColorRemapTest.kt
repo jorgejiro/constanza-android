@@ -27,7 +27,7 @@ private val SCHEMA_V2_PALETTE = setOf(
  * rename is the whole story of this file's update. That assertion existed to catch a re-tone that
  * would leave a migrated habit holding a colour the picker no longer offered. The picker now offers
  * a free custom colour, so an off-palette value is a first-class state rather than an orphan, and
- * the twenty-three-family standard palette that replaced the six pastels shares none of their values.
+ * the twenty-two-family standard palette that replaced the six pastels shares none of their values.
  * Keeping the old assertion would have meant either failing on a correct migration or dragging the
  * frozen v1→v2 map forward onto whatever the palette happens to be today — the exact drift
  * [HabitColorRemap]'s KDoc forbids. Pinning the v2 values as literals keeps the guard's real job:

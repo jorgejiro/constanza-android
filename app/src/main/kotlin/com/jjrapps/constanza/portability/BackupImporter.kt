@@ -3,6 +3,7 @@ package com.jjrapps.constanza.portability
 import androidx.room.withTransaction
 import com.jjrapps.constanza.core.data.AppDatabase
 import com.jjrapps.constanza.core.data.migration.HabitColorRemap
+import com.jjrapps.constanza.core.data.migration.HabitColorRetoneRemap
 import com.jjrapps.constanza.reminding.ReminderSettingsStore
 import com.jjrapps.constanza.reminding.SnoozeDuration
 import com.jjrapps.constanza.scheduling.AlarmScheduler
@@ -79,22 +80,45 @@ class UnsupportedBackupVersionException(val fileVersion: Int) :
 }
 
 /**
+ * `PASTEL_REMAP_SCHEMA_VERSION` (`2`): the value [CURRENT_SCHEMA_VERSION] held before the colour
+ * overhaul, i.e. the schema version as of the six-pastel -> 23-preset warm-dark repaint. A file
+ * older than *this* needs [HabitColorRemap]'s hop before anything newer applies; named separately
+ * from [CURRENT_SCHEMA_VERSION] now that a second colour epoch exists, so a future third one can add
+ * its own threshold without this one silently drifting to mean something else.
+ */
+private const val PASTEL_REMAP_SCHEMA_VERSION = 2
+
+/**
  * Task 2.8 (data-portability: Backup Schema Version Read On Import, Legacy Habit Colour Normalized
- * On Import). A pure, top-level function — not a [BackupImporter] method — so
- * `BackupImporterNormalizationTest` can assert its behaviour directly, without constructing a
- * [BackupImporter] and its five injected collaborators. [schemaVersion] `< CURRENT_SCHEMA_VERSION`
- * (a file exported before this palette change) has every habit's [BackupHabit.colorArgb] rewritten
- * through [HabitColorRemap.normalize] — the same one-to-one map `AppMigrations.MIGRATION_1_2`
- * applies to already-persisted data. `schemaVersion == CURRENT_SCHEMA_VERSION` returns [habits]
- * unchanged: colours are imported byte-identical (data-portability: Round-Trip Fidelity, "Current-
- * version round trip preserves colour exactly").
+ * On Import), extended by the colour overhaul's second habit-colour repaint. A pure, top-level
+ * function — not a [BackupImporter] method — so `BackupImporterNormalizationTest` can assert its
+ * behaviour directly, without constructing a [BackupImporter] and its five injected collaborators.
+ *
+ * [schemaVersion] `< CURRENT_SCHEMA_VERSION` (a file exported before the colour overhaul) has every
+ * habit's [BackupHabit.colorArgb] pushed through [normalizeColor], which chains both colour epochs a
+ * file that old might still need: [HabitColorRemap.normalize] first, only for a file older than
+ * [PASTEL_REMAP_SCHEMA_VERSION] (the six pastels -> 23-preset warm-dark hop
+ * `AppMigrations.migration1To2` applies to already-persisted data), then
+ * [HabitColorRetoneRemap.normalize] always — the 23-preset -> 22-preset legible-band hop
+ * `AppMigrations.migration4To5` applies on-device. `schemaVersion == CURRENT_SCHEMA_VERSION` returns
+ * [habits] unchanged: colours are imported byte-identical (data-portability: Round-Trip Fidelity,
+ * "Current-version round trip preserves colour exactly").
  */
 internal fun normalizeHabitColors(habits: List<BackupHabit>, schemaVersion: Int): List<BackupHabit> =
     if (schemaVersion < CURRENT_SCHEMA_VERSION) {
-        habits.map { it.copy(colorArgb = HabitColorRemap.normalize(it.colorArgb)) }
+        habits.map { it.copy(colorArgb = normalizeColor(it.colorArgb, schemaVersion)) }
     } else {
         habits
     }
+
+private fun normalizeColor(colorArgb: Int, schemaVersion: Int): Int {
+    val pastelNormalized = if (schemaVersion < PASTEL_REMAP_SCHEMA_VERSION) {
+        HabitColorRemap.normalize(colorArgb)
+    } else {
+        colorArgb
+    }
+    return HabitColorRetoneRemap.normalize(pastelNormalized)
+}
 
 /**
  * Task 7.3 (data-portability: Import, Round-Trip Fidelity). Split in two on purpose:

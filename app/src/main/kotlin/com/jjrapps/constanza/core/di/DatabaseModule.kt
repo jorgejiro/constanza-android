@@ -40,6 +40,7 @@ object DatabaseModule {
                 AppMigrations.migration1To2(writer),
                 AppMigrations.migration2To3(writer),
                 AppMigrations.migration3To4(writer),
+                AppMigrations.migration4To5(writer),
             )
             .build()
     }

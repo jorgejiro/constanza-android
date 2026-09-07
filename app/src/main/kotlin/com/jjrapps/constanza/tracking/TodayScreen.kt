@@ -7,11 +7,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ButtonDefaults
@@ -40,9 +38,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.jjrapps.constanza.R
-import com.jjrapps.constanza.core.ui.component.HabitColorDot
 import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
-import com.jjrapps.constanza.core.ui.theme.Dimens
 import com.jjrapps.constanza.core.ui.theme.Spacing
 import com.jjrapps.constanza.domain.model.EntryStatus
 import java.time.ZoneId
@@ -159,23 +155,24 @@ fun TodayScreen(
  *  spare. */
 private val FAB_SCROLL_CLEARANCE = 88.dp
 
-/** today-row-alignment, decision 1: the ONE left edge every line of a habit row starts at.
+/** today-row-alignment, decision 1, revised by the colour overhaul: the ONE left edge every line
+ *  of a habit row starts at.
  *
- *  Computed from the tokens the colour dot is actually drawn with, never written as a `48.dp`
- *  literal: the row's own [Spacing.lg] gutter, plus [Dimens.HabitDotSlot] — the dot's full slot, not
- *  its 12dp core — plus one [Spacing.sm] so 16sp text does not sit flush against the dot the way it
- *  did before this change. Change any of the three and the status line follows the habit name
- *  automatically, which is the whole point: the defect being fixed here WAS two independent
- *  literals that had drifted apart. `HabitRollupRow`'s name row padded `start = 16.dp` and then drew
- *  a 24dp dot, putting the name at 40dp, while [SlotRow] padded `start = 16.dp` (or 32dp when it was
- *  `indented`) — so a row's status line hung 24dp to the LEFT of the name it belonged to, and the
- *  indented case disagreed with both. Measured at 360dp before the fix; that is what "mal alineada"
- *  meant. Resolves to 48dp today. */
+ *  today-row-alignment fixed a defect where the name row and the status row disagreed about their
+ *  left edge, and derived this token from the colour dot's own geometry so the two could never
+ *  drift apart again: the row's own [Spacing.lg] gutter, plus the dot's 24dp slot, plus one
+ *  [Spacing.sm] gap before the text — 48dp. The colour overhaul removes the dot outright: a habit's
+ *  identity colour now paints its name text directly (see [HabitRollupHeader]), so there is no dot
+ *  slot and no gap left to reserve room for, and this token collapses back to the plain [Spacing.lg]
+ *  screen margin every other screen already uses. One token rather than a literal is still the
+ *  point — the header row, [SlotRow] and the section headers below all read this same value, so
+ *  they cannot silently drift apart again. Measured: widens the text column by 32dp of 360 (8.9%)
+ *  on the reference 360dp phone. */
 // today-grouped-sections: `internal`, not `private` — [TodaySectionHeader]/[TodaySectionDivider]
 // in TodaySectionHeader.kt need this same one left edge, and moving them out of this file (rather
 // than growing it past detekt's file-level TooManyFunctions threshold) is exactly what
 // TodayDateBar.kt, TodayBanners.kt and TodayAddHabitAction.kt already did for the identical reason.
-internal val ROW_CONTENT_INSET = Spacing.lg + Dimens.HabitDotSlot + Spacing.sm
+internal val ROW_CONTENT_INSET = Spacing.lg
 
 /** today-answered-slot-collapse, design.md decision 5: one holder instead of two extra parameters
  *  on both [HabitRollupRow] and [SlotRow], which would otherwise push each past detekt's
@@ -305,8 +302,9 @@ private fun TodayContent(
  *  design.md) — "Ahora" and "Más tarde" both render at full brightness, since a "Más tarde" row is
  *  still answerable early and dimming it would be a false affordance. Threaded down to
  *  [HabitRollupHeader] and [SlotRow] rather than a `Modifier.alpha()` on this whole `Column`: alpha
- *  is all-or-nothing over a subtree and would wrongly dim the colour dot (identity, not state) and
- *  the answer/Change buttons (live controls in every section) along with the text. */
+ *  is all-or-nothing over a subtree and would wrongly dim the habit's own colour on its name
+ *  (identity, not state; the colour overhaul's successor to "never dim the colour dot") and the
+ *  answer/Change buttons (live controls in every section) along with the text. */
 @Composable
 @Suppress("LongParameterList") // muted is the row-level emphasis flag every child below already threads.
 private fun HabitRollupRow(
@@ -336,18 +334,14 @@ private fun HabitRollupRow(
     }
 }
 
-/** today-row-alignment, decision 3: the colour dot is aligned to the name's FIRST LINE rather than
- *  to the row's vertical centre.
- *
- *  `bodyLarge`'s line box is 24dp and [Dimens.HabitDotSlot] is 24dp, so [Alignment.Top] lands the
- *  dot exactly on that first line with no offset constant to keep in sync, and it stays landed
- *  however many lines the name wraps to. `Alignment.CenterVertically`, which this replaces, put the
- *  dot in the GAP between the two lines of a wrapped name — the reported list has two such names —
- *  where it read as belonging to neither. That was the other half of "mal alineada".
- *
- *  The [Spacer] is not decoration either: [HabitColorDot] centres a 12dp core inside a 24dp slot, so
- *  butting the name straight against the slot leaves 6dp between glyph and dot. [ROW_CONTENT_INSET]
- *  includes the same [Spacing.sm] so the name and the status line below it still agree. */
+/** today-row-alignment, decision 3, superseded by the colour overhaul: this Row used to align a
+ *  leading colour dot to the name's FIRST LINE via `Alignment.Top`, rather than the row's vertical
+ *  centre, so the dot stayed landed on the name however many lines it wrapped to. The dot and its
+ *  gap [Spacer] are gone now — see [HabitRollupHeader]'s own KDoc for why — so there is no second
+ *  child left to align against the name. `Alignment.Top` stays on this Row anyway: with a
+ *  multi-slot habit's Expand/Collapse [TextButton] as the name's only remaining sibling, top
+ *  alignment is still what keeps that button pinned to the name's first line rather than drifting
+ *  toward the vertical centre of a wrapped, multi-line name. */
 @Composable
 private fun HabitRollupHeader(
     row: TodayHabitRow,
@@ -356,11 +350,12 @@ private fun HabitRollupHeader(
     onToggleExpanded: (Long) -> Unit,
     muted: Boolean,
 ) {
-    // today-grouped-sections: the only two things [muted] ever changes on this line — never the
-    // colour dot (identity, not state) and never the expand control's own label colour.
+    // today-grouped-sections: [muted] never touches the habit's own colour (identity, not state) —
+    // the same rule that used to protect the colour dot now protects the coloured name text. It
+    // still changes the name's size step-down and the demoted suffix's tone, both state rather than
+    // identity.
     val nameTopPadding = if (muted) Spacing.xs else Spacing.sm
     val nameStyle = if (muted) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge
-    val textColor = if (muted) ConstanzaColors.OnBackgroundMuted else Color.Unspecified
     Row(
         // `end` padding: a long habit name — the reported case was a full sentence — otherwise runs
         // to the very edge of the screen with nothing between it and the bezel.
@@ -369,18 +364,28 @@ private fun HabitRollupHeader(
             .padding(start = Spacing.lg, end = Spacing.lg, top = nameTopPadding),
         verticalAlignment = Alignment.Top,
     ) {
-        HabitColorDot(row.colorArgb)
-        Spacer(modifier = Modifier.width(Spacing.sm))
         Text(
+            // Colour overhaul: a habit's identity colour now paints its own name directly rather
+            // than a leading dot beside it — the future habits-by-days report needs colour ON the
+            // name to follow a row across a grid, which a dot beside the text cannot do.
+            // [demotedSuffix]'s `leadColor` carries [row.colorArgb] on the name span only; the
+            // day-status suffix below is state, not identity, and keeps its own muted/quiet tone
+            // regardless, through the same `muted` plumbing every other state-only colour on this
+            // row already uses.
+            //
             // A multi-slot habit's own line has no answerable slot, so the day rollup is the only
             // state it can carry — and it has to carry it while collapsed. Demoted rather than given
             // its own line: it is a summary of the slot lines, not a peer of the habit name.
-            demotedSuffix(row.habitName, stringResource(dayStatusLabel(row.dayStatus)).takeIf { multiSlot }, muted),
+            demotedSuffix(
+                row.habitName,
+                stringResource(dayStatusLabel(row.dayStatus)).takeIf { multiSlot },
+                muted,
+                leadColor = Color(row.colorArgb),
+            ),
             // `weight(1f)` for the same reason [SlotRow]'s status text carries one: without it the
             // name takes what it wants and the expand control is squeezed into the remainder.
             modifier = Modifier.weight(1f),
             style = nameStyle,
-            color = textColor,
         )
         if (multiSlot) {
             val labelRes = if (expanded) R.string.today_collapse else R.string.today_expand
@@ -476,9 +481,11 @@ private fun SlotRow(
         // takes whatever width it wants and `SpaceBetween` squeezes the button group into the
         // remainder, so "Skip" wrapped mid-word as "Ski / p" — reported from a real Galaxy S25.
         // The buttons keep their intrinsic width and the text wraps instead, which is the right way
-        // round: a wrapped sentence is readable, a wrapped control label is not. Still true after
-        // this row moved right: [ROW_CONTENT_INSET] costs this column 32dp against the 141dp it had
-        // at a 16dp start, and the buttons are unmoved at 165dp-344dp on a 360dp screen.
+        // round: a wrapped sentence is readable, a wrapped control label is not. today-row-alignment
+        // moved this row's start from 16dp to 48dp to fix the header/status left-edge mismatch; the
+        // colour overhaul's removal of the leading dot moves [ROW_CONTENT_INSET] back to 16dp (see
+        // its own KDoc), so this column regains the 32dp it lost — back to 141dp at 360dp rather
+        // than 109dp — while the buttons stay unmoved at 165dp-344dp.
         Text(
             statusText,
             modifier = Modifier.weight(1f).padding(end = Spacing.sm, top = statusTopPadding),

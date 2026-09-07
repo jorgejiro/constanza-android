@@ -40,7 +40,7 @@ class HabitPaletteTest {
 
     /**
      * No two swatches anywhere in the palette may be as close as the pair that prompted this change.
-     * A twenty-three colour palette is necessarily denser than a six colour one, so the bar here is
+     * A twenty-two colour palette is necessarily denser than a six colour one, so the bar here is
      * "closer than the pair a person rejected", not "as far apart as six colours can be".
      */
     @Test
@@ -203,13 +203,27 @@ class HabitPaletteTest {
         }
     }
 
-    /** Spec `Accent Reserved For Chrome`: the accent must not be selectable as a habit colour. */
+    /**
+     * The invariant this re-tone exists to create: a habit's own colour is now painted directly on
+     * its name text, so no preset may read as either dimmer or louder than another. Every preset must
+     * sit inside the `[HABIT_BAND_FLOOR, HABIT_BAND_CEILING]` contrast band against
+     * [ConstanzaColors.Background], widened by [HABIT_BAND_TOLERANCE] — the same tolerance
+     * `clampToHabitBand` itself checks against, and for the same reason (`HabitColorBand.kt`'s KDoc):
+     * these presets were produced by that clamp's own reasoning, and an exact `7.0`/`11.0` is not
+     * itself a reachable 8-bit value. The previous 23-colour palette spanned 5.31:1 to 16.01:1, a
+     * 3.02x spread, which is exactly the defect this test pins shut.
+     */
     @Test
-    fun `the chrome accent is not offered as a habit colour`() {
-        assertFalse(
-            HabitPalette.contains(ConstanzaColors.Accent.toArgb()),
-            "the accent must not be selectable as a habit identity colour",
-        )
+    fun `every preset sits inside the legible contrast band against Background`() {
+        val band = (HABIT_BAND_FLOOR - HABIT_BAND_TOLERANCE)..(HABIT_BAND_CEILING + HABIT_BAND_TOLERANCE)
+        HabitPalette.ORDERED.forEach { habitColor ->
+            val ratio = contrastRatio(Color(habitColor.argb), ConstanzaColors.Background)
+            assertTrue(
+                ratio in band,
+                "${habitColor.name} measured %.2f:1 against Background, outside the [%.1f, %.1f] band"
+                    .format(ratio, band.start, band.endInclusive),
+            )
+        }
     }
 
     /** [HabitPalette.contains] is what tells the editor whether to select a preset or the custom
@@ -295,7 +309,7 @@ class HabitPaletteTest {
         const val OLD_PALETTE_WORST_PAIR = 23.9
 
         /** No two colours anywhere may be closer than this. Below the calibration point, because a
-         *  twenty-three colour palette is legitimately denser than a six colour one. */
+         *  twenty-two colour palette is legitimately denser than a six colour one. */
         const val GLOBAL_SEPARATION_FLOOR = 14.0
 
         /** Cells that touch in the grid, though, must be far clearer than the rejected pair. */

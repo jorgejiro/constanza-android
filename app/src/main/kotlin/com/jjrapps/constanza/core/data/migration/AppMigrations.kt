@@ -15,13 +15,17 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * [HabitColorRemap.LEGACY_TO_CURRENT] (a bijection, so the inverse is exact) if a colour rollback
  * is ever needed. Unmapped ints were never written by this migration (see the `WHERE colorArgb IN
  * (...)` guard below), so they need no inverse. Never revert
- * [com.jjrapps.constanza.core.data.AppDatabase]'s `version` back to 1, 2, 3, or 4 — Room refuses to
- * open an already-upgraded file at a lower version, making the user's data unreachable.
+ * [com.jjrapps.constanza.core.data.AppDatabase]'s `version` back to 1, 2, 3, 4, or 5 — Room refuses
+ * to open an already-upgraded file at a lower version, making the user's data unreachable.
  * (`Migration(2, 3)`, the slot this note used to reserve, was consumed by [migration2To3] — the
- * removal of `HabitEntity.question`. `Migration(3, 4)`, the slot that note then reserved, is now
- * consumed by [migration3To4] — the `schedules.daysOfWeekMask` column
- * (weekday-only-schedule design.md decision 3) — so any future rollback recipe starts from version
- * 5 onward.)
+ * removal of `HabitEntity.question`. `Migration(3, 4)`, the slot that note then reserved, was
+ * consumed by [migration3To4] — the `schedules.daysOfWeekMask` column (weekday-only-schedule
+ * design.md decision 3). `Migration(4, 5)`, the slot that note reserved next, is now consumed by
+ * [migration4To5] — the colour re-tone into `HabitColor`'s `[7:1, 11:1]` band — so any future
+ * rollback recipe starts from version 6 onward. Unlike [migration1To2]'s bijection,
+ * [HabitColorRetoneRemap.LEGACY_TO_CURRENT] has no exact inverse to offer a rollback: it is a
+ * 17-into-22 map, and the clamp fallthrough it sits on ([HabitColorRetoneRemap.normalize]) is lossy
+ * by construction — a rollback here would need to fall back to reverting the app version instead.)
  *
  * **Deviation, flagged loudly (same class of issue as unit 1's `Color.kt` -> `ConstanzaColors.kt`
  * rename).** Declared as an `object`, not a `class`: detekt's default `VariableNaming` rule (active
@@ -51,6 +55,9 @@ internal object AppMigrations {
 
     /** Same `MagicNumber` reasoning as [SCHEMA_VERSION_3] — `4` needs a named constant too. */
     private const val SCHEMA_VERSION_4 = 4
+
+    /** Same `MagicNumber` reasoning as [SCHEMA_VERSION_3] — `5` needs a named constant too. */
+    private const val SCHEMA_VERSION_5 = 5
 
     /**
      * **The sign trap.** `0xFF8E24AA.toInt()` is a *negative* `Int` once stored in the `colorArgb`
@@ -174,6 +181,63 @@ internal object AppMigrations {
         db.query("SELECT COUNT(*) FROM schedules WHERE kind = 'WEEKLY'").use {
             it.moveToFirst()
             it.getInt(0)
+        }
+
+    /**
+     * Data-only colour re-tone: the "23-preset warm-dark palette" habit colours are rewritten to
+     * their "22-preset legible-band palette" counterparts (`HabitColor`'s KDoc — the `[7:1, 11:1]`
+     * contrast band), and anything left over — the retired `SILVER` preset and any genuinely custom
+     * colour a habit already holds — is pulled into that same band exactly as a fresh custom pick
+     * would be (`HabitColorBand.kt`'s `clampToHabitBand`). No column, table, or index changes, so
+     * `5.json`'s `identityHash` is unchanged from `4.json`'s — the same shape [migration1To2]'s KDoc
+     * documents for its own data-only change.
+     *
+     * **Why this cannot be a fixed `CASE WHEN` built from [HabitColorRetoneRemap.LEGACY_TO_CURRENT]
+     * alone, unlike [migration1To2].** At schema version 1 the only colours that could ever exist
+     * were the six legacy pastels — a closed, compile-time-known set, which is why [migration1To2]
+     * can build its whole `UPDATE` from the map at compile time. By version 4 the free custom colour
+     * wheel has shipped, so a habit's `colorArgb` can already be any `Int` at all. Building the
+     * `UPDATE` from [HabitColorRetoneRemap.LEGACY_TO_CURRENT] alone would rewrite the 17 presets that
+     * actually moved but leave `SILVER` and every custom colour untouched — precisely the defect this
+     * migration exists to fix. So this migration reads back every **distinct** `colorArgb` actually
+     * present in the table, runs each through [HabitColorRetoneRemap.normalize] here in Kotlin (map
+     * lookup, then [com.jjrapps.constanza.core.ui.theme.clampToHabitBand] fallthrough), and writes
+     * only the ones whose value actually changed — still via bound `Int` arguments in the `UPDATE`
+     * itself, for the exact sign-trap reason [migration1To2]'s KDoc gives: the *comparison* against
+     * `colorArgb` must never be built from inlined hex text either.
+     *
+     * [writer]`.write(db)` runs first, exactly as every earlier migration's does, for the same
+     * reason: a recoverable snapshot failure must never fail the migration itself.
+     */
+    fun migration4To5(writer: PreMigrationSnapshotWriter): Migration =
+        object : Migration(SCHEMA_VERSION_4, SCHEMA_VERSION_5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                writer.write(db)
+
+                val changed = distinctHabitColors(db).mapNotNull { legacy ->
+                    val current = HabitColorRetoneRemap.normalize(legacy)
+                    if (current != legacy) legacy to current else null
+                }
+                if (changed.isEmpty()) return
+
+                val caseWhenSql = "WHEN ? THEN ? ".repeat(changed.size)
+                val inPlaceholders = changed.joinToString(separator = ",") { "?" }
+                val caseArgs = changed.flatMap { (legacy, current) -> listOf(legacy, current) }
+                val inArgs = changed.map { it.first }
+                db.execSQL(
+                    "UPDATE habits SET colorArgb = CASE colorArgb $caseWhenSql END " +
+                        "WHERE colorArgb IN ($inPlaceholders)",
+                    (caseArgs + inArgs).toTypedArray(),
+                )
+            }
+        }
+
+    /** Every distinct `colorArgb` actually stored in `habits` right now — the set [migration4To5]
+     *  must check against [HabitColorRetoneRemap.normalize], since (unlike schema version 1's six
+     *  fixed pastels) it is not a compile-time-known set. */
+    private fun distinctHabitColors(db: SupportSQLiteDatabase): List<Int> =
+        db.query("SELECT DISTINCT colorArgb FROM habits").use { cursor ->
+            buildList { while (cursor.moveToNext()) add(cursor.getInt(0)) }
         }
 
     /**

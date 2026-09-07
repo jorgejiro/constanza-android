@@ -11,12 +11,20 @@ import kotlin.test.assertTrue
  * (Engram #47, point 10a; ported from the sibling app's `sleep-noise-android` `ColorContrastTest`).
  *
  * Spec `Habit Colour And Accent Contrast Floor` / `Contrast Floors Asserted By Automated Test`: every
- * offered habit colour and the accent MUST clear **4.5:1** against both [ConstanzaColors.Background]
- * and [ConstanzaColors.SurfaceSelected] — one floor, not a lighter graphics-only tier, because a habit
- * colour also has to carry the habit name as adjacent text. The ratified palette measures well above
- * this floor (≥10:1 vs `Background`, ≥8.4:1 vs `SurfaceSelected`), but the floor asserted here is the
- * spec's 4.5:1, not the current headroom — a future re-tone should fail this test before it ships
- * rather than after.
+ * offered habit colour MUST clear **4.5:1** against both [ConstanzaColors.Background] and
+ * [ConstanzaColors.SurfaceSelected] — one floor, not a lighter graphics-only tier. That reason used to
+ * be anticipatory ("a habit colour also has to carry the habit name as adjacent text"); it is now
+ * literal, because the habit colour *is* the habit name's text colour (`TodayScreen`,
+ * `HabitListScreen`) rather than a swatch beside it.
+ *
+ * The retoned palette measures ≥6.98:1 against `Background` and ≥5.96:1 against `SurfaceSelected`
+ * (`OLIVE` is the worst member on both), but the floor asserted here stays the spec's 4.5:1 rather
+ * than the current headroom — a future re-tone should fail this test before it ships, not after.
+ * `HabitPaletteTest` separately pins the tighter `[7:1, 11:1]` band that re-tone actually targets.
+ *
+ * The spec's name still reads "And Accent". There is no chrome accent any more; it was replaced by
+ * [ConstanzaColors.ChromeInteractive], asserted below under its own name.
+ * `openspec/specs/visual-design-system/spec.md` has not caught up with either change.
  */
 class ColorContrastTest {
 
@@ -45,17 +53,22 @@ class ColorContrastTest {
     }
 
     @Test
-    fun `the accent clears the floor against the background`() {
-        assertRatioAtLeast(ConstanzaColors.Accent, ConstanzaColors.Background, CONTRAST_FLOOR, "Accent on Background")
+    fun `chrome interactive clears the floor against the background`() {
+        assertRatioAtLeast(
+            ConstanzaColors.ChromeInteractive,
+            ConstanzaColors.Background,
+            CONTRAST_FLOOR,
+            "ChromeInteractive on Background",
+        )
     }
 
     @Test
-    fun `the accent clears the floor against the selected surface`() {
+    fun `chrome interactive clears the floor against the selected surface`() {
         assertRatioAtLeast(
-            ConstanzaColors.Accent,
+            ConstanzaColors.ChromeInteractive,
             ConstanzaColors.SurfaceSelected,
             CONTRAST_FLOOR,
-            "Accent on SurfaceSelected",
+            "ChromeInteractive on SurfaceSelected",
         )
     }
 
@@ -87,9 +100,9 @@ class ColorContrastTest {
     /**
      * Task 6.0 — `Theme.kt` now binds `surfaceContainer`/`surfaceContainerHigh` to
      * [ConstanzaColors.Surface]/[ConstanzaColors.SurfaceRaised], so `ListItem` (`TodayScreen`,
-     * `HabitListScreen`) reads [ConstanzaColors.Surface] as its container, with [HabitColorDot]'s
-     * colour and the habit name text drawn on top of it — a surface neither habit colours nor text
-     * were ever measured against before this task. [ConstanzaColors.SurfaceRaised] is included too:
+     * `HabitListScreen`) reads [ConstanzaColors.Surface] as its container, with the habit colour and
+     * the habit name text drawn on top of it — a surface neither habit colours nor text were ever
+     * measured against before this task. [ConstanzaColors.SurfaceRaised] is included too:
      * it backs `AlertDialog` (`surfaceContainerHigh`, `DataPortabilityScreen.ImportConfirmDialog`)
      * and `ExactAlarmBanner`'s explicit `Surface`, both of which carry body text.
      */
@@ -148,8 +161,13 @@ class ColorContrastTest {
     }
 
     @Test
-    fun `text on the accent is legible`() {
-        assertRatioAtLeast(ConstanzaColors.OnAccent, ConstanzaColors.Accent, CONTRAST_FLOOR, "OnAccent on Accent")
+    fun `text on chrome interactive is legible`() {
+        assertRatioAtLeast(
+            ConstanzaColors.OnChromeInteractive,
+            ConstanzaColors.ChromeInteractive,
+            CONTRAST_FLOOR,
+            "OnChromeInteractive on ChromeInteractive",
+        )
     }
 
     // ------------------------------------------------------------------------------------------
