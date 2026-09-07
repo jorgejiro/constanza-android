@@ -32,7 +32,7 @@ object Spacing {
  * tick's size.
  *
  * [SwatchTouchTarget] is the swatch's *hit* area, not its paint: [Swatch] is 40dp, below the 48dp
- * minimum touch target, and a grid of twenty-four of them a finger-width apart is exactly where that
+ * minimum touch target, and a grid of twenty-three of them a finger-width apart is exactly where that
  * matters. The circle stays 40dp; the selectable box around it is 48dp.
  *
  * [FieldBorder] is Material 3's own unfocused outlined-text-field border width, named here so a

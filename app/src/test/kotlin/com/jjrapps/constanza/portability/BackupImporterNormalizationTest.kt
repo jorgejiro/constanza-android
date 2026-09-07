@@ -5,16 +5,24 @@ import kotlin.test.assertEquals
 
 /**
  * Task 2.10 (data-portability: Backup Schema Version Read On Import, Legacy Habit Colour
- * Normalized On Import). Exercises the pure [normalizeHabitColors] directly — no [BackupImporter]
- * instance, no mocked collaborators, matching how [BackupImporterTest] already tests
- * `remapEntrySlotId`. Runs via `./gradlew :app:testDebugUnitTest`.
+ * Normalized On Import), extended by the colour overhaul's second habit-colour repaint. Exercises
+ * the pure [normalizeHabitColors] directly — no [BackupImporter] instance, no mocked collaborators,
+ * matching how [BackupImporterTest] already tests `remapEntrySlotId`. Runs via
+ * `./gradlew :app:testDebugUnitTest`.
  *
- * The right-hand values below are `schemaVersion` 2's colours, and they are deliberately spelled as
- * literals rather than as `HabitColor` members. They stopped being the offered palette when the
- * picker moved to Material's families plus a free custom colour, and that changed nothing here:
- * this function's contract is about what each schema version *meant*, not about what the picker
- * offers today. A colour that is no longer a preset now imports as a custom colour instead of being
- * orphaned, which is why no `schemaVersion` 3 normalization step exists to test.
+ * Two colour epochs exist now, and [CURRENT_SCHEMA_VERSION] has moved past both of them. The
+ * `schemaVersion 1` cases below chain through *both* — [HabitColorRemap] first (six pastels -> the
+ * 23-preset warm-dark palette), then [HabitColorRetoneRemap] (that palette -> the current 22-preset
+ * legible-band one) — and their expected values are unchanged from before this second epoch existed:
+ * both pastels these seeds remap to already sit inside [clampToHabitBand]'s tolerance, so the second
+ * hop leaves them untouched. The `schemaVersion 2` cases are new: a file at that version already
+ * skipped [HabitColorRemap] (it was already past that epoch) but still needs
+ * [HabitColorRetoneRemap]'s hop, which did not exist when `2` was [CURRENT_SCHEMA_VERSION].
+ *
+ * Right-hand values are deliberately spelled as literals rather than as `HabitColor` members: this
+ * function's contract is about what each schema version *meant* at the time, not about what the
+ * picker offers today (`HabitColorRemap`'s and `HabitColorRetoneRemap`'s own KDoc make the same
+ * choice, for the same reason).
  */
 class BackupImporterNormalizationTest {
 
@@ -40,8 +48,36 @@ class BackupImporterNormalizationTest {
         assertEquals(schemaV2Pink, normalized.single().colorArgb)
     }
 
+    /** New coverage for the colour overhaul: a `schemaVersion 2` file already skipped
+     *  [HabitColorRemap] (that epoch is behind it) but still holds a 23-preset warm-dark colour that
+     *  needs [HabitColorRetoneRemap]'s hop, which did not exist the last time `2` meant "current". */
     @Test
-    fun `schemaVersion 2 leaves colours byte-identical`() {
+    fun `schemaVersion 2 normalizes an old-preset colour to its retoned counterpart`() {
+        val oldRed = 0xFFF44336.toInt()
+        val newRed = 0xFFFF6D48.toInt()
+        val habits = listOf(habitWithColor(oldRed))
+
+        val normalized = normalizeHabitColors(habits, schemaVersion = 2)
+
+        assertEquals(newRed, normalized.single().colorArgb)
+    }
+
+    /** The retired `SILVER` preset gets no explicit `HabitColorRetoneRemap` entry — it falls through
+     *  to `clampToHabitBand`, exactly as `HabitColorRetoneRemapTest` pins for the on-device migration.
+     *  A `schemaVersion 2` backup holding it must retone the same way on import. */
+    @Test
+    fun `schemaVersion 2 normalizes the retired silver preset through the contrast clamp`() {
+        val retiredSilver = 0xFFE0E0E0.toInt()
+        val clampedSilver = 0xFFC2C2C2.toInt()
+        val habits = listOf(habitWithColor(retiredSilver))
+
+        val normalized = normalizeHabitColors(habits, schemaVersion = 2)
+
+        assertEquals(clampedSilver, normalized.single().colorArgb)
+    }
+
+    @Test
+    fun `a current-schemaVersion file leaves colours byte-identical`() {
         val schemaV2Violet = 0xFFCBB2FF.toInt()
         val habits = listOf(habitWithColor(schemaV2Violet))
 

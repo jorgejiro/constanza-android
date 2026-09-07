@@ -37,6 +37,13 @@ import com.jjrapps.constanza.core.data.entity.ScheduleEntity
  * from `3.json`'s. `AppMigrations.migration3To4` also rewrites every legacy `kind = 'WEEKLY'` row
  * into `kind = 'DAYS_OF_WEEK'` with the day encoded as a bitmask, and throws if any such row
  * survives un-rewritten (weekday-only-schedule design.md decision 3).
+ *
+ * `version = 5` (colour overhaul slice B): a second data-only habit-colour repaint, same shape as
+ * `version = 2`'s. No column, table, or index changed, so `5.json`'s `identityHash` is unchanged
+ * from `4.json`'s. `AppMigrations.migration4To5` rewrites every habit's `colorArgb` from the
+ * 23-preset warm-dark palette into `HabitColor`'s 22-preset legible-band palette (or, for the
+ * retired `SILVER` preset and any custom colour, through `clampToHabitBand`'s `[7:1, 11:1]` fallback)
+ * — registered in `DatabaseModule`, same as every migration before it.
  */
 @Database(
     entities = [
@@ -46,7 +53,7 @@ import com.jjrapps.constanza.core.data.entity.ScheduleEntity
         EntryEntity::class,
         ReminderOccurrenceEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
