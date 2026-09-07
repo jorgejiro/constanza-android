@@ -12,7 +12,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -38,6 +42,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.rememberTimeOfDayFormat
 import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.core.ui.theme.Spacing
 import com.jjrapps.constanza.domain.model.EntryStatus
@@ -123,11 +128,19 @@ fun TodayScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.today_title)) },
                 actions = {
-                    TextButton(onClick = onOpenSettings) {
-                        Text(stringResource(R.string.today_settings))
-                    }
                     TextButton(onClick = onManageHabits) {
                         Text(stringResource(R.string.today_manage_habits))
+                    }
+                    // today-status-icons: a gear is the single most universally recognised icon in
+                    // mobile UI, and the top bar is exactly where horizontal space is scarcest — a
+                    // clear win for an icon over the word here. `Icons.Filled.Settings` is part of
+                    // `material-icons-core` (app/build.gradle.kts), the only icon artifact this
+                    // project depends on.
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = stringResource(R.string.today_settings),
+                        )
                     }
                 },
             )
@@ -458,6 +471,12 @@ private fun SlotRow(
     // A reopened slot is pending for display purposes, which is why `bypassSnooze` is derived from
     // this rather than from the stored status: the branch below and the sentence must agree.
     val pending = slot.status == EntryStatus.UNKNOWN || key in actions.reopenedKeys
+    // today-status-icons, point 3: `TodayHabitRow.slots.size` is the real source of truth for
+    // "does this habit have more than one slot", not `timeIsIdentity` — see [AnsweredStatusRow]'s
+    // own KDoc and [slotStatusText]'s "today-status-icons supersedes..." section for why the latter
+    // still gates the PENDING sentence's time display (it already agrees with this at every call
+    // site) while this recomputes the real count for the ANSWERED glyph row below.
+    val multiSlot = row.slots.size > 1
     val statusText = slotStatusText(slot, zone, timeIsIdentity, bypassSnooze = !pending, muted = muted)
     val statusBottomPadding = if (muted) Spacing.xs else 8.dp
     // today-slot-status-air: see the doc comment above. Derived from real tokens rather than a
@@ -486,18 +505,30 @@ private fun SlotRow(
         // colour overhaul's removal of the leading dot moves [ROW_CONTENT_INSET] back to 16dp (see
         // its own KDoc), so this column regains the 32dp it lost — back to 141dp at 360dp rather
         // than 109dp — while the buttons stay unmoved at 165dp-344dp.
-        Text(
-            statusText,
-            modifier = Modifier.weight(1f).padding(end = Spacing.sm, top = statusTopPadding),
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (muted) ConstanzaColors.OnBackgroundMuted else Color.Unspecified,
-        )
         if (pending) {
+            Text(
+                statusText,
+                modifier = Modifier.weight(1f).padding(end = Spacing.sm, top = statusTopPadding),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (muted) ConstanzaColors.OnBackgroundMuted else Color.Unspecified,
+            )
             AnswerButtons(
                 modifier = Modifier.align(Alignment.CenterVertically),
                 onAnswer = { status -> actions.onAnswer(row.habitId, slot, status) },
             )
         } else {
+            // today-status-icons: the status WORD [statusText] used to render here is gone — a
+            // glyph carries it now — but [statusText] itself is still computed above and still fed
+            // to [ChangeButton], whose own spoken accessible label (`today_slot_change_a11y`) is
+            // unaffected by this slice and still wants the full sentence, time included.
+            val timeFormat = rememberTimeOfDayFormat()
+            val time = slot.minuteOfDay?.let(timeFormat::format)?.takeIf { multiSlot }
+            AnsweredStatusRow(
+                status = slot.status,
+                time = time,
+                muted = muted,
+                modifier = Modifier.weight(1f).padding(end = Spacing.sm, top = statusTopPadding),
+            )
             ChangeButton(
                 row.habitName,
                 statusText,
@@ -533,7 +564,13 @@ private fun AnswerButtons(onAnswer: (InAppEntryStatus) -> Unit, modifier: Modifi
  *  plain `String`, and the label collapses [TODAY_SLOT_STATUS_GAP] back to a single space before
  *  reading it out. Those extra spaces are typographic separation between two rendered halves, not
  *  words — a label is spoken, not laid out — and `TodayAnsweredSlotComposeTest` asserts these
- *  sentences by exact match, so the difference is visible rather than a matter of taste. */
+ *  sentences by exact match, so the difference is visible rather than a matter of taste.
+ *
+ *  today-status-icons: explicitly [ConstanzaColors.OnBackgroundMuted] rather than the `primary`
+ *  this `TextButton` used to inherit — "Cambiar" is a repeated per-row action, one on every
+ *  answered slot on the whole screen, and at `primary` it competed with the habit names for
+ *  attention. Still a `TextButton` with the same label and the same 48dp touch target; whether it
+ *  eventually becomes an icon or disappears is a separate, still-open design question. */
 @Composable
 private fun ChangeButton(
     habitName: String,
@@ -545,6 +582,7 @@ private fun ChangeButton(
     val description = stringResource(R.string.today_slot_change_a11y, habitName, spoken)
     TextButton(
         onClick = onClick,
+        colors = ButtonDefaults.textButtonColors(contentColor = ConstanzaColors.OnBackgroundMuted),
         modifier = modifier.semantics { contentDescription = description },
     ) {
         Text(stringResource(R.string.today_slot_change))

@@ -109,13 +109,13 @@ class TodayPastDayComposeTest {
             state.date == pastDate && state.rows.singleOrNull()?.slots?.getOrNull(0)?.status == EntryStatus.MISSED
         }
 
-        composeTestRule.onNodeWithText(text(R.string.today_slot_missed), substring = true).assertExists()
+        composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_missed)).assertExists()
         composeTestRule.onNodeWithText(text(R.string.today_slot_change)).performClick()
         composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).performClick()
         viewModel.awaitState("slot 0 completed on $pastDate") { state ->
             state.date == pastDate && state.rows.singleOrNull()?.slots?.getOrNull(0)?.status == EntryStatus.COMPLETED
         }
-        composeTestRule.onNodeWithText(text(R.string.today_slot_completed), substring = true).assertExists()
+        composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_completed)).assertExists()
 
         val pastEntry = fixture.database.entryDao().findByHabitAndDate(seeded.habitId, pastDate.toString()).single()
         assertEquals(EntryStatus.COMPLETED.name, pastEntry.status)

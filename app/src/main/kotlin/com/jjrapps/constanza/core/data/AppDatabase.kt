@@ -44,6 +44,14 @@ import com.jjrapps.constanza.core.data.entity.ScheduleEntity
  * 23-preset warm-dark palette into `HabitColor`'s 22-preset legible-band palette (or, for the
  * retired `SILVER` preset and any custom colour, through `clampToHabitBand`'s `[7:1, 11:1]` fallback)
  * — registered in `DatabaseModule`, same as every migration before it.
+ *
+ * `version = 6` (colour overhaul slice C): a third data-only habit-colour repaint, same shape as
+ * `version = 2`'s and `version = 5`'s. No column, table, or index changed, so `6.json`'s
+ * `identityHash` is unchanged from `5.json`'s. `AppMigrations.migration5To6` rewrites every `habits`
+ * row still holding the retired `BLUE_GREY` preset onto `HabitColor.CYAN` — the one explicit entry
+ * `HabitColorRetireRemap` carries, since `BLUE_GREY`'s `#849FAC` measures inside the `[7:1, 11:1]`
+ * band and so would otherwise pass `clampToHabitBand` unchanged — registered in `DatabaseModule`,
+ * same as every migration before it.
  */
 @Database(
     entities = [
@@ -53,7 +61,7 @@ import com.jjrapps.constanza.core.data.entity.ScheduleEntity
         EntryEntity::class,
         ReminderOccurrenceEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

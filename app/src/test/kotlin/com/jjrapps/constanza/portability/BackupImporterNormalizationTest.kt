@@ -5,19 +5,23 @@ import kotlin.test.assertEquals
 
 /**
  * Task 2.10 (data-portability: Backup Schema Version Read On Import, Legacy Habit Colour
- * Normalized On Import), extended by the colour overhaul's second habit-colour repaint. Exercises
- * the pure [normalizeHabitColors] directly — no [BackupImporter] instance, no mocked collaborators,
- * matching how [BackupImporterTest] already tests `remapEntrySlotId`. Runs via
+ * Normalized On Import), extended by the colour overhaul's second and third habit-colour repaints.
+ * Exercises the pure [normalizeHabitColors] directly — no [BackupImporter] instance, no mocked
+ * collaborators, matching how [BackupImporterTest] already tests `remapEntrySlotId`. Runs via
  * `./gradlew :app:testDebugUnitTest`.
  *
- * Two colour epochs exist now, and [CURRENT_SCHEMA_VERSION] has moved past both of them. The
- * `schemaVersion 1` cases below chain through *both* — [HabitColorRemap] first (six pastels -> the
- * 23-preset warm-dark palette), then [HabitColorRetoneRemap] (that palette -> the current 22-preset
- * legible-band one) — and their expected values are unchanged from before this second epoch existed:
- * both pastels these seeds remap to already sit inside [clampToHabitBand]'s tolerance, so the second
- * hop leaves them untouched. The `schemaVersion 2` cases are new: a file at that version already
- * skipped [HabitColorRemap] (it was already past that epoch) but still needs
- * [HabitColorRetoneRemap]'s hop, which did not exist when `2` was [CURRENT_SCHEMA_VERSION].
+ * Three colour epochs exist now, and [CURRENT_SCHEMA_VERSION] has moved past all of them. The
+ * `schemaVersion 1` cases below chain through *all three* — [HabitColorRemap] first (six pastels ->
+ * the 23-preset warm-dark palette), then [HabitColorRetoneRemap] (that palette -> the 22-preset
+ * legible-band one), then [HabitColorRetireRemap] (that palette -> the current 21-preset one, minus
+ * `BLUE_GREY`) — and their expected values are unchanged from before the second and third epochs
+ * existed: both pastels these seeds remap to already sit inside [clampToHabitBand]'s tolerance, so
+ * neither later hop moves them. The `schemaVersion 2` cases are unchanged from before the third
+ * epoch existed for the same reason: a file at that version already skipped [HabitColorRemap] but
+ * still needs [HabitColorRetoneRemap]'s hop, and neither seed there is `BLUE_GREY`, so
+ * [HabitColorRetireRemap] leaves them untouched. The `schemaVersion 3` case is new: a file at that
+ * version already skipped both earlier epochs (it was already past them) but still needs
+ * [HabitColorRetireRemap]'s hop, which did not exist when `3` was [CURRENT_SCHEMA_VERSION].
  *
  * Right-hand values are deliberately spelled as literals rather than as `HabitColor` members: this
  * function's contract is about what each schema version *meant* at the time, not about what the
@@ -74,6 +78,21 @@ class BackupImporterNormalizationTest {
         val normalized = normalizeHabitColors(habits, schemaVersion = 2)
 
         assertEquals(clampedSilver, normalized.single().colorArgb)
+    }
+
+    /** New coverage for the colour overhaul's third repaint: a `schemaVersion 3` file already
+     *  skipped both [HabitColorRemap] and [HabitColorRetoneRemap] (both epochs are behind it) but
+     *  still holds the retired `BLUE_GREY` preset, which needs [HabitColorRetireRemap]'s hop that
+     *  did not exist the last time `3` meant "current". */
+    @Test
+    fun `schemaVersion 3 normalizes the retired blue grey preset to cyan`() {
+        val retiredBlueGrey = 0xFF849FAC.toInt()
+        val cyan = 0xFF00ABBD.toInt()
+        val habits = listOf(habitWithColor(retiredBlueGrey))
+
+        val normalized = normalizeHabitColors(habits, schemaVersion = 3)
+
+        assertEquals(cyan, normalized.single().colorArgb)
     }
 
     @Test

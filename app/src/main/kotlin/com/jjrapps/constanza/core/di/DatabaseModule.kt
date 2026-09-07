@@ -41,6 +41,7 @@ object DatabaseModule {
                 AppMigrations.migration2To3(writer),
                 AppMigrations.migration3To4(writer),
                 AppMigrations.migration4To5(writer),
+                AppMigrations.migration5To6(writer),
             )
             .build()
     }

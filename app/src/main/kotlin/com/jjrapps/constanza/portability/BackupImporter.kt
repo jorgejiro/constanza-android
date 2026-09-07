@@ -3,6 +3,7 @@ package com.jjrapps.constanza.portability
 import androidx.room.withTransaction
 import com.jjrapps.constanza.core.data.AppDatabase
 import com.jjrapps.constanza.core.data.migration.HabitColorRemap
+import com.jjrapps.constanza.core.data.migration.HabitColorRetireRemap
 import com.jjrapps.constanza.core.data.migration.HabitColorRetoneRemap
 import com.jjrapps.constanza.reminding.ReminderSettingsStore
 import com.jjrapps.constanza.reminding.SnoozeDuration
@@ -95,14 +96,16 @@ private const val PASTEL_REMAP_SCHEMA_VERSION = 2
  * behaviour directly, without constructing a [BackupImporter] and its five injected collaborators.
  *
  * [schemaVersion] `< CURRENT_SCHEMA_VERSION` (a file exported before the colour overhaul) has every
- * habit's [BackupHabit.colorArgb] pushed through [normalizeColor], which chains both colour epochs a
+ * habit's [BackupHabit.colorArgb] pushed through [normalizeColor], which chains every colour epoch a
  * file that old might still need: [HabitColorRemap.normalize] first, only for a file older than
  * [PASTEL_REMAP_SCHEMA_VERSION] (the six pastels -> 23-preset warm-dark hop
  * `AppMigrations.migration1To2` applies to already-persisted data), then
  * [HabitColorRetoneRemap.normalize] always — the 23-preset -> 22-preset legible-band hop
- * `AppMigrations.migration4To5` applies on-device. `schemaVersion == CURRENT_SCHEMA_VERSION` returns
- * [habits] unchanged: colours are imported byte-identical (data-portability: Round-Trip Fidelity,
- * "Current-version round trip preserves colour exactly").
+ * `AppMigrations.migration4To5` applies on-device — then [HabitColorRetireRemap.normalize] always —
+ * the 22-preset -> 21-preset `BLUE_GREY` retirement hop `AppMigrations.migration5To6` applies
+ * on-device. `schemaVersion == CURRENT_SCHEMA_VERSION` returns [habits] unchanged: colours are
+ * imported byte-identical (data-portability: Round-Trip Fidelity, "Current-version round trip
+ * preserves colour exactly").
  */
 internal fun normalizeHabitColors(habits: List<BackupHabit>, schemaVersion: Int): List<BackupHabit> =
     if (schemaVersion < CURRENT_SCHEMA_VERSION) {
@@ -117,7 +120,8 @@ private fun normalizeColor(colorArgb: Int, schemaVersion: Int): Int {
     } else {
         colorArgb
     }
-    return HabitColorRetoneRemap.normalize(pastelNormalized)
+    val retoned = HabitColorRetoneRemap.normalize(pastelNormalized)
+    return HabitColorRetireRemap.normalize(retoned)
 }
 
 /**

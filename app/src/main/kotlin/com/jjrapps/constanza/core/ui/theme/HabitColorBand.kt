@@ -14,7 +14,7 @@ internal const val HABIT_BAND_CEILING = 11.0
  * the targets a continuous search aims at, not values the discrete 24-bit colour space is guaranteed
  * to actually contain. [bisectValue]/[bisectSaturation] already pick whichever of their two final
  * bracketing candidates lands closer to the target once rounded (see their own KDoc), but "closer"
- * can still be a step away rather than exact — the palette itself is proof: `HabitColor`'s 22 presets
+ * can still be a step away rather than exact — the palette itself is proof: `HabitColor`'s 21 presets
  * were produced by the same reasoning this clamp uses and measure `6.98:1` to `11.05:1`, not exactly
  * `[7.0, 11.0]`. So every passthrough check and every test asserting band membership compares against
  * `[HABIT_BAND_FLOOR - HABIT_BAND_TOLERANCE, HABIT_BAND_CEILING + HABIT_BAND_TOLERANCE]`, never

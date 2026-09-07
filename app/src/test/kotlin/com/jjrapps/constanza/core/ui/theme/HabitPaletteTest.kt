@@ -40,7 +40,7 @@ class HabitPaletteTest {
 
     /**
      * No two swatches anywhere in the palette may be as close as the pair that prompted this change.
-     * A twenty-two colour palette is necessarily denser than a six colour one, so the bar here is
+     * A twenty-one colour palette is necessarily denser than a six colour one, so the bar here is
      * "closer than the pair a person rejected", not "as far apart as six colours can be".
      */
     @Test
@@ -309,7 +309,7 @@ class HabitPaletteTest {
         const val OLD_PALETTE_WORST_PAIR = 23.9
 
         /** No two colours anywhere may be closer than this. Below the calibration point, because a
-         *  twenty-two colour palette is legitimately denser than a six colour one. */
+         *  twenty-one colour palette is legitimately denser than a six colour one. */
         const val GLOBAL_SEPARATION_FLOOR = 14.0
 
         /** Cells that touch in the grid, though, must be far clearer than the rejected pair. */

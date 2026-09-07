@@ -77,7 +77,7 @@ private val DEMOTED_TEXT_SIZE = 11.sp
  * Deleting the time was rejected, because on a MULTI-SLOT habit it is the only thing that tells one
  * slot from another — it is that slot's whole name, and `TodayAdaptiveComposeTest` finds those rows
  * by it. So the rule is ordering, not deletion: **whichever half carries the row's identity leads at
- * the row's own text style, and the other trails demoted.** A single-slot habit reads
+ * the row's own text style, and the other trails demoted.** A single-slot habit used to read
  * `Pendiente  21:00`, because its name is its identity and the time is metadata. A multi-slot slot
  * ([timeIsIdentity], set by `HabitRollupRow`'s expanded branch) reads `15:00  Pendiente`, because
  * there the time IS the identity and the status is what varies.
@@ -86,6 +86,23 @@ private val DEMOTED_TEXT_SIZE = 11.sp
  * single-slot row lead with its time restores the defect this change fixed; making the multi-slot
  * slot lead with its status demotes the only label those three sibling rows have to tell them apart,
  * and shrinks it to 11sp while it is at it. Neither is a tidy-up.
+ *
+ * ## today-status-icons supersedes the single-slot illustration above
+ *
+ * That `Pendiente  21:00` example is now wrong on purpose: a single-slot habit's own name and (once
+ * answered) its own status glyph already say everything the row has to say, so
+ * [TodaySlot.minuteOfDay] renders nothing at all there any more, not even demoted.
+ *
+ * [timeIsIdentity] doubles as that gate rather than taking a separate parameter (`LongParameterList`
+ * is already at this function's configured threshold): the true source of truth is
+ * `TodayHabitRow.slots.size > 1`, but `HabitRollupRow` already derives [timeIsIdentity] from exactly
+ * that condition at both its call sites — `false` only for a habit's single, un-expandable slot,
+ * `true` only inside a multi-slot habit's expanded rows — so there is no longer a call shape where a
+ * time renders trailing-and-demoted (the case the `else` branch below used to cover). Reusing it
+ * here means the "single-slot" and "leads the sentence" questions are answered by one boolean that
+ * is provably always the right value for both, not two that happen to agree by coincidence; `SlotRow`
+ * itself recomputes `row.slots.size > 1` independently for [com.jjrapps.constanza.tracking.AnsweredStatusRow],
+ * which does not go through this function at all.
  */
 @Composable
 internal fun slotStatusText(
@@ -96,7 +113,7 @@ internal fun slotStatusText(
     muted: Boolean = false,
 ): AnnotatedString {
     val timeFormat = rememberTimeOfDayFormat()
-    val time = slot.minuteOfDay?.let(timeFormat::format)
+    val time = slot.minuteOfDay?.takeIf { timeIsIdentity }?.let(timeFormat::format)
     val snoozed = !bypassSnooze && slot.snoozedUntilEpochMs != null
     val status = if (snoozed) {
         // Still ahead of the status itself: a snoozed slot is pending WITH a time attached, and that

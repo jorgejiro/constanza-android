@@ -20,13 +20,15 @@ private const val BACKUP_FORMAT_NAME = "constanza.backup"
 /**
  * Task 2.7 (correction C5): NOT `private` — `BackupImporter` gates its legacy-colour
  * normalization on this value (`schemaVersion < CURRENT_SCHEMA_VERSION`), so it must be visible
- * outside this file. Independent of `AppDatabase`'s Room `version` (currently 5) — this counter
+ * outside this file. Independent of `AppDatabase`'s Room `version` (currently 6) — this counter
  * only advances when a colour re-tone changes what `normalizeHabitColors` must do to an imported
  * file, which is why it stayed `2` through Room's own versions 3 and 4. `3` as of the colour
  * overhaul's second habit-colour repaint (`HabitColorRetoneRemap`, `HabitColor`'s 22-preset
- * legible-band palette) — the first bump since `2` (warm-dark-design-system, work unit 2).
+ * legible-band palette) — the first bump since `2` (warm-dark-design-system, work unit 2). `4` as
+ * of the colour overhaul's third habit-colour repaint (`HabitColorRetireRemap`, the retirement of
+ * `BLUE_GREY` into `HabitColor`'s 21-preset palette).
  */
-const val CURRENT_SCHEMA_VERSION = 3
+const val CURRENT_SCHEMA_VERSION = 4
 
 @Serializable
 data class BackupFile(

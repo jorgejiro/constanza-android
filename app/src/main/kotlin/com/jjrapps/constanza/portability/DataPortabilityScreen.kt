@@ -28,8 +28,15 @@ private const val BACKUP_JSON_MIME_TYPE = "application/json"
  * export/import is two buttons and one confirmation dialog, which does not justify a new
  * [com.jjrapps.constanza.core.ui.MainActivity] route and its navigation/rotation-survival cost.
  *
- * Text-label buttons throughout (this project has `material-icons-core` only, no
- * `material-icons-extended`, the established fallback per prior work units).
+ * Export/import are text-label buttons here because the words are clearer than any glyph anyone
+ * could pick for them, not because this codebase avoids icons — it does not (`HabitListScreen`'s
+ * add/overflow, `ReminderTimeField`'s dropdown, `HabitColorPicker`/`CustomColorDialog`'s swatch
+ * tick, `HabitEditorScreen`'s back arrow, and Today's own settings gear are all icons). The one real
+ * constraint is `material-icons-core` being the sole icon artifact this project depends on — no
+ * `material-icons-extended` — so a new icon has to be chosen from that set, or adding the extended
+ * artifact needs its own deliberate decision (see `HabitColorPicker`'s note on picking
+ * `KeyboardArrowUp`/`Down` over `ExpandLess`/`ExpandMore` for exactly this reason). Icon versus text
+ * is otherwise an ordinary per-control judgement call, made per screen.
  */
 @Composable
 fun DataPortabilitySection(viewModel: DataPortabilityViewModel = hiltViewModel()) {

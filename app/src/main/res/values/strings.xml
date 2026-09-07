@@ -65,7 +65,6 @@
     <string name="habit_color_indigo">Indigo</string>
     <string name="habit_color_orange">Orange</string>
     <string name="habit_color_mint">Mint</string>
-    <string name="habit_color_blue_grey">Blue grey</string>
     <string name="habit_color_lime">Lime</string>
     <string name="habit_color_blue">Blue</string>
     <string name="habit_color_light_green">Light green</string>
@@ -122,7 +121,10 @@
 
     <!-- habit-entry-tracking: Today screen, expandable per-habit rollup rows (task 6b.1, OA-2). -->
     <string name="today_title">Today</string>
-    <string name="today_manage_habits">Manage habits</string>
+    <!-- today-status-icons: shortened from "Manage habits" now that Settings is a gear icon
+         beside it rather than a second text button — "Manage" was disambiguating this label
+         against that other button, which is no longer text at all. -->
+    <string name="today_manage_habits">Habits</string>
     <string name="today_empty">Nothing due today.</string>
     <!-- today-add-habit: one label for both presentations of the same action — centred when the
          list is empty, trailing the last row once it is not. Deliberately shared: it is one
@@ -143,7 +145,10 @@
          applied in the composable, so these stay normal-case for localisation. -->
     <string name="today_section_now">Now</string>
     <string name="today_section_later">Later</string>
-    <string name="today_section_done">Done</string>
+    <!-- today-status-icons: this section has always held every slot that is answered, missed
+         included — groupTodayRows only distinguishes answered from unanswered — so "Done" read as
+         wrong the moment a red cross could sit inside it. -->
+    <string name="today_section_done">Answered</string>
     <string name="today_expand">Show times</string>
     <string name="today_collapse">Hide times</string>
 
