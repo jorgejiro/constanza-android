@@ -3,6 +3,7 @@ package com.jjrapps.constanza.tracking
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -28,7 +29,7 @@ import java.time.ZoneId
  * em dash that used to join them (`08:00 — Hecho`), which spent a glyph's worth of emphasis on the
  * join and made the two halves read as equal.
  *
- * Public, and for the same reason [com.jjrapps.constanza.core.ui.component.HABIT_COLOR_DOT_TEST_TAG]
+ * Public, and for the same reason [com.jjrapps.constanza.habit.REMINDER_TIME_MODE_TOGGLE_TEST_TAG]
  * is: `TodaySlotRowComposeTest` asserts the row's WHOLE sentence rather than a substring — that is
  * deliberate and must stay that way — and a test that re-typed three invisible spaces by hand would
  * be a silent trap the first time this value changes. Not a `contentDescription` and nothing but
@@ -140,16 +141,30 @@ internal fun slotStatusText(
  * [muted] (today-grouped-sections, design.md) switches the suffix's own colour to
  * [ConstanzaColors.OnBackgroundMuted] instead of the brighter `onSurfaceVariant` — the design's
  * explicit rule that in a muted row the demoted suffix must dim WITH the lead text, never stay
- * behind at its normal, brighter tone. [lead] itself carries no colour of its own here: it inherits
- * whatever colour the caller's own `Text` was given, which is where the "muted" half of this pair
- * actually comes from.
+ * behind at its normal, brighter tone.
+ *
+ * [leadColor] (the colour overhaul) is the one caller-supplied exception to "[lead] carries no
+ * colour of its own here": [HabitRollupHeader] passes the habit's own [TodayHabitRow.colorArgb]
+ * through it so the habit's identity colour paints the name span while the suffix span keeps its
+ * own state-only tone — the two are deliberately independent, and [muted] never reaches [leadColor].
+ * Every other caller of this function leaves it `null`, so [lead] there still inherits whatever
+ * colour the caller's own `Text` was given, exactly as before.
  */
 @Composable
-internal fun demotedSuffix(lead: String, suffix: String?, muted: Boolean = false): AnnotatedString {
+internal fun demotedSuffix(
+    lead: String,
+    suffix: String?,
+    muted: Boolean = false,
+    leadColor: Color? = null,
+): AnnotatedString {
     val quiet = if (muted) ConstanzaColors.OnBackgroundMuted else MaterialTheme.colorScheme.onSurfaceVariant
-    return remember(lead, suffix, quiet) {
+    return remember(lead, suffix, quiet, leadColor) {
         buildAnnotatedString {
-            append(lead)
+            if (leadColor != null) {
+                withStyle(SpanStyle(color = leadColor)) { append(lead) }
+            } else {
+                append(lead)
+            }
             if (suffix != null) {
                 withStyle(SpanStyle(color = quiet, fontSize = DEMOTED_TEXT_SIZE)) {
                     append(TODAY_SLOT_STATUS_GAP + suffix)

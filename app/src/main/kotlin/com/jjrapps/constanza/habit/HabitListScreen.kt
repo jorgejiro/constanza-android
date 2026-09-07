@@ -38,14 +38,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jjrapps.constanza.R
-import com.jjrapps.constanza.core.ui.component.HabitColorDot
 import com.jjrapps.constanza.domain.model.Habit
 
 /**
@@ -256,8 +259,25 @@ private fun HabitRow(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     ListItem(
-        leadingContent = { HabitColorDot(habit.colorArgb) },
-        headlineContent = { Text(habit.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        // Colour overhaul: the habit's identity colour used to sit in a leading dot ahead of the
+        // name; it now paints the name text itself (see `TodayScreen.HabitRollupHeader`'s own KDoc
+        // for why), and there is no leading content left to reserve room for. Dropping `leadingContent`
+        // outright — rather than leaving an empty slot — is what lets `ListItem`'s own default
+        // padding put the name back at the screen's plain 16dp margin instead of the dot's old 48dp.
+        //
+        // Built as an `AnnotatedString` with an explicit `SpanStyle`, the same shape
+        // `TodayScreen.demotedSuffix` uses for the identical colour, rather than `Text`'s own `color`
+        // parameter: a plain-string `Text`'s `color` paints at the layout layer only, so it never
+        // reaches `SemanticsProperties.Text` for a test to read back, while a `SpanStyle` embedded in
+        // the `AnnotatedString` is part of the rendered content itself and is what
+        // `HabitNameColourComposeTest` asserts against on both screens.
+        headlineContent = {
+            Text(
+                buildAnnotatedString { withStyle(SpanStyle(color = Color(habit.colorArgb))) { append(habit.name) } },
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
         trailingContent = {
             Box {
                 IconButton(onClick = { menuExpanded = true }) {

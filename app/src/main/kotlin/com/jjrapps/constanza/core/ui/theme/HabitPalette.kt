@@ -74,9 +74,10 @@ import com.jjrapps.constanza.R
  * first so that expanding adds rows underneath instead of rearranging what is already on screen.
  *
  * [labelRes] is not decoration. This is a radio group of twenty-three circles (22 presets plus the
- * custom wheel), and colour is never this app's sole recognition channel (`HabitColorDot`'s KDoc,
- * design.md decision 6), so every swatch carries its colour's name as its accessible label rather
- * than relying on the fill alone.
+ * custom wheel), and colour is never this app's sole recognition channel (design.md decision 6) —
+ * the colour overhaul makes the point sharper rather than retiring it: the habit's *name* is now
+ * itself the non-colour channel a swatch's colour is checked against, so every swatch still carries
+ * its colour's name as its accessible label rather than relying on the fill alone.
  */
 enum class HabitColor(val argb: Int, @param:StringRes val labelRes: Int) {
     GREEN(0xFF4CAF50.toInt(), R.string.habit_color_green), // Green 500, 7.03:1

@@ -46,7 +46,8 @@ private const val MINUTES_PER_HOUR = 60
  *  is a `contentDescription` that comes from Material 3's own **internal** string resources
  *  (`m3c_time_picker_*`), which no test in this module can name without reaching into another
  *  library's private resource table. Same reasoning, and same shape, as
- *  [com.jjrapps.constanza.core.ui.component.HABIT_COLOR_DOT_TEST_TAG]. */
+ *  [com.jjrapps.constanza.tracking.TODAY_ADD_HABIT_FAB_TEST_TAG]: a tag that adds no accessibility
+ *  announcement, for a node no test can otherwise name. */
 const val REMINDER_TIME_MODE_TOGGLE_TEST_TAG = "reminder_time_mode_toggle"
 
 /**
