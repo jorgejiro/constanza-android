@@ -17,6 +17,8 @@ import javax.inject.Inject
 private const val ENTRY_SOURCE_NOTIFICATION = "NOTIFICATION"
 private const val ENTRY_SOURCE_IN_APP = "IN_APP"
 private const val STATE_RESOLVED = "RESOLVED"
+private const val STATE_FIRED = "FIRED"
+private const val NO_SLOT = 0L
 
 /**
  * Entry states a notification action can reach: Yes/No only (reminder-response: Notification
@@ -92,8 +94,55 @@ class EntryWriter @Inject constructor(
         }
     }
 
+    /**
+     * "Sin responder" / "Not answered" — the change dialog's fourth option (task today-clear-
+     * answer), and the inverse of [answerInApp]: it undoes an answer rather than writing a fourth
+     * status, so it deletes the [entryDao] row instead of upserting one. Only offered for today or
+     * a future date (never a past day, where the law has already decided — see
+     * [com.jjrapps.constanza.tracking.ChangeAnswerDialog]'s KDoc), so [occ]'s `scheduledDate` is
+     * always today or later whenever [occurrenceId] is non-null here.
+     *
+     * Shaped as one transactional sequence, like [resolveOccurrenceAndWrite], rather than a delete
+     * plus a separate reopen call that would merely look atomic.
+     *
+     * **Deliberately never touches [alarmScheduler] or [notificationPoster].** The moment the
+     * cleared answer was for has already passed; re-arming it would fire a reminder a second time
+     * for a slot someone just corrected, which is not what "Sin responder" asks for — only the
+     * entry and the occurrence's own resolution state are restored.
+     *
+     * That restraint is also what keeps [OccurrenceResolver.reconcile]'s hourly pass safe. [occ] is
+     * reopened to `FIRED`, never `ARMED`: `reconcile`'s recovery branch — "an `ARMED` occurrence
+     * whose alarm should already have fired is re-armed for now" — matches `state == ARMED`
+     * specifically, and `scheduledAt` is always in the past for anything a same-day clear reopens,
+     * so reopening to `ARMED` would have that branch treat it as a lost alarm and repost the
+     * notification within the hour (verified against `OccurrenceResolver.kt` while building this;
+     * it is the trap this feature exists to avoid). `FIRED` — the state a real notification
+     * delivery already leaves an occurrence in while it awaits an answer — matches neither that
+     * branch nor `isGraceExpired` (which matches only `SNOOZED`), so `reconcile` leaves it alone.
+     * [OccurrenceResolver.sweepMidnight] still finds it there — `findUnresolved()` excludes only
+     * `RESOLVED`/`ABANDONED`/`SUPPRESSED` — and resolves it exactly like any other still-unanswered
+     * slot: `MISSED` if due, `RESOLVED` either way. That is THE ONE RULE this feature must not
+     * break: an unanswered slot still becomes `MISSED` at day's end.
+     */
+    suspend fun clearAnswer(habitId: Long, date: LocalDate, slotId: Long?, occurrenceId: Long? = null) {
+        val occ = occurrenceId?.let { reminderOccurrenceDao.findById(it) }
+        if (occ != null) {
+            reopenOccurrenceAndClear(occ)
+        } else {
+            deleteEntry(habitId, date, slotId)
+        }
+    }
+
+    private suspend fun reopenOccurrenceAndClear(occ: ReminderOccurrenceEntity) {
+        val slotId = if (occ.slotId == NO_SLOT) null else occ.slotId
+        database.withTransaction {
+            deleteEntry(occ.habitId, LocalDate.parse(occ.scheduledDate), slotId)
+            reminderOccurrenceDao.upsert(occ.copy(state = STATE_FIRED))
+        }
+    }
+
     private suspend fun resolveOccurrenceAndWrite(occ: ReminderOccurrenceEntity, status: EntryStatus, source: String) {
-        val slotId = if (occ.slotId == 0L) null else occ.slotId
+        val slotId = if (occ.slotId == NO_SLOT) null else occ.slotId
         database.withTransaction {
             writeEntry(occ.habitId, LocalDate.parse(occ.scheduledDate), slotId, status, source)
             reminderOccurrenceDao.upsert(occ.copy(state = STATE_RESOLVED))
@@ -107,5 +156,9 @@ class EntryWriter @Inject constructor(
             habitId = habitId, date = date, slotId = slotId, status = status, answeredAt = timeProvider.now(),
         )
         entryDao.upsert(entry.toEntity(source))
+    }
+
+    private suspend fun deleteEntry(habitId: Long, date: LocalDate, slotId: Long?) {
+        entryDao.deleteByHabitDateSlot(habitId, date.toString(), slotId ?: NO_SLOT)
     }
 }

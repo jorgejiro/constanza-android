@@ -88,6 +88,7 @@ fun TodayRoute(
         state = state,
         onToggleExpanded = viewModel::toggleExpanded,
         onAnswer = viewModel::answer,
+        onClearAnswer = viewModel::clearAnswer,
         onManageHabits = onManageHabits,
         onAddHabit = onAddHabit,
         onOpenSettings = onOpenSettings,
@@ -112,6 +113,7 @@ fun TodayScreen(
     state: TodayUiState,
     onToggleExpanded: (Long) -> Unit,
     onAnswer: (Long, TodaySlot, InAppEntryStatus) -> Unit,
+    onClearAnswer: (Long, TodaySlot) -> Unit = { _, _ -> },
     onManageHabits: () -> Unit,
     onAddHabit: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
@@ -140,8 +142,15 @@ fun TodayScreen(
         ChangeAnswerDialog(
             habitName = target.habitName,
             current = target.slot.status,
+            // today-clear-answer: never on a past day (design.md's deliberate asymmetry — see
+            // ChangeAnswerDialog's KDoc).
+            showNotAnsweredOption = !state.isPastDay,
             onSelect = { status ->
                 onAnswer(target.habitId, target.slot, status)
+                changeDialogTarget = null
+            },
+            onClear = {
+                onClearAnswer(target.habitId, target.slot)
                 changeDialogTarget = null
             },
             onDismiss = { changeDialogTarget = null },

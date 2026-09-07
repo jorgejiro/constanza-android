@@ -38,15 +38,31 @@ import com.jjrapps.constanza.domain.model.EntryStatus
  * past-tense register the day already has, and skipping a still-open moment ("Omitir") is a
  * different thing from a moment already gone by ("Skipped").
  *
- * A fourth option, "Sin responder" (returning a slot to [EntryStatus.UNKNOWN]), is a separate
- * future change — this dialog is a plain list of rows rather than a fixed-arity layout, so adding
- * it later is one more row, not a restructure.
+ * today-clear-answer adds the fourth option this KDoc used to defer: "Sin responder"/"Not
+ * answered" (returning a slot to [EntryStatus.UNKNOWN] by deleting its `Entry` row, [EntryWriter
+ * .clearAnswer]) — reachable through [onClear], a separate callback from [onSelect] since
+ * clearing writes nothing an [InAppEntryStatus] can name. It is gated by [showNotAnsweredOption],
+ * which the caller always passes as `!isPastDay` ([com.jjrapps.constanza.tracking
+ * .TodayUiState.isPastDay]), a deliberate asymmetry: on a past day the midnight law has already
+ * decided this slot's fate, so "Not answered" and "No" are the same outcome there — offering both
+ * would be offering one outcome under two names, and picking "Sin responder" would visibly turn
+ * into a red cross moments later, which is not what the tap asked for. A past day's three options
+ * are already the complete set; there is no third distinct outcome to reach. This dialog stays a
+ * plain list of rows rather than a fixed-arity layout, so a fifth option later is one more row,
+ * not a restructure.
  */
+// [onClear] pushes this to exactly 6 parameters, `LongParameterList`'s unconfigured threshold —
+// the same class of Compose false positive `TodayScreen.kt`'s own `fun TodayScreen` is suppressed
+// for: one state value plus a hoisted lambda per event IS the parameter list here, and collapsing
+// them into a holder object to satisfy a count would make the call site harder to read, not easier.
+@Suppress("LongParameterList")
 @Composable
 internal fun ChangeAnswerDialog(
     habitName: String,
     current: EntryStatus,
+    showNotAnsweredOption: Boolean,
     onSelect: (InAppEntryStatus) -> Unit,
+    onClear: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -69,6 +85,16 @@ internal fun ChangeAnswerDialog(
                     selected = current == EntryStatus.SKIPPED,
                     onClick = { onSelect(InAppEntryStatus.SKIPPED) },
                 )
+                if (showNotAnsweredOption) {
+                    // Never `selected`: this dialog only ever opens for an already-answered slot
+                    // (today-one-line-row point 2), so `current` can never be UNKNOWN here — there
+                    // is no state in which this row is the current one.
+                    ChangeAnswerOption(
+                        label = stringResource(R.string.today_answer_not_answered),
+                        selected = false,
+                        onClick = onClear,
+                    )
+                }
             }
         },
         confirmButton = {},
