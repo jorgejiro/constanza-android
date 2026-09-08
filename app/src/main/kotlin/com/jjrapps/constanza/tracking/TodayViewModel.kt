@@ -207,6 +207,19 @@ class TodayViewModel @Inject constructor(
         }
     }
 
+    /** today-clear-answer: the change dialog's fourth option ("Sin responder"/"Not answered"),
+     *  gated to today-or-later by [ChangeAnswerDialog]'s own `showNotAnsweredOption` — this
+     *  function trusts that gate the same way [answer] trusts the dialog to only ever offer
+     *  statuses valid for the slot it was opened on. Mirrors [answer]'s date discipline exactly:
+     *  [uiState]'s CURRENT `date`, never a fresh clock read, for the identical reason (design.md
+     *  decision 3). */
+    fun clearAnswer(habitId: Long, slot: TodaySlot) {
+        val date = uiState.value.date
+        viewModelScope.launch {
+            entryWriter.clearAnswer(habitId, date, slot.slotId, slot.occurrenceId)
+        }
+    }
+
     /** Called from [TodayRoute] on `ON_RESUME`, alongside [refreshExactAlarmPermission] and
      *  [refreshNotificationPermission] (task 2.7): corrects [TodayDate.clock] if the app was
      *  backgrounded across local midnight, per the spec's "backgrounded app corrects the date on

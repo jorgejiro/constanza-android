@@ -155,6 +155,7 @@
     <string name="today_answer_no">No</string>
     <string name="today_answer_yes_a11y">Responder sí a %1$s</string>
     <string name="today_answer_no_a11y">Responder no a %1$s</string>
+    <string name="today_answer_not_answered">Sin responder</string>
 
     <!-- today-answered-slot-collapse: %1$s is the habit name, %2$s is the answered-status text
          (see TodayScreen.kt). Spanish word order legitimately reorders the two arguments while

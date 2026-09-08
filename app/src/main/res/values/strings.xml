@@ -180,6 +180,12 @@
          would announce identically for every habit. -->
     <string name="today_answer_yes_a11y">Answer yes for %1$s</string>
     <string name="today_answer_no_a11y">Answer no for %1$s</string>
+    <!-- today-clear-answer: the change dialog's fourth option — undoes an answer rather than
+         writing a fourth status (habit-entry-tracking: an unanswered slot must still become
+         Missed at midnight). Offered only for today or a future date: on a past day the midnight
+         law has already decided, so "Not answered" and "No" are the same outcome there, and this
+         option is withheld (ChangeAnswerDialog in TodayChangeAnswerDialog.kt). -->
+    <string name="today_answer_not_answered">Not answered</string>
 
     <!-- today-one-line-row: an answered slot's row is itself the tap target now that "Cambiar" is
          gone — see ChangeAnswerDialog in TodayChangeAnswerDialog.kt. today_slot_change_a11y is

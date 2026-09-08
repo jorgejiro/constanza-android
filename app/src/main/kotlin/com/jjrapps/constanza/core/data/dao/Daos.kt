@@ -107,6 +107,14 @@ interface EntryDao {
     @Query("DELETE FROM entries WHERE habitId = :habitId AND slotId = :slotId")
     suspend fun deleteBySlot(habitId: Long, slotId: Long)
 
+    /** today-clear-answer: the single-row counterpart to [upsert] a "Sin responder" clear needs
+     *  — removes exactly the row an answer occupies rather than overwriting it with a sentinel
+     *  status, so a cleared slot reads as pending again the same way a never-answered one does
+     *  (absence of a row IS unknown, design.md §8.1). `slotId` is the storage-level value — the
+     *  `0` sentinel for "no slot" (D11), the same convention every other query on this DAO uses. */
+    @Query("DELETE FROM entries WHERE habitId = :habitId AND date = :date AND slotId = :slotId")
+    suspend fun deleteByHabitDateSlot(habitId: Long, date: String, slotId: Long)
+
     /** habit-management: Habit Deletion (design.md D3) — the confirmation dialog's per-habit
      *  answer count, resident in [com.jjrapps.constanza.habit.HabitListUiState] rather than
      *  queried at dialog-open time. A habit absent from the result has zero entries. */
