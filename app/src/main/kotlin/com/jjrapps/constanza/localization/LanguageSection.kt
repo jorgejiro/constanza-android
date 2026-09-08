@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleStartEffect
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.component.SectionDivider
+import com.jjrapps.constanza.core.ui.component.SectionHeader
 
 /**
  * app-localization: Three-State Language Override — the picker, as a third section on the existing
@@ -52,7 +54,11 @@ fun LanguageSection(viewModel: LanguageSettingsViewModel = hiltViewModel()) {
 @Composable
 fun LanguageSectionContent(selected: AppLanguage, onSelect: (AppLanguage) -> Unit) {
     Column(modifier = Modifier.padding(16.dp)) {
-        Text(stringResource(R.string.settings_language_section_title))
+        // settings-section-headings: the Column above already supplies the 16dp screen inset every
+        // row here shares, so the header's own horizontal inset is zeroed out — otherwise it would
+        // sit indented past the radio rows it introduces.
+        SectionHeader(stringResource(R.string.settings_language_section_title), startInset = 0.dp, endInset = 0.dp)
+        SectionDivider(startInset = 0.dp, endInset = 0.dp)
         AppLanguage.entries.forEach { language ->
             LanguageRow(
                 language = language,

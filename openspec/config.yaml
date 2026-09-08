@@ -798,7 +798,15 @@ carried_forward_open_items:
         blind-tap on someone's daily driver; take a screenshot and read it first.
     - id: "colour-dot-fold-unfold"
       title: "Habit colour dot across a real fold/unfold configuration change"
-      status: blocked
+      status: resolved
+      resolution: >
+        Moot as of the colour overhaul (#106, v0.1.8). This item was waiting on a
+        foldable to exercise `HabitColorDot` across a fold/unfold configuration
+        change. That composable was deleted: a habit's colour is now painted on
+        its name, so there is no dot left to survive anything. Closed because the
+        subject is gone, NOT because the fold/unfold gap was ever closed — if a
+        future item needs a real fold/unfold, it inherits the same unmet owner
+        condition recorded below, which is why that text is left standing.
       origin: >
         The one sub-item of warm-dark-design-system task 6.5 that could not be
         closed. Its other two halves ARE closed and automated: the notification
@@ -1020,13 +1028,21 @@ carried_forward_open_items:
         the FAB's glyph is now `onPrimaryContainer` = `Accent`, so it reads 8.11:1 against its own
         container rather than the 13.98:1 the old off-white gave — still far above any floor, and
         traded deliberately for marking the app's primary action in the accent.
+      what_moved_since: >
+        The defect is unchanged: `primaryContainer` is still `SurfaceSelected` and still measures
+        1.17:1 against `Background`, below SC 1.4.11's 3:1. What #106 changed is the CONTENT tone,
+        not the fill — `onPrimaryContainer` moved from `Accent` to `ChromeInteractive`, so the
+        FAB's `+` is a light neutral rather than amber. The control is still carried entirely by
+        its content, which is exactly what this item is about; only that content's colour differs.
       owner_condition: >
-        Any change that revisits the surface ramp itself, or one that decides the FAB should be a
-        filled accent button (`primaryContainer` = `Accent`, `onPrimaryContainer` = `OnAccent`).
-        That second option was considered and rejected here only because it would also turn M3's
-        time-picker selected-hour box into a solid amber block, which the unmerged time-picker
-        work had already judged too loud on a real screenshot — an argument that stops applying
-        the moment that work ratifies a different look.
+        Any change that revisits the surface ramp itself. The second escape route this item used
+        to name is gone: it proposed making the FAB a filled accent button (`primaryContainer` =
+        `Accent`, `onPrimaryContainer` = `OnAccent`), and the colour overhaul (#106, v0.1.8)
+        deleted both of those tokens outright. There is no accent left to fill with, and by the
+        `Habit Colour Is The Only Chroma` requirement there will not be one — a saturated chrome
+        fill is now precisely the thing that requirement forbids. So the ramp is the only lever
+        left, and this item can no longer be closed as a side effect of a decision about how the
+        FAB itself should look.
 
     - id: "control-stroke-overrides-are-not-guarded-by-a-test"
       title: "Three call sites must opt into ConstanzaControlDefaults, and nothing fails if a fourth forgets"

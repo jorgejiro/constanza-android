@@ -24,6 +24,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.component.SectionDivider
+import com.jjrapps.constanza.core.ui.component.SectionHeader
 import com.jjrapps.constanza.localization.LanguageSection
 import com.jjrapps.constanza.portability.DataPortabilitySection
 
@@ -51,12 +53,8 @@ fun SnoozeSettingsScreen(current: SnoozeDuration, onSelect: (SnoozeDuration) -> 
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
             // app-localization: the screen title is now the generic "Settings", so the snooze list
             // needs its own heading — it stopped being the whole screen two sections ago.
-            item {
-                Text(
-                    stringResource(R.string.settings_snooze_section_title),
-                    modifier = Modifier.padding(16.dp),
-                )
-            }
+            item { SectionHeader(stringResource(R.string.settings_snooze_section_title)) }
+            item { SectionDivider() }
             items(SnoozeDuration.entries, key = { it.name }) { duration ->
                 SnoozeDurationRow(duration, duration == current, onSelect)
             }
@@ -69,8 +67,14 @@ fun SnoozeSettingsScreen(current: SnoozeDuration, onSelect: (SnoozeDuration) -> 
     }
 }
 
+/**
+ * `internal` rather than `private` — mirrors `DataPortabilityScreen.ImportResultMessage`'s own
+ * reasoning: `SnoozeSettingsScreen` itself cannot be rendered whole in `androidTest` (see
+ * `SnoozeSectionHeadingComposeTest`'s KDoc), so this row is widened solely so that test can render
+ * the actual production row next to the actual production section heading.
+ */
 @Composable
-private fun SnoozeDurationRow(duration: SnoozeDuration, selected: Boolean, onSelect: (SnoozeDuration) -> Unit) {
+internal fun SnoozeDurationRow(duration: SnoozeDuration, selected: Boolean, onSelect: (SnoozeDuration) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
