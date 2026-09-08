@@ -2139,6 +2139,17 @@ carried_forward_open_items:
         Deferred by the maintainer on 2026-09-06, after he began comparing how
         other apps solve it. Not rejected — parked. The exploration below is
         recorded so whoever picks it up does not start from zero.
+
+        Deferred a SECOND time on 2026-09-08, and this time on the interaction
+        rather than on the comparison: "pudiendo pulsar en cada día y para
+        hábito igual es muy lioso". That is a judgement about the WRITE half of
+        the grid, not the read half — a cell that is both a status and a target
+        for two different gestures, at the size 360dp allows, is the part he
+        finds confusing. Whoever resumes this should treat recommendation 1
+        below as reopened, not as settled guidance: a read-only grid with
+        correction left to Today's date bar (which already does it with
+        ordinary taps, and is tested) is now a candidate first version in its
+        own right, not merely a slice of a bigger one.
       what_the_exploration_established: >
         Explored 2026-09-05; the full document is in Engram at
         `sdd/habit-tracking-grid/explore`. The load-bearing findings:
@@ -2207,10 +2218,14 @@ carried_forward_open_items:
         (2) read-only grid rendering, (3) long-press write path,
         (4) management absorption.
       owner_condition: >
-        The maintainer's own decision to resume. He parked it while comparing
-        other apps; the useful lens for that comparison is that almost every
-        competitor is binary, so watch what they do — if anything — with a day
-        that was not due and with a day only half done.
+        The maintainer's own decision to resume, and it is now further out than
+        it was. On 2026-09-08 he chose to live with the app for several days
+        without wiping data, reviewing it in use and asking for small
+        adjustments; this screen is explicitly not part of that. Resume only
+        when he asks. The useful lens when he does: almost every competitor is
+        binary, so watch what they do — if anything — with a day that was not
+        due and with a day only half done, and settle the cell interaction
+        before any layout work, since that is what he rejected.
     - id: "settings-sections-do-not-read-as-sections"
       title: "Settings' section headings look like ordinary content, and its primary actions look quieter than their own heading"
       status: resolved
