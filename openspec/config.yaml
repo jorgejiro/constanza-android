@@ -2213,7 +2213,24 @@ carried_forward_open_items:
         that was not due and with a day only half done.
     - id: "settings-sections-do-not-read-as-sections"
       title: "Settings' section headings look like ordinary content, and its primary actions look quieter than their own heading"
-      status: open
+      status: resolved
+      resolution: >
+        Closed by #114 (v0.1.11). Today's heading treatment was extracted out of the `tracking`
+        package into `core/ui/component/SectionHeader.kt` — uppercased `labelMedium`, semibold,
+        letter-spaced, `onSurfaceVariant`, over a `SectionDivider` — and adopted at all three
+        Settings call sites, which had been three independent bare `Text` composables with no style
+        argument. `TodaySectionHeader` survives as a thin wrapper, so `TodayScreen.kt` changed by
+        zero lines; that, rather than a test, is what proves Today's own layout did not shift.
+
+        The `second_defect` below resolved itself and is worth recording as such, because the fix
+        was not the obvious one. Export and Import are `TextButton`s on `ChromeInteractive`
+        (10.44:1) and their heading was plain text on `onSurface` (16.37:1), so the label outranked
+        the two actions it introduced. Nothing was re-toned: making the heading small, uppercase and
+        muted removed the competition instead of fighting it, and the actions now read brighter than
+        the heading above them. That outcome was predicted but not trusted — it was confirmed by
+        opening the real screen on an emulator and looking, which is also what caught a second,
+        unlisted defect on the way: the two actions were indented 12dp past every edge on the
+        screen by `TextButton`'s default content padding, and are now flush with their own heading.
       severity: >
         Cosmetic, but it makes a settings screen with three unrelated sections
         read as one undifferentiated list, which is the whole navigational job
