@@ -16,6 +16,15 @@
     <string name="notification_action_no">No</string>
     <string name="notification_action_snooze">Aplazar</string>
 
+    <!-- day-review, slice B (day-review-notification). See values/strings.xml for the rationale. -->
+    <string name="notification_channel_day_review_name">Repaso del día</string>
+    <string name="notification_day_review_title">Repasa tu día</string>
+    <string name="notification_day_review_all_done">Has respondido todos tus hábitos hoy. Buen trabajo.</string>
+    <plurals name="notification_day_review_outstanding">
+        <item quantity="one">Todavía tienes %1$d hábito por responder.</item>
+        <item quantity="other">Todavía tienes %1$d hábitos por responder.</item>
+    </plurals>
+
     <!-- habit-management: Habit list (task 6a.4). -->
     <string name="habit_list_title">Hábitos</string>
     <string name="habit_list_add_habit">Añadir hábito</string>
@@ -194,6 +203,13 @@
     <string name="settings_language_system_default">Predeterminado del sistema</string>
     <string name="settings_language_english">English</string>
     <string name="settings_language_spanish">Español</string>
+
+    <!-- day-review, slice C (day-review-notification): la sección de ajustes del repaso nocturno. -->
+    <string name="settings_day_review_section_title">Repaso del día</string>
+    <string name="settings_day_review_time_label">Hora del repaso</string>
+    <string name="settings_day_review_time_supporting">No más tarde de las %1$s, para que el repaso llegue antes de que termine el día.</string>
+    <string name="settings_day_review_mode_every_night">Todas las noches</string>
+    <string name="settings_day_review_mode_only_if_unanswered">Solo cuando quede algo sin responder</string>
 
     <!-- habit-management: per-habit progress entry point (task 6b.4). -->
     <string name="habit_list_progress">Progreso</string>

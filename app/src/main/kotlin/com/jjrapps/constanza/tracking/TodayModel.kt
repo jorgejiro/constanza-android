@@ -112,6 +112,50 @@ fun buildTodayHabitRow(
 fun countHabitsWithUnansweredSlots(rows: List<TodayHabitRow>): Int =
     rows.count { row -> row.slots.any { slot -> slot.status == EntryStatus.UNKNOWN } }
 
+/** day-review, slice B (day-review-notification): what, if anything, the nightly review
+ *  notification should say. A sealed result rather than a nullable count so "post nothing" has one
+ *  named case ([Skip]) instead of a magic count or a `null` a caller could forget to check. */
+sealed interface DayReviewDecision {
+    /** Post the notification; [outstandingCount] is [countHabitsWithUnansweredSlots]'s own count,
+     *  carried through unchanged so the caller never recomputes it. */
+    data class Post(val outstandingCount: Int) : DayReviewDecision
+
+    /** Post nothing. Reached for two different reasons — the decision's own `rows` being empty
+     *  (nothing was due at all that day) and `firesEveryNight == false` with nothing outstanding —
+     *  deliberately collapsed into one case: both are "no review to give tonight", and
+     *  [DayReviewWorker][com.jjrapps.constanza.scheduling.DayReviewWorker] has no different action
+     *  to take for either. */
+    data object Skip : DayReviewDecision
+}
+
+/**
+ * day-review, slice B: the pure decision behind the nightly review notification, exercised the
+ * same way [countHabitsWithUnansweredSlots] is — real [TodayHabitRow]s built through
+ * [buildTodayHabitRow], never a hand-rolled stand-in.
+ *
+ * [rows] is the day's already-filtered snapshot (a habit not due that day contributes no row at
+ * all, exactly as [buildTodayHabitRow] mirrors [DayStatus.NOT_DUE]), so `rows.isEmpty()` IS "nothing
+ * was due at all that day" — the case this app's own owner asked to be flagged rather than decided
+ * unilaterally (see [DayReviewWorker][com.jjrapps.constanza.scheduling.DayReviewWorker]'s class doc):
+ * without it, a habit-set that is entirely weekday-only would fire a review every Saturday and
+ * Sunday with nothing to say. [firesEveryNight] gates the remaining case exactly as
+ * [DayReviewSettingsStore][com.jjrapps.constanza.reminding.DayReviewSettingsStore]'s own KDoc
+ * describes it: `true` posts regardless of the count (a closing ritual), `false` posts only when
+ * [countHabitsWithUnansweredSlots] is greater than zero.
+ *
+ * The late-fire guard (comparing the run's target date against
+ * [TimeProvider.today][com.jjrapps.constanza.core.time.TimeProvider.today]) is deliberately NOT
+ * folded in here: it depends on wall-clock state this pure function has no business reading, and
+ * [DayReviewWorker][com.jjrapps.constanza.scheduling.DayReviewWorker] checks it before ever calling
+ * this — a late fire never even assembles the rows this function would otherwise be given.
+ */
+fun decideDayReview(rows: List<TodayHabitRow>, firesEveryNight: Boolean): DayReviewDecision {
+    if (rows.isEmpty()) return DayReviewDecision.Skip
+    val outstanding = countHabitsWithUnansweredSlots(rows)
+    if (!firesEveryNight && outstanding == 0) return DayReviewDecision.Skip
+    return DayReviewDecision.Post(outstanding)
+}
+
 private fun toTodaySlot(
     slotId: Long?,
     minuteOfDay: Int?,

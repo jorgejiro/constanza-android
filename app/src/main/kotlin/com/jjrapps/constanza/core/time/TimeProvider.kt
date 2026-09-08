@@ -57,11 +57,21 @@ fun TimeProvider.millisUntilNextMidnight(): Long {
  *  [millisUntilNextMidnight] is: `setInitialDelay` rejects a negative delay. */
 fun TimeProvider.millisUntilNextLocalTime(minuteOfDay: Int): Long {
     val time = LocalTime.of(minuteOfDay / MINUTES_PER_HOUR, minuteOfDay % MINUTES_PER_HOUR)
-    val todayAtTime = today().atTime(time).atZone(zone())
-    val target = if (todayAtTime.toInstant().isAfter(now())) {
-        todayAtTime
-    } else {
-        today().plusDays(1).atTime(time).atZone(zone())
-    }
+    val target = nextLocalDateForLocalTime(minuteOfDay).atTime(time).atZone(zone())
     return Duration.between(now(), target.toInstant()).toMillis().coerceAtLeast(0)
+}
+
+/** day-review, slice B (day-review-notification): the LOCAL DATE [millisUntilNextLocalTime]
+ *  anchors [minuteOfDay] on — "today" if that time is still ahead, "tomorrow" if it has already
+ *  passed (including standing exactly on it), the same rollover rule [millisUntilNextLocalTime]
+ *  itself applies. Factored out, rather than left inline in that function, so a caller that must
+ *  remember which day a scheduled run targeted — [com.jjrapps.constanza.scheduling.DayReviewWorker]'s
+ *  late-fire guard, which compares this against [TimeProvider.today] at run time to tell a
+ *  drifted/late fire apart from an on-time one — reads the exact same DST-sensitive resolution
+ *  [millisUntilNextLocalTime] uses for its delay, rather than re-deriving it and risking the two
+ *  disagreeing on a transition day. */
+fun TimeProvider.nextLocalDateForLocalTime(minuteOfDay: Int): LocalDate {
+    val time = LocalTime.of(minuteOfDay / MINUTES_PER_HOUR, minuteOfDay % MINUTES_PER_HOUR)
+    val todayAtTime = today().atTime(time).atZone(zone())
+    return if (todayAtTime.toInstant().isAfter(now())) today() else today().plusDays(1)
 }

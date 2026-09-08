@@ -13,6 +13,21 @@
     <string name="notification_action_no">No</string>
     <string name="notification_action_snooze">Snooze</string>
 
+    <!-- day-review, slice B (day-review-notification): the once-a-night "review your day" nudge's
+         own channel and copy — a separate channel from notification_channel_reminders_name so the
+         owner can mute this without muting habit reminders. notification_day_review_outstanding's
+         count is countHabitsWithUnansweredSlots' own count (habits, not slots); zero is worded by
+         notification_day_review_all_done instead of the "other" plural category, since the
+         only-when-pending mode never posts at zero and fires-every-night's zero case reads as a
+         closing ritual, not an empty count. -->
+    <string name="notification_channel_day_review_name">Day review</string>
+    <string name="notification_day_review_title">Review your day</string>
+    <string name="notification_day_review_all_done">All habits answered today. Nice work.</string>
+    <plurals name="notification_day_review_outstanding">
+        <item quantity="one">You still have %1$d habit to answer.</item>
+        <item quantity="other">You still have %1$d habits to answer.</item>
+    </plurals>
+
     <!-- habit-management: Habit list (task 6a.4). -->
     <string name="habit_list_title">Habits</string>
     <string name="habit_list_add_habit">Add habit</string>
@@ -224,6 +239,16 @@
     <string name="settings_language_system_default">System default</string>
     <string name="settings_language_english">English</string>
     <string name="settings_language_spanish">Español</string>
+
+    <!-- day-review, slice C (day-review-notification): the nightly day-review's own settings
+         section. `settings_day_review_time_supporting` takes the 23:45 ceiling as a runtime-
+         formatted %1$s (the device's own time format), never a fixed literal, so it can never
+         disagree with what the time field itself shows. -->
+    <string name="settings_day_review_section_title">Day review</string>
+    <string name="settings_day_review_time_label">Review time</string>
+    <string name="settings_day_review_time_supporting">No later than %1$s, so the review lands before the day closes.</string>
+    <string name="settings_day_review_mode_every_night">Every night</string>
+    <string name="settings_day_review_mode_only_if_unanswered">Only when something is unanswered</string>
 
     <!-- habit-management: per-habit progress entry point (task 6b.4). -->
     <string name="habit_list_progress">Progress</string>
