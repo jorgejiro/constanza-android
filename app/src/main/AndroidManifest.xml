@@ -6,9 +6,20 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- The habit database never leaves the device on its own. Auto Backup was on - explicitly
+         written, but also the platform default, so it read as template rather than as a decision -
+         and it silently restored every habit from the owner's Google Drive after a deliberate
+         uninstall-and-reinstall, which is how an uninstall stopped meaning "start clean". Turning
+         it off is a decision about where personal data lives: preserving it across a reinstall or
+         a new phone is what DataPortabilityScreen's export/import is for, an explicit file the
+         user chooses, keeps and can read. `dataExtractionRules` closes the other half - on API 31+
+         device-to-device transfer is configured separately and this flag alone would not stop it.
+         AutoBackupDisabledInstrumentedTest asserts the flag on a real device rather than trusting
+         this comment. -->
     <application
         android:name=".ConstanzaApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:localeConfig="@xml/locales_config"
