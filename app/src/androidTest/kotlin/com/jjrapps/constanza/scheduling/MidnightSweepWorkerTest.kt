@@ -1,6 +1,7 @@
 package com.jjrapps.constanza.scheduling
 
 import android.content.Context
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -15,18 +16,22 @@ import com.jjrapps.constanza.core.data.entity.EntryEntity
 import com.jjrapps.constanza.core.data.entity.HabitEntity
 import com.jjrapps.constanza.core.data.entity.ReminderOccurrenceEntity
 import com.jjrapps.constanza.core.data.entity.ScheduleEntity
+import com.jjrapps.constanza.reminding.DayReviewSettingsStore
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import java.time.Instant
 
 private const val RECONCILE_PERIOD_HOURS = 1L
 private const val RESOLVE_DEADLINE_HOURS = 24L
+private const val DAY_REVIEW_SETTINGS_TEST_FILE_NAME = "midnight_sweep_worker_test_day_review_settings.preferences_pb"
 
 /**
  * habit-entry-tracking: Midnight Transition (design.md D3/D8). Exercises [MidnightSweepWorker] via
@@ -36,6 +41,9 @@ private const val RESOLVE_DEADLINE_HOURS = 24L
  */
 @RunWith(AndroidJUnit4::class)
 class MidnightSweepWorkerTest {
+
+    @get:Rule
+    val tempFolder = TemporaryFolder()
 
     private lateinit var database: AppDatabase
     private val now: Instant = Instant.parse("2026-09-02T00:05:00Z")
@@ -62,10 +70,17 @@ class MidnightSweepWorkerTest {
         val resolver = OccurrenceResolver(
             daos, database.entryDao(), mockk(relaxed = true), RECONCILE_PERIOD_HOURS, RESOLVE_DEADLINE_HOURS,
         )
+        // day-review, slice B: a real DataStore-backed store, not a mock — WorkScheduler's
+        // constructor now needs one (see WorkSchedulerTest's identical fixture for why).
+        val dayReviewSettingsStore = DayReviewSettingsStore(
+            PreferenceDataStoreFactory.create(
+                produceFile = { tempFolder.newFile(DAY_REVIEW_SETTINGS_TEST_FILE_NAME) },
+            ),
+        )
         // The real WorkScheduler, not a mock: the worker re-enqueues its own successor (task G.4),
         // and that enqueue lands harmlessly in this test's WorkManager. What the successor's anchor
         // must be is asserted in WorkSchedulerTest, through WorkManager's own query APIs.
-        val workScheduler = WorkScheduler(context, FakeTimeProvider(now), RECONCILE_PERIOD_HOURS)
+        val workScheduler = WorkScheduler(context, FakeTimeProvider(now), RECONCILE_PERIOD_HOURS, dayReviewSettingsStore)
         val factory = object : WorkerFactory() {
             override fun createWorker(appContext: Context, workerClassName: String, workerParameters: WorkerParameters) =
                 MidnightSweepWorker(appContext, workerParameters, resolver, FakeTimeProvider(now), workScheduler)

@@ -94,7 +94,16 @@ interface EntryDao {
     @Query("SELECT * FROM entries WHERE habitId = :habitId AND date BETWEEN :from AND :to")
     suspend fun findByHabitIdBetweenDates(habitId: Long, from: String, to: String): List<EntryEntity>
 
-    /** Task 6b.1: the today screen's own reactive entry source — every habit's rows for one date. */
+    /** Task 6b.1: the today screen's own reactive entry source — every habit's rows for one date.
+     *
+     *  day-review, slice B (day-review-notification): also
+     *  [com.jjrapps.constanza.tracking.DayHabitRowsAssembler]'s one-shot source, via
+     *  `.first()` — a `CoroutineWorker` runs once and is gone, so it takes a single emission rather
+     *  than staying subscribed. A dedicated suspend query was deliberately NOT added alongside this
+     *  one for that: `EntryDao` was already at detekt's `TooManyFunctions` interface threshold (11),
+     *  and Room's `Flow` always emits the current query result immediately on collection (then again
+     *  on invalidation), so `.first()` over the existing reactive query is a correct one-shot read,
+     *  not a workaround. */
     @Query("SELECT * FROM entries WHERE date = :date")
     fun observeByDate(date: String): Flow<List<EntryEntity>>
 

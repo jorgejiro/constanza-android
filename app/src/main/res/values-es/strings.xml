@@ -16,6 +16,15 @@
     <string name="notification_action_no">No</string>
     <string name="notification_action_snooze">Aplazar</string>
 
+    <!-- day-review, slice B (day-review-notification). See values/strings.xml for the rationale. -->
+    <string name="notification_channel_day_review_name">Repaso del día</string>
+    <string name="notification_day_review_title">Repasa tu día</string>
+    <string name="notification_day_review_all_done">Has respondido todos tus hábitos hoy. Buen trabajo.</string>
+    <plurals name="notification_day_review_outstanding">
+        <item quantity="one">Todavía tienes %1$d hábito por responder.</item>
+        <item quantity="other">Todavía tienes %1$d hábitos por responder.</item>
+    </plurals>
+
     <!-- habit-management: Habit list (task 6a.4). -->
     <string name="habit_list_title">Hábitos</string>
     <string name="habit_list_add_habit">Añadir hábito</string>
