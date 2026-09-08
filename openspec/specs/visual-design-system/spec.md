@@ -22,33 +22,51 @@ colour), and MUST NOT vary its colour scheme based on the device's system-wide l
 #### Scenario: App ignores wallpaper-derived dynamic colour
 - GIVEN the device wallpaper would produce a dynamic ("Material You") colour palette
 - WHEN the app is launched
-- THEN the app's chrome and accent colours match the fixed palette, not a wallpaper-derived one
+- THEN the app's chrome and habit colours match the fixed palette, not a wallpaper-derived one
 
-### Requirement: Habit Colour And Accent Contrast Floor
+### Requirement: Habit Colour Contrast Floor
 
-Every colour offered as a habit identity colour, and the app's accent colour, MUST meet a
-contrast ratio of at least 4.5:1 against both the app's background surface and its raised/selected
-surface.
+Every colour a habit's identity may take MUST meet a contrast ratio of at least 4.5:1 against
+both the app's background surface and its raised/selected surface. This applies to the offered
+presets and to any colour reachable through the free custom-colour picker alike, because a habit's
+colour is rendered as its name's text colour and not merely as a swatch beside it.
 
 #### Scenario: Sub-floor colour is rejected
 - GIVEN a candidate colour measuring below 4.5:1 against the app background
 - WHEN it is evaluated against this floor
-- THEN it MUST NOT be offered as a habit colour or used as the accent
+- THEN it MUST NOT be offered as a habit colour
 
 #### Scenario: Ratified palette clears the floor
-- GIVEN the six ratified habit colours and the ratified accent colour
+- GIVEN every ratified habit colour
 - WHEN each is measured against the background and the raised/selected surface
 - THEN every measurement is at or above 4.5:1 on both surfaces
 
-### Requirement: Accent Reserved For Chrome
+#### Scenario: A custom colour below the floor is brought up to it
+- GIVEN the user picks a custom colour measuring below the floor against the app background
+- WHEN that colour is committed to the habit
+- THEN the stored colour is one inside the legible band, with the picked hue preserved
 
-The accent colour MUST be used only for chrome and actions (app bars, selection indicators,
-primary controls) and MUST NOT be offered or assigned as a habit's identity colour.
+### Requirement: Habit Colour Is The Only Chroma
 
-#### Scenario: Accent excluded from the habit colour picker
+The app's chrome MUST be achromatic: no saturated accent may be used for app bars, selection
+indicators, primary controls or any other chrome role. A habit's own colour is the only chroma the
+interface carries, apart from the two reserved semantic tones that mark an answer as done or not
+done.
+
+This supersedes the retired requirement `Accent Reserved For Chrome`, which required the opposite
+arrangement — a single reserved chrome accent, excluded from the habit palette. That accent was
+removed because it competed with the habit colours it sat beside, and because reserving it cost the
+habit palette the whole neighbourhood of its hue.
+
+#### Scenario: No chrome role resolves to a saturated colour
+- GIVEN the app's colour scheme
+- WHEN each chrome role is inspected
+- THEN none of them resolves to a saturated colour
+
+#### Scenario: Every hue is available to a habit
 - GIVEN the set of colours offered when creating or editing a habit
 - WHEN the user opens the colour picker
-- THEN the accent colour is not among the selectable options
+- THEN no colour is withheld from it on the grounds of being reserved for chrome
 
 ### Requirement: Cold-Start Window Background And System Bar Icons
 
@@ -70,8 +88,8 @@ device's system-wide light/dark setting.
 ### Requirement: Contrast Floors Asserted By Automated Test
 
 The contrast floor MUST be asserted by an automated test runnable in the JVM unit test suite, not
-documented only. The test MUST fail if any offered habit colour or the accent drops below 4.5:1
-against either the background or the raised/selected surface.
+documented only. The test MUST fail if any offered habit colour drops below 4.5:1 against either
+the background or the raised/selected surface.
 
 #### Scenario: Automated test fails a sub-floor colour
 - GIVEN a colour value below 4.5:1 against the app background is introduced into the palette
@@ -79,6 +97,6 @@ against either the background or the raised/selected surface.
 - THEN the test suite fails
 
 #### Scenario: Automated test passes the ratified palette
-- GIVEN the ratified six habit colours and accent colour
+- GIVEN every ratified habit colour
 - WHEN the automated contrast test suite runs
 - THEN the test suite passes with no floor violation

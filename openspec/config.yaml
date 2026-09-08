@@ -2195,6 +2195,55 @@ carried_forward_open_items:
         other apps; the useful lens for that comparison is that almost every
         competitor is binary, so watch what they do — if anything — with a day
         that was not due and with a day only half done.
+    - id: "settings-sections-do-not-read-as-sections"
+      title: "Settings' section headings look like ordinary content, and its primary actions look quieter than their own heading"
+      status: open
+      severity: >
+        Cosmetic, but it makes a settings screen with three unrelated sections
+        read as one undifferentiated list, which is the whole navigational job
+        that screen has.
+      origin: >
+        Reported by the maintainer on 2026-09-08 from a screenshot of his own
+        Galaxy S25 running v0.1.9: "cada sección/título no destaca ni se
+        diferencia de forma clara del resto del contenido". Confirmed by reading
+        the code rather than only the screenshot.
+      reason: >
+        The three headings are three independent bare `Text` composables with no
+        style argument at all, so each inherits `bodyLarge` — the same style the
+        option labels beside them use. `SnoozeSettingsScreen.kt`'s
+        `settings_snooze_section_title`, `DataPortabilityScreen.kt`'s
+        `portability_section_title` and `LanguageSection.kt`'s heading were each
+        written by a different work unit and none of them was ever given a
+        heading treatment.
+      why_it_matters: >
+        The app already solved this, on the other screen. `TodaySectionHeader`
+        (TodaySectionHeader.kt) renders its title uppercased in `labelMedium` +
+        `FontWeight.SemiBold` + letter spacing + `onSurfaceVariant`, followed by
+        `TodaySectionDivider`. Today reads as sections; Settings does not,
+        because that treatment was never extracted and nothing pulled Settings
+        along with it. This is the same shape as this repository's recurring
+        failure mode: the mechanism exists, tested, with no second consumer.
+      second_defect: >
+        There is a related hierarchy inversion, introduced by the accent removal
+        in #106 and visible in the same screenshot. "Exportar datos" and
+        "Importar datos" ARE `TextButton`s, so they resolve to `primary`, which
+        is now `ChromeInteractive` (#C4BCB6, 10.44:1) — deliberately quieter
+        than body text. Their own section heading is a plain `Text` on
+        `onSurface` (#EFEAE6, 16.37:1). So the label reads as more important
+        than the two actions underneath it. On Today that demotion was the
+        point; here the export/import buttons are the entire content of their
+        section. Fix both together or the heading fix will make the inversion
+        worse.
+      owner_condition: >
+        No blocker, and no design decision outstanding — Today has already
+        ratified what a section heading looks like in this app. The work is to
+        extract that heading (and its divider) out of the `tracking` package
+        into a shared component, since `TodaySectionHeader` is `internal` and
+        takes a Today-specific `TodaySectionKind`, then adopt it at the three
+        Settings call sites and decide a tone for a section's primary action
+        that is not quieter than its own heading. Verify by rendering Settings
+        on the emulator the way the Today redesign was verified, not by reading
+        the diff.
 stack:
   status: ratified
   note: >
