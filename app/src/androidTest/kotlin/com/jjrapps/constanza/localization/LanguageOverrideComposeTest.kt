@@ -87,7 +87,10 @@ class LanguageOverrideComposeTest {
             }
         }
 
-        composeTestRule.onNodeWithText(SPANISH_SECTION_TITLE).assertIsDisplayed()
+        // ignoreCase: the section heading is uppercased for display (`SectionHeader`), and this
+        // test is about which language `stringResource` resolved in, not about typography. Matching
+        // case-sensitively made it fail the moment Settings got a real heading treatment.
+        composeTestRule.onNodeWithText(SPANISH_SECTION_TITLE, ignoreCase = true).assertIsDisplayed()
         composeTestRule.onNodeWithText(SPANISH_SYSTEM_DEFAULT).assertIsDisplayed()
     }
 
@@ -100,7 +103,8 @@ class LanguageOverrideComposeTest {
             }
         }
 
-        composeTestRule.onNodeWithText(ENGLISH_SECTION_TITLE).assertIsDisplayed()
+        // See the note in spanishOverrideReachesStringResource for why case is ignored here.
+        composeTestRule.onNodeWithText(ENGLISH_SECTION_TITLE, ignoreCase = true).assertIsDisplayed()
     }
 
     /**
