@@ -94,6 +94,24 @@ fun buildTodayHabitRow(
     return TodayHabitRow(habit.id, habit.name, dayStatus, habit.colorArgb, slotRows)
 }
 
+/**
+ * day-review, slice A (day-review-data): how many habits still have something unanswered — the
+ * pure fact day-review's "only when something is still unanswered" mode (slice C) decides on. Lives
+ * here, next to [TodayHabitRow]/[buildTodayHabitRow], rather than as a new DAO aggregate: nothing in
+ * the DAO layer joins habits, schedules, reminder slots and entries the way a SQL count would need
+ * to, and [rows] is exactly the same per-habit join [TodayViewModel] already assembles for the
+ * Today screen — day-review reuses it rather than inventing a second query shape.
+ *
+ * "Unanswered" means a slot whose [TodaySlot.status] is [EntryStatus.UNKNOWN] on a habit that was
+ * actually due — both already guaranteed by [rows] having been built through [buildTodayHabitRow]:
+ * a not-due habit produces no row at all (mirroring [DayStatus.NOT_DUE]), and a slot already
+ * answered [EntryStatus.SKIPPED] is answered, not unanswered, so only [EntryStatus.UNKNOWN] counts.
+ * A multi-slot habit with at least one unanswered slot counts once — this answers "how many
+ * habits", not "how many slots".
+ */
+fun countHabitsWithUnansweredSlots(rows: List<TodayHabitRow>): Int =
+    rows.count { row -> row.slots.any { slot -> slot.status == EntryStatus.UNKNOWN } }
+
 private fun toTodaySlot(
     slotId: Long?,
     minuteOfDay: Int?,
