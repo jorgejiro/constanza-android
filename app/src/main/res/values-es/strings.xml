@@ -204,6 +204,13 @@
     <string name="settings_language_english">English</string>
     <string name="settings_language_spanish">Español</string>
 
+    <!-- day-review, slice C (day-review-notification): la sección de ajustes del repaso nocturno. -->
+    <string name="settings_day_review_section_title">Repaso del día</string>
+    <string name="settings_day_review_time_label">Hora del repaso</string>
+    <string name="settings_day_review_time_supporting">No más tarde de las %1$s, para que el repaso llegue antes de que termine el día.</string>
+    <string name="settings_day_review_mode_every_night">Todas las noches</string>
+    <string name="settings_day_review_mode_only_if_unanswered">Solo cuando quede algo sin responder</string>
+
     <!-- habit-management: per-habit progress entry point (task 6b.4). -->
     <string name="habit_list_progress">Progreso</string>
 

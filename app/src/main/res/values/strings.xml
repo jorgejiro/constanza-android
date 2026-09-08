@@ -240,6 +240,16 @@
     <string name="settings_language_english">English</string>
     <string name="settings_language_spanish">Español</string>
 
+    <!-- day-review, slice C (day-review-notification): the nightly day-review's own settings
+         section. `settings_day_review_time_supporting` takes the 23:45 ceiling as a runtime-
+         formatted %1$s (the device's own time format), never a fixed literal, so it can never
+         disagree with what the time field itself shows. -->
+    <string name="settings_day_review_section_title">Day review</string>
+    <string name="settings_day_review_time_label">Review time</string>
+    <string name="settings_day_review_time_supporting">No later than %1$s, so the review lands before the day closes.</string>
+    <string name="settings_day_review_mode_every_night">Every night</string>
+    <string name="settings_day_review_mode_only_if_unanswered">Only when something is unanswered</string>
+
     <!-- habit-management: per-habit progress entry point (task 6b.4). -->
     <string name="habit_list_progress">Progress</string>
 

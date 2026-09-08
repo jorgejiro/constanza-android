@@ -2277,6 +2277,35 @@ carried_forward_open_items:
         that is not quieter than its own heading. Verify by rendering Settings
         on the emulator the way the Today redesign was verified, not by reading
         the diff.
+    - id: "notification-action-test-resolves-strings-the-wrong-way"
+      title: "NotificationActionWiringInstrumentedTest fails whenever the device carries a Spanish app-language override"
+      status: open
+      severity: >
+        Not a product defect - the app behaves correctly. It is a test that fails for a reason
+        unrelated to what it asserts, which is worse than it sounds: a red test whose redness means
+        nothing trains everyone to look past it, and the next real failure in that file goes with it.
+      origin: >
+        Found on 2026-09-08 while building the day-review notification. The test failed with
+        NoSuchElementException on an emulator that happened to carry a persisted Spanish
+        app-language override, and was reproduced in complete isolation from the new code. `adb
+        shell pm clear` fixed it, which is what identified the cause.
+      reason: >
+        The test compares the posted notification's action titles against a plain
+        `context.getString(labelRes)`. Production does not resolve strings that way:
+        `NotificationPoster` goes through `AppLocaleController`, so when an in-app language override
+        is set the posted titles are in the chosen language while the test's expectation is in the
+        device language. The two only agree when no override is set, which is the state a fresh
+        emulator happens to be in.
+      why_it_matters: >
+        The matrix has never caught it because managed devices start clean every run, so the
+        override is never set there. It only bites a developer running the suite on a device where
+        the app has been used - exactly the person who then has to decide whether a red test is
+        theirs. The same trap was hit and avoided in the day-review notification's own instrumented
+        test, which resolves through the same path production does.
+      owner_condition: >
+        No blocker. Resolve the expected strings the way `NotificationPoster` resolves them rather
+        than through the bare context, and check whether any other instrumented test compares
+        against `context.getString` for a string the notification pipeline emits.
 stack:
   status: ratified
   note: >

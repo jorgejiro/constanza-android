@@ -63,6 +63,8 @@ fun SnoozeSettingsScreen(current: SnoozeDuration, onSelect: (SnoozeDuration) -> 
             item { DataPortabilitySection() }
             // app-localization: third section, same precedent.
             item { LanguageSection() }
+            // day-review, slice C: fourth section, same precedent.
+            item { DayReviewSection() }
         }
     }
 }
