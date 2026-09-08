@@ -27,6 +27,13 @@ import javax.inject.Inject
  * `CoreFlowTestFixture` seeds through the app's own singleton `DataStore` (design.md §8.1, A5) and
  * references [ONBOARDING_DONE_KEY] directly, so a rename in production breaks the seeding fixture
  * at compile time instead of silently seeding a key nobody reads.
+ *
+ * day-review's own settings (slice A, day-review-data) deliberately do NOT live here — see
+ * [DayReviewSettingsStore] — even though they share this same [DataStore] instance: they own a
+ * distinct feature, and folding them in here would have pushed this class past detekt's
+ * `TooManyFunctions` ceiling, which this codebase answers by splitting (`TodayScreen.kt`'s
+ * `TodayDateBar.kt`/`TodayBanners.kt`/`TodayAddHabitAction.kt` split is the precedent), not by
+ * suppressing the rule.
  */
 class ReminderSettingsStore @Inject constructor(
     private val dataStore: DataStore<Preferences>,
