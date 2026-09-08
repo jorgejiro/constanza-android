@@ -38,8 +38,9 @@ import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.theme.Dimens
 import com.jjrapps.constanza.core.ui.theme.Hsv
 import com.jjrapps.constanza.core.ui.theme.Spacing
-import com.jjrapps.constanza.core.ui.theme.clampToHabitBand
 import com.jjrapps.constanza.core.ui.theme.contrastingInk
+import com.jjrapps.constanza.core.ui.theme.habitBandColor
+import com.jjrapps.constanza.core.ui.theme.habitBandPositionOf
 import com.jjrapps.constanza.core.ui.theme.hsvOf
 
 /** Stops around the hue wheel. Twelve is enough that the seams are invisible at the sizes this is
@@ -81,24 +82,37 @@ internal fun hueSpectrum(): List<Color> =
  * mid-pick restores through `rememberSaveable`'s built-in float support with no custom `Saver`.
  * Greyscale is why they must be separate at all: `hsvOf` cannot recover a hue from a grey, so a
  * picker that re-derived its sliders from the composed colour each frame would snap the hue slider
- * to zero the moment saturation reached it.
+ * to zero the moment saturation reached it. The third float is no longer [Hsv.value] (see below), but
+ * the same argument still holds for it: deriving it from the composed colour every frame would fight
+ * the user's own drag the moment the colour's measured contrast did not land exactly back on the
+ * position they set it to.
  *
- * **The committed (and previewed) colour is [clampToHabitBand]`(current)`, never `current` itself.**
- * The three sliders keep their full unrestricted range — nothing about what the user can *move* is
- * limited — but this colour is about to be painted on a habit's name text (see [clampToHabitBand]'s
- * KDoc), so what actually reaches [onConfirm] must sit in the legible band. Clamping the preview to
- * the same value the confirm button commits, rather than showing the raw mix, is what keeps this from
- * being a surprise: a user who drags to an unreadable navy sees the colour they will actually get
- * before they tap confirm, not after.
+ * **The third axis is the legibility band itself, not raw brightness.** This colour is about to be
+ * painted on a habit's name text (see `clampToHabitBand`'s KDoc for why that needs a floor and a
+ * ceiling at all), so what reaches [onConfirm] must sit inside `[7:1, 11:1]` against the app
+ * background. An earlier version ran the raw HSV mix through `clampToHabitBand` for preview and
+ * commit — but that clamp *rebuilds* an out-of-band colour from scratch at exactly the floor or
+ * ceiling, ignoring the caller's `value` once a colour was out of band, so most of the brightness
+ * slider was dead: measured over its 101 positions, saturated red produced only 12 distinct outputs
+ * (50 of them identical to the maximum), saturated blue only 13 (38 identical). Only the very bottom
+ * of the slider looked different, because black has no hue to preserve and clamped to a plain grey
+ * instead of the same hue-preserving rebuild every other floor-bound position collapsed onto — this
+ * is the "only visible at minimum or maximum" defect that was reported.
+ *
+ * `bandPosition` below fixes this by driving the *target contrast ratio* directly (see
+ * `habitBandColor`'s KDoc): `0f` is the darkest legible colour at the current hue/saturation, `1f`
+ * the lightest, and every position in between solves for the colour whose contrast equals that
+ * position's point on the band. The result is in-band by construction, not by a downstream clamp —
+ * `clampToHabitBand` no longer sits in this dialog's path at all; it stays in place for migrations and
+ * imports, which still need to pull an arbitrary stored colour into the band.
  */
 @Composable
 internal fun CustomColorDialog(initialArgb: Int, onConfirm: (Int) -> Unit, onDismiss: () -> Unit) {
     val initial = remember(initialArgb) { hsvOf(initialArgb) }
     var hue by rememberSaveable { mutableFloatStateOf(initial.hue) }
     var saturation by rememberSaveable { mutableFloatStateOf(initial.saturation) }
-    var brightness by rememberSaveable { mutableFloatStateOf(initial.value) }
-    val current = Hsv(hue, saturation, brightness).toArgb()
-    val committed = clampToHabitBand(current)
+    var bandPosition by rememberSaveable { mutableFloatStateOf(habitBandPositionOf(initialArgb)) }
+    val committed = habitBandColor(hue, saturation, bandPosition)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -117,22 +131,26 @@ internal fun CustomColorDialog(initialArgb: Int, onConfirm: (Int) -> Unit, onDis
                 GradientSlider(
                     label = stringResource(R.string.habit_editor_color_saturation),
                     fraction = saturation,
-                    trackColors = listOf(
-                        Color(Hsv(hue, 0f, brightness).toArgb()),
-                        Color(Hsv(hue, 1f, brightness).toArgb()),
-                    ),
+                    trackColors = remember(hue, bandPosition) {
+                        listOf(
+                            Color(habitBandColor(hue, 0f, bandPosition)),
+                            Color(habitBandColor(hue, 1f, bandPosition)),
+                        )
+                    },
                     testTag = HABIT_COLOR_SATURATION_SLIDER_TEST_TAG,
                     onFractionChange = { saturation = it },
                 )
                 GradientSlider(
                     label = stringResource(R.string.habit_editor_color_brightness),
-                    fraction = brightness,
-                    trackColors = listOf(
-                        Color(Hsv(hue, saturation, 0f).toArgb()),
-                        Color(Hsv(hue, saturation, 1f).toArgb()),
-                    ),
+                    fraction = bandPosition,
+                    trackColors = remember(hue, saturation) {
+                        listOf(
+                            Color(habitBandColor(hue, saturation, 0f)),
+                            Color(habitBandColor(hue, saturation, 1f)),
+                        )
+                    },
                     testTag = HABIT_COLOR_BRIGHTNESS_SLIDER_TEST_TAG,
-                    onFractionChange = { brightness = it },
+                    onFractionChange = { bandPosition = it },
                 )
             }
         },

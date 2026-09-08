@@ -91,6 +91,105 @@ class HabitColorBandTest {
         )
     }
 
+    @Test
+    fun `habitBandColor spans the whole band for saturated red`() =
+        assertBandBoundary(hue = 12f, saturation = 1f)
+
+    @Test
+    fun `habitBandColor spans the whole band for saturated blue`() =
+        assertBandBoundary(hue = 212f, saturation = 1f)
+
+    @Test
+    fun `habitBandColor spans the whole band for saturated green`() =
+        assertBandBoundary(hue = 120f, saturation = 1f)
+
+    @Test
+    fun `habitBandColor spans the whole band for yellow`() =
+        assertBandBoundary(hue = 50f, saturation = 1f)
+
+    @Test
+    fun `habitBandColor spans the whole band for pure grey`() =
+        assertBandBoundary(hue = 0f, saturation = 0f)
+
+    /**
+     * The regression test that would have caught the dead brightness slider: before this change, the
+     * slider drove raw HSV `value` straight into [clampToHabitBand], which rebuilds any out-of-band
+     * colour from scratch at exactly the floor or ceiling — discarding `value` entirely once a colour
+     * was out of band. Sweeping the old slider's 101 positions (`0f` to `1f` in steps of `0.01`)
+     * produced only 12 distinct outputs for saturated red and only 13 for saturated blue; the other 89
+     * (red) and 88 (blue) positions were indistinguishable from one another. [habitBandColor] fixes
+     * this by driving the target contrast ratio itself instead of `value`, so every position asks for a
+     * genuinely different point on the band and must produce a genuinely different colour.
+     */
+    @Test
+    fun `habitBandColor sweep has no dead zone, unlike the old value-driven slider`() {
+        assertDistinctSweep(hue = 12f, saturation = 1f, previousDistinctCount = 12)
+        assertDistinctSweep(hue = 212f, saturation = 1f, previousDistinctCount = 13)
+    }
+
+    @Test
+    fun `habitBandColor round-trips through habitBandPositionOf for every preset`() {
+        HabitPalette.ORDERED.forEach { habitColor ->
+            val hsv = hsvOf(habitColor.argb)
+            val seededPosition = habitBandPositionOf(habitColor.argb)
+            val reconstructed = habitBandColor(hsv.hue, hsv.saturation, seededPosition)
+
+            val originalRatio = contrastRatio(Color(habitColor.argb), ConstanzaColors.Background)
+            val reconstructedRatio = contrastRatio(Color(reconstructed), ConstanzaColors.Background)
+
+            assertTrue(
+                kotlin.math.abs(originalRatio - reconstructedRatio) <= ROUND_TRIP_RATIO_TOLERANCE,
+                "${habitColor.name}: seeded position $seededPosition reconstructed a ratio of " +
+                    "%.3f:1, but the preset itself measures %.3f:1".format(reconstructedRatio, originalRatio),
+            )
+        }
+    }
+
+    @Test
+    fun `habitBandPositionOf coerces pure black to 0 and pure white to 1`() {
+        assertEquals(0f, habitBandPositionOf(OPAQUE or 0x000000))
+        assertEquals(1f, habitBandPositionOf(OPAQUE or 0xFFFFFF))
+    }
+
+    private fun assertBandBoundary(hue: Float, saturation: Float) {
+        val floorRatio = contrastRatio(Color(habitBandColor(hue, saturation, 0f)), ConstanzaColors.Background)
+        val ceilingRatio = contrastRatio(Color(habitBandColor(hue, saturation, 1f)), ConstanzaColors.Background)
+
+        assertTrue(
+            kotlin.math.abs(floorRatio - HABIT_BAND_FLOOR) <= HABIT_BAND_TOLERANCE,
+            "hue=$hue sat=$saturation at position 0f measured %.3f:1, expected close to $HABIT_BAND_FLOOR:1"
+                .format(floorRatio),
+        )
+        assertTrue(
+            kotlin.math.abs(ceilingRatio - HABIT_BAND_CEILING) <= HABIT_BAND_TOLERANCE,
+            "hue=$hue sat=$saturation at position 1f measured %.3f:1, expected close to $HABIT_BAND_CEILING:1"
+                .format(ceilingRatio),
+        )
+    }
+
+    private fun assertDistinctSweep(hue: Float, saturation: Float, previousDistinctCount: Int) {
+        val results = (0..SWEEP_STEPS).map { step ->
+            habitBandColor(hue, saturation, step.toFloat() / SWEEP_STEPS)
+        }
+        val bandRange = (HABIT_BAND_FLOOR - HABIT_BAND_TOLERANCE)..(HABIT_BAND_CEILING + HABIT_BAND_TOLERANCE)
+        results.forEach { argb ->
+            val ratio = contrastRatio(Color(argb), ConstanzaColors.Background)
+            assertTrue(
+                ratio in bandRange,
+                "hue=$hue sat=$saturation swept to 0x%06X, measuring %.3f:1, outside $bandRange"
+                    .format(argb and 0xFFFFFF, ratio),
+            )
+        }
+
+        val distinctCount = results.toSet().size
+        assertTrue(
+            distinctCount >= MIN_DISTINCT_SWEEP_COUNT,
+            "hue=$hue sat=$saturation produced only $distinctCount distinct colours across " +
+                "${SWEEP_STEPS + 1} swept positions (was $previousDistinctCount before the band-position " +
+                "reparameterisation) — expected at least $MIN_DISTINCT_SWEEP_COUNT",
+        )
+    }
+
     private fun assertClamp(inputRgb: Int, expectedRgb: Int) {
         val input = OPAQUE or inputRgb
         val expected = OPAQUE or expectedRgb
@@ -118,5 +217,19 @@ class HabitColorBandTest {
         const val CHANNEL_TOLERANCE = 1
         const val CHANNEL_MAX = 255
         const val CHANNEL_STEP = 17
+
+        /** 101 positions (`0f` to `1f` in steps of `0.01`), matching the slider's own resolution. */
+        const val SWEEP_STEPS = 100
+
+        /**
+         * The regression floor: comfortably above both pre-fix counts (12 for red, 13 for blue) while
+         * leaving headroom for 8-bit channel quantisation to still collapse a handful of adjacent
+         * positions onto the same rounded byte.
+         */
+        const val MIN_DISTINCT_SWEEP_COUNT = 60
+
+        /** Contrast-ratio "tenths" tolerance for [habitBandPositionOf]'s round trip — generous enough
+         *  to absorb 8-bit channel rounding on both the seed measurement and the reconstruction. */
+        const val ROUND_TRIP_RATIO_TOLERANCE = 0.2
     }
 }

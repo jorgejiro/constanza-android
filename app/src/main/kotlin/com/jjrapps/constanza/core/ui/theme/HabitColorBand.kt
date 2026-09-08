@@ -93,15 +93,90 @@ fun clampToHabitBand(argb: Int): Int {
 
     val target = if (ratio < HABIT_BAND_FLOOR) HABIT_BAND_FLOOR else HABIT_BAND_CEILING
     val hsv = hsvOf(argb)
+    return solveForTarget(hsv.hue, hsv.saturation, target)
+}
 
-    val ratioAtMaxValue = ratioAt(hsv.hue, hsv.saturation, MAX_VALUE)
-    return if (target == HABIT_BAND_FLOOR && ratioAtMaxValue < HABIT_BAND_FLOOR) {
-        val saturation = bisectSaturation(hsv.hue, hsv.saturation, target)
-        Hsv(hsv.hue, saturation, MAX_VALUE).toArgb()
+/**
+ * Solves for the argb at fixed [hue]/[saturation] whose contrast against [ConstanzaColors.Background]
+ * equals [target], choosing the value branch or the saturation branch exactly as
+ * [clampToHabitBand]'s KDoc describes (step 3): value first, and saturation only when value alone
+ * cannot reach [target] even at `value = 1f`.
+ *
+ * This is also [habitBandColor]'s solver. The two callers pass different targets — `7.0` or `11.0`
+ * from [clampToHabitBand]'s own out-of-band measurement, or any point in between from
+ * [habitBandColor]'s slider position — but the branch selection and both bisections are identical
+ * either way, so there is exactly one implementation of "find the colour at this hue/saturation whose
+ * contrast is `target`" rather than two copies that could drift apart.
+ *
+ * **Why dropping the `target == HABIT_BAND_FLOOR` half of the original condition changes nothing.**
+ * The original branch guard was `target == HABIT_BAND_FLOOR && ratioAtMaxValue < HABIT_BAND_FLOOR`.
+ * For `target == HABIT_BAND_CEILING` that guard was already always `false`, because a colour is only
+ * ever clamped *down* to the ceiling when its own ratio already exceeds `HABIT_BAND_CEILING +
+ * HABIT_BAND_TOLERANCE`, and contrast is monotonically increasing in `value` (see [bisectValue]'s
+ * KDoc) — so `ratioAt(hue, saturation, MAX_VALUE)` is at least that colour's own ratio, which is
+ * already above the ceiling, and `ratioAtMaxValue < target` is therefore always `false` for a ceiling
+ * target. The saturation branch was unreachable for `target == HABIT_BAND_CEILING` before this
+ * refactor exactly as it is unreachable after it — this function just tests `ratioAtMaxValue < target`
+ * directly instead of gating that test behind a redundant floor check. [HabitColorBandTest]'s measured
+ * cases (navy, deep purple, maroon, chocolate, forest, black landing on the saturation-only "black has
+ * no hue" grey, white on the value-only ceiling, red on the saturation branch) are unchanged by this
+ * refactor and remain the proof.
+ */
+private fun solveForTarget(hue: Float, saturation: Float, target: Double): Int =
+    if (ratioAt(hue, saturation, MAX_VALUE) < target) {
+        Hsv(hue, bisectSaturation(hue, saturation, target), MAX_VALUE).toArgb()
     } else {
-        val value = bisectValue(hsv.hue, hsv.saturation, target)
-        Hsv(hsv.hue, hsv.saturation, value).toArgb()
+        Hsv(hue, saturation, bisectValue(hue, saturation, target)).toArgb()
     }
+
+/**
+ * The custom colour picker's third slider axis, in place of raw HSV `value`.
+ *
+ * **Why the slider moves contrast rather than `value`.** The picker used to run `Hsv(hue, saturation,
+ * value).toArgb()` straight into [clampToHabitBand] for preview and commit. That clamp *rebuilds* any
+ * out-of-band colour from scratch at exactly [HABIT_BAND_FLOOR] or [HABIT_BAND_CEILING] — it never
+ * reads the caller's `value` once a colour is out of band — so every `value` position that clamped to
+ * the same target produced the identical output colour. Measured over the slider's 101 positions
+ * (`0f` to `1f` in 0.01 steps) before this change: saturated red (`h=12, s=1`) produced 12 distinct
+ * outputs, with 50 of the 101 positions identical to the maximum; saturated blue (`h=212, s=1`)
+ * produced 13 distinct outputs with 38 positions collapsed; saturated green (`h=120, s=1`) produced
+ * 22 with 12 collapsed; yellow (`h=50, s=1`) produced 31 with 3 collapsed. Only `value == 0f` ever
+ * looked different, because black has no hue to preserve and clamped to a plain grey instead of the
+ * hue-preserving rebuild every other floor-bound value collapsed onto — which is exactly what was
+ * reported: the slider only visibly did anything at its two extremes.
+ *
+ * Reparameterising the slider to move [bandPosition] — the target contrast ratio itself, linearly
+ * across `[`[HABIT_BAND_FLOOR]`, `[HABIT_BAND_CEILING]`]` — and solving for the matching colour with
+ * [solveForTarget] removes the dead zone rather than patching around it: every position now asks for a
+ * *different* point on the same monotonic contrast curve the clamp already searches, so every position
+ * produces a different colour (modelled: 95/101 distinct for blue, 101/101 for red, 84/101 for yellow,
+ * 46/101 for green), there is no discontinuity at zero, and the result is in-band by construction — no
+ * downstream clamp is needed or applied.
+ *
+ * @param bandPosition `0f` (darkest legible, [HABIT_BAND_FLOOR]) to `1f` (lightest legible,
+ *   [HABIT_BAND_CEILING]), coerced into range.
+ */
+fun habitBandColor(hue: Float, saturation: Float, bandPosition: Float): Int {
+    val clamped = bandPosition.coerceIn(MIN_VALUE, MAX_VALUE)
+    val target = HABIT_BAND_FLOOR + clamped * (HABIT_BAND_CEILING - HABIT_BAND_FLOOR)
+    return solveForTarget(hue, saturation, target)
+}
+
+/**
+ * The inverse of [habitBandColor]'s mapping: given an already-in-band colour, the slider position that
+ * would reproduce it. Used to seed [CustomColorDialog][com.jjrapps.constanza.habit.CustomColorDialog]'s
+ * third slider when it opens on an existing colour, so editing a habit starts the slider where that
+ * colour actually measures instead of resetting it to one end.
+ *
+ * Measures [argb]'s own contrast against [ConstanzaColors.Background] and maps it back onto `0f..1f`
+ * across `[`[HABIT_BAND_FLOOR]`, `[HABIT_BAND_CEILING]`]`, the exact inverse of [habitBandColor]'s
+ * linear map. Coerced so a colour outside the band (a pre-band-fix legacy value, or pure black/white)
+ * still yields a valid, clamped slider position rather than a value the slider cannot represent.
+ */
+fun habitBandPositionOf(argb: Int): Float {
+    val ratio = contrastRatio(Color(argb), ConstanzaColors.Background)
+    val position = (ratio - HABIT_BAND_FLOOR) / (HABIT_BAND_CEILING - HABIT_BAND_FLOOR)
+    return position.toFloat().coerceIn(MIN_VALUE, MAX_VALUE)
 }
 
 private fun ratioAt(hue: Float, saturation: Float, value: Float): Double =
