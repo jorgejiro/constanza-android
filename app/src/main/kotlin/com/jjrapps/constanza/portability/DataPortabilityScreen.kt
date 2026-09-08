@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -19,8 +20,17 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.component.SectionDivider
+import com.jjrapps.constanza.core.ui.component.SectionHeader
+import com.jjrapps.constanza.core.ui.theme.Spacing
 
 private const val BACKUP_JSON_MIME_TYPE = "application/json"
+
+/** Zero horizontal, so an action starts on the same left edge as the heading above it rather than
+ *  12dp past it. The vertical half of `ButtonDefaults.TextButtonContentPadding` is kept: it is what
+ *  gives the two stacked actions air between them, and Material's own minimum interactive size
+ *  still guarantees the touch target regardless of what is set here. */
+private val ACTION_CONTENT_PADDING = PaddingValues(horizontal = 0.dp, vertical = Spacing.sm)
 
 /**
  * Tasks 7.2/7.3/7.4. Rendered as an extra section on the existing Settings screen
@@ -51,11 +61,26 @@ fun DataPortabilitySection(viewModel: DataPortabilityViewModel = hiltViewModel()
     }
 
     Column(modifier = Modifier.padding(16.dp)) {
-        Text(stringResource(R.string.portability_section_title))
-        TextButton(onClick = { exportLauncher.launch(viewModel.suggestedFileName()) }) {
+        // settings-section-headings: the Column above already supplies the 16dp screen inset every
+        // row and button here shares, so the header's own horizontal inset is zeroed out — otherwise
+        // it would sit indented past the very buttons it introduces.
+        SectionHeader(stringResource(R.string.portability_section_title), startInset = 0.dp, endInset = 0.dp)
+        SectionDivider(startInset = 0.dp, endInset = 0.dp)
+        // A TextButton's default content padding is 12dp horizontal, which would start these two
+        // labels 12dp past the heading that introduces them and past the radio rows in the sections
+        // above and below — an indent that belongs to no edge on this screen. Zeroed horizontally so
+        // the action lines up with its own heading; the vertical half is kept, and Material's own
+        // minimum interactive size still guarantees the touch target.
+        TextButton(
+            onClick = { exportLauncher.launch(viewModel.suggestedFileName()) },
+            contentPadding = ACTION_CONTENT_PADDING,
+        ) {
             Text(stringResource(R.string.portability_export_action))
         }
-        TextButton(onClick = { importLauncher.launch(arrayOf(BACKUP_JSON_MIME_TYPE)) }) {
+        TextButton(
+            onClick = { importLauncher.launch(arrayOf(BACKUP_JSON_MIME_TYPE)) },
+            contentPadding = ACTION_CONTENT_PADDING,
+        ) {
             Text(stringResource(R.string.portability_import_action))
         }
         ImportResultMessage(importResult, onDismiss = viewModel::dismissImportResult)
