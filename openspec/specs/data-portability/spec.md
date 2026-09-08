@@ -160,3 +160,23 @@ colour values.
 - GIVEN a dataset containing a habit with a colour from the current warm-dark palette
 - WHEN the user exports, wipes all app data, and imports that same file
 - THEN the habit's colour is restored exactly as exported, unchanged
+
+### Requirement: Data Leaves The Device Only Through Export
+
+App data MUST NOT be copied off the device by any automatic platform mechanism. Android Auto
+Backup MUST be disabled, and device-to-device transfer MUST be excluded, so that the export file
+this capability produces is the only way a user's habits leave the phone.
+
+A consequence that is intended rather than tolerated: uninstalling the app removes its data, and
+reinstalling starts clean. Preserving data across a reinstall or a new phone is the user's own
+deliberate act — export, then import — not something that happens to them silently.
+
+#### Scenario: Uninstalling and reinstalling starts clean
+- GIVEN the user has habits recorded and uninstalls the app
+- WHEN the app is installed again on the same device and opened
+- THEN no habit from before the uninstall is present
+
+#### Scenario: The disabled flag is asserted, not documented
+- GIVEN the app's merged manifest as the platform parses it
+- WHEN the automated instrumented suite runs
+- THEN a test fails if the allow-backup flag is set

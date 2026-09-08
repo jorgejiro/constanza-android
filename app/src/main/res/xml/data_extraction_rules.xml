@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Nothing this app stores leaves the device by itself.
+
+    `android:allowBackup="false"` in the manifest already stops Android Auto Backup from copying
+    app data to the user's Google Drive, on every API level. It does NOT stop the other extraction
+    path: on Android 12 (API 31) and above, device-to-device transfer is governed separately, by
+    the `<device-transfer>` block below, and would otherwise still carry the habit database onto a
+    new phone. `targetSdk` is 37, so these rules apply.
+
+    Both blocks are spelled out rather than relying on the manifest flag alone, because the two
+    paths are configured independently and a reader checking one should not have to know that the
+    other is covered somewhere else.
+
+    The `<cloud-backup>` block is redundant while `allowBackup="false"` stands, and is kept anyway:
+    it states the same intent in the file whose whole job is stating it, so flipping the manifest
+    flag back on cannot silently re-enable cloud backup without someone also editing this.
+
+    Why exclude everything rather than tune it: preserving data across a reinstall or a new phone
+    is what `DataPortabilityScreen`'s export/import is for — an explicit, user-driven file the user
+    can see, keep and inspect. A silent restore is how an uninstall stopped meaning "start clean",
+    which is the surprise that prompted this. One path, chosen deliberately, beats two where one is
+    invisible.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+        <exclude domain="device_root" />
+        <exclude domain="device_file" />
+        <exclude domain="device_database" />
+        <exclude domain="device_sharedpref" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+        <exclude domain="device_root" />
+        <exclude domain="device_file" />
+        <exclude domain="device_database" />
+        <exclude domain="device_sharedpref" />
+    </device-transfer>
+</data-extraction-rules>
