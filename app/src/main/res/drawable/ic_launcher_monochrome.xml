@@ -1,13 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Launcher icon monochrome layer for Android 13+ themed icons: the same "Espiral" path as
-    ic_launcher_foreground.xml, on the same 108x108 viewport.
+    The themed-icon layer (Android 13+). The system tints this silhouette with the user's wallpaper
+    colours and ignores the colour declared here, so ring and tick are one flat black: they have to
+    read as a single mark, not as two shapes that happen to be tinted alike.
 
-    The system reads ONLY this layer's alpha coverage and tints it with the user's wallpaper-derived
-    theme colour, so the stroke colour written here is never shown on device. It is kept as an
-    opaque placeholder purely so the drawable renders visibly in tooling previews. What actually
-    matters is the alpha mask — that the stroke geometry, width and round caps match the foreground
-    exactly, because a themed icon is nothing but this coverage.
+    Same traced geometry and same framing as ic_launcher_foreground — see that file's header for
+    where the shape came from and why it sits where it does.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -15,8 +13,34 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:pathData="M26,54 A28,28 0 0 1 82,54 A21.5,21.5 0 0 1 39,54 A15,15 0 0 1 69,54 A8.5,8.5 0 0 1 52,54"
-        android:strokeColor="#FF000000"
-        android:strokeWidth="8"
-        android:strokeLineCap="round" />
+        android:fillColor="#000000"
+        android:pathData="M 53.27,29.92 L 53.27,34.37 L 53.63,34.37 C 56.70,34.37 60.31,35.41 62.91,37.05 L 63.41,37.37 L
+            64.28,36.44 C 64.76,35.93 65.65,34.97 66.25,34.31 C 66.87,33.65 67.83,32.59 68.43,31.96 C
+            69.00,31.34 69.48,30.82 69.48,30.81 C 69.48,30.75 67.90,29.70 67.12,29.25 C 65.61,28.35
+            63.34,27.32 61.63,26.76 C 59.27,25.98 56.13,25.48 53.71,25.48 L 53.27,25.48 L 53.27,29.92 Z M
+            47.45,25.92 C 46.28,26.09 43.80,26.46 41.94,26.75 C 40.06,27.04 37.94,27.37 37.22,27.48 C
+            33.52,28.05 29.93,28.62 29.91,28.64 C 29.88,28.67 30.85,29.64 32.04,30.84 C 33.23,32.03
+            34.20,33.02 34.20,33.04 C 34.20,33.06 33.79,33.54 33.28,34.09 C 31.04,36.52 29.79,38.31
+            28.48,40.96 C 26.97,44.01 26.14,46.81 25.73,50.17 C 25.60,51.23 25.59,54.76 25.71,55.84 C
+            26.19,60.30 27.75,64.65 30.22,68.39 C 33.71,73.67 38.94,77.65 44.93,79.58 C 54.05,82.52
+            63.83,80.50 71.20,74.13 C 78.94,67.45 82.41,57.24 80.29,47.44 C 79.80,45.23 79.08,43.16
+            78.16,41.32 L 77.82,40.63 L 76.63,41.97 C 75.97,42.70 74.52,44.31 73.40,45.55 C 72.28,46.79
+            71.34,47.85 71.32,47.91 C 71.29,47.97 71.35,48.39 71.48,49.02 C 71.80,50.59 71.87,51.22
+            71.90,52.84 C 71.94,54.53 71.87,55.39 71.56,56.88 C 70.81,60.66 69.22,63.64 66.49,66.36 C
+            59.84,73.01 49.57,73.76 42.09,68.15 C 34.94,62.80 32.56,53.62 36.20,45.47 C 36.98,43.73
+            37.98,42.19 39.39,40.54 C 39.91,39.94 40.51,39.36 40.60,39.36 C 40.62,39.36 41.77,40.51
+            43.13,41.89 C 45.63,44.42 45.63,44.42 45.66,44.24 C 45.68,44.13 46.18,41.78 46.77,39.01 C
+            48.95,28.88 49.62,25.72 49.59,25.66 C 49.58,25.63 48.63,25.76 47.45,25.92 Z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M 71.01,34.12 C 70.41,34.36 70.31,34.44 67.42,37.62 C 64.66,40.63 63.35,42.09 60.50,45.23 C
+            58.77,47.14 56.38,49.78 55.19,51.11 C 52.81,53.72 51.94,54.65 51.85,54.65 C 51.82,54.65
+            50.70,53.57 49.37,52.24 C 46.78,49.65 46.72,49.60 46.00,49.47 C 45.51,49.39 45.06,49.44
+            44.63,49.65 C 44.18,49.87 42.46,51.55 42.20,52.02 C 41.84,52.70 41.83,53.51 42.17,54.24 C
+            42.34,54.58 42.72,54.99 46.46,58.74 C 50.02,62.31 50.61,62.87 50.92,63.02 C 52.01,63.56
+            52.99,63.32 53.92,62.30 C 54.18,62.01 55.93,60.09 57.81,58.05 C 61.82,53.64 63.77,51.49
+            69.11,45.58 C 69.27,45.40 69.93,44.67 70.59,43.95 C 71.24,43.23 72.14,42.24 72.59,41.75 C
+            73.04,41.26 73.73,40.51 74.11,40.07 C 75.21,38.87 75.41,38.51 75.42,37.70 C 75.42,36.80
+            75.15,36.31 73.99,35.20 C 72.98,34.22 72.69,34.06 71.87,34.03 C 71.44,34.02 71.25,34.04
+            71.01,34.12 Z" />
 </vector>
