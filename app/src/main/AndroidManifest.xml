@@ -93,6 +93,12 @@
             android:name=".scheduling.ReminderFireReceiver"
             android:exported="false" />
 
+        <!-- day-review-exact-alarm: DayReviewAlarmScheduler's own AlarmManager PendingIntent
+             target, mirroring ReminderFireReceiver's identical exported=false reasoning above. -->
+        <receiver
+            android:name=".scheduling.DayReviewFireReceiver"
+            android:exported="false" />
+
         <!-- design.md §9.1/§12: the notification-action PendingIntent target
              (`ActionIntentContract.ACTION_RECEIVER_CLASS`). No intent-filter: every PendingIntent
              targets this component explicitly via `setClassName`, so a filter would only widen the

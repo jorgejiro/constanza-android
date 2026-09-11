@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.first
 /**
  * day-review, slice B (day-review-notification): the one-shot twin of the per-habit join
  * [TodayViewModel.uiState] assembles reactively for the Today screen. A `CoroutineWorker`
- * ([com.jjrapps.constanza.scheduling.DayReviewWorker]) has no `ViewModel` and no `combine` chain to
+ * ([com.jjrapps.constanza.scheduling.DayReviewFireWorker]) has no `ViewModel` and no `combine` chain to
  * attach to — it runs once for one date and is gone — so this class re-reads the exact same
  * [HabitDaos] bundle [com.jjrapps.constanza.habit.HabitRepository] already reads, through one-shot
  * suspend calls in the same style [com.jjrapps.constanza.scheduling.OccurrencePlanner] and

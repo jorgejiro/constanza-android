@@ -2,8 +2,7 @@ package com.jjrapps.constanza.reminding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.work.ExistingWorkPolicy
-import com.jjrapps.constanza.scheduling.WorkScheduler
+import com.jjrapps.constanza.scheduling.DayReviewAlarmScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -15,23 +14,22 @@ import javax.inject.Inject
 /**
  * day-review, slice C (day-review-notification): the settings screen's half of
  * [DayReviewSettingsStore] — the store slice A already built, and the schedule
- * [WorkScheduler.scheduleDayReview] slice B already anchors.
+ * [DayReviewAlarmScheduler.scheduleNext] (day-review-exact-alarm) now anchors.
  *
  * Mirrors [SnoozeSettingsViewModel]'s own shape: no locally-cached copy of either setting, every
  * read comes straight from [settingsStore]'s own flows, combined into one [uiState] so the
  * presentational composable reads one flow rather than two.
  *
- * Only [setReviewTimeMinuteOfDay] re-anchors the job afterwards, with [ExistingWorkPolicy.REPLACE]
- * — [WorkScheduler.scheduleDayReview]'s own KDoc calls out exactly this call site as the one a
- * settings screen must use once it exists, and `REPLACE` for the same reason
- * [WorkScheduler.scheduleNextDayReview] uses it: an already-pending request must be replaced, not
- * merely kept. [setReviewFiresEveryNight] changes what [DayReviewWorker] does once it runs, not
- * when it runs, so it never needs to touch [WorkScheduler] at all.
+ * Only [setReviewTimeMinuteOfDay] re-anchors the alarm afterwards — an already-armed alarm is
+ * replaced by [DayReviewAlarmScheduler.scheduleNext]'s own `PendingIntent.FLAG_UPDATE_CURRENT` re-arm,
+ * so no separate policy argument is needed the way the deleted `WorkManager` path required one.
+ * [setReviewFiresEveryNight] changes what [com.jjrapps.constanza.scheduling.DayReviewFireWorker] does
+ * once it runs, not when it runs, so it never needs to touch [DayReviewAlarmScheduler] at all.
  */
 @HiltViewModel
 class DayReviewSettingsViewModel @Inject constructor(
     private val settingsStore: DayReviewSettingsStore,
-    private val workScheduler: WorkScheduler,
+    private val dayReviewAlarmScheduler: DayReviewAlarmScheduler,
 ) : ViewModel() {
 
     val uiState: StateFlow<DayReviewSettingsUiState> = combine(
@@ -43,7 +41,7 @@ class DayReviewSettingsViewModel @Inject constructor(
     fun setReviewTimeMinuteOfDay(minuteOfDay: Int) {
         viewModelScope.launch {
             settingsStore.setReviewTimeMinuteOfDay(minuteOfDay)
-            workScheduler.scheduleDayReview(ExistingWorkPolicy.REPLACE)
+            dayReviewAlarmScheduler.scheduleNext()
         }
     }
 

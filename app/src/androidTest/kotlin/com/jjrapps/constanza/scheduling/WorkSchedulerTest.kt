@@ -1,7 +1,6 @@
 package com.jjrapps.constanza.scheduling
 
 import android.content.Context
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.Configuration
@@ -11,7 +10,6 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
-import com.jjrapps.constanza.reminding.DayReviewSettingsStore
 import io.mockk.coVerify
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
@@ -19,17 +17,13 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
-
-private const val DAY_REVIEW_SETTINGS_TEST_FILE_NAME = "work_scheduler_test_day_review_settings.preferences_pb"
 
 private const val RECONCILE_PERIOD_HOURS = 1L
 private const val COLD_START_GAP_MINUTES = 17L
@@ -59,22 +53,14 @@ private val SWEEP_FIRES_AT: Instant = Instant.parse("2026-09-03T00:00:00Z")
 @RunWith(AndroidJUnit4::class)
 class WorkSchedulerTest {
 
-    @get:Rule
-    val tempFolder = TemporaryFolder()
-
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val timeProvider = FakeTimeProvider(FIRST_COLD_START)
     private val occurrenceResolver = mockk<OccurrenceResolver>(relaxed = true)
 
-    // day-review, slice B: a real DataStore-backed store, not a mock — WorkScheduler.scheduleAll()
-    // now also fires a background scheduleDayReview() coroutine (see ConstanzaApplication.onCreate's
-    // KDoc for why that call is async), and a mocked suspend read would either need relaxed stubbing
-    // or risk throwing on that background thread; a real temp-file-backed store behaves exactly like
-    // the production one, matching DayReviewSettingsStoreTest's own JVM pattern.
-    private val dayReviewSettingsStore = DayReviewSettingsStore(
-        PreferenceDataStoreFactory.create(produceFile = { tempFolder.newFile(DAY_REVIEW_SETTINGS_TEST_FILE_NAME) }),
-    )
-    private val scheduler = WorkScheduler(context, timeProvider, RECONCILE_PERIOD_HOURS, dayReviewSettingsStore)
+    // day-review-exact-alarm: WorkScheduler no longer takes a DayReviewSettingsStore — the day
+    // review's own scheduling moved to DayReviewAlarmScheduler, exercised by
+    // DayReviewFireWorkerTest/RescheduleReceivers coverage instead of here.
+    private val scheduler = WorkScheduler(context, timeProvider, RECONCILE_PERIOD_HOURS)
     private lateinit var workManager: WorkManager
 
     /** Stands in for `HiltWorkerFactory`, which an instrumented test cannot reach — without it the
