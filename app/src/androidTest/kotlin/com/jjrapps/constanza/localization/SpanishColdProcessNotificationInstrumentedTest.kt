@@ -121,7 +121,7 @@ class SpanishColdProcessNotificationInstrumentedTest {
         // here only because the test's fixture habit is named "Meditar").
         val posted = fixture.awaitPostedNotification(occurrenceId.toInt())
         assertEquals(
-            "Hábitos",
+            "Buenos hábitos",
             posted.notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
         )
         assertEquals(
