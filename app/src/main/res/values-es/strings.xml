@@ -11,7 +11,7 @@
          fixed, localized title; the body carries the user's own habit name verbatim and is never
          localized (design.md D4). -->
     <string name="notification_channel_reminders_name">Recordatorios de hábitos</string>
-    <string name="notification_reminder_title">Hábitos</string>
+    <string name="notification_reminder_title">Buenos hábitos</string>
     <string name="notification_action_yes">Sí</string>
     <string name="notification_action_no">No</string>
     <string name="notification_action_snooze">Aplazar</string>
