@@ -12,12 +12,17 @@ import javax.inject.Inject
 
 /**
  * day-review, slice A (day-review-data): the default time for the once-a-day "review your day"
- * notification — 23:30, as a minute-of-day. This is deliberately the LAST CHANCE before the
- * midnight sweep turns any still-`UNKNOWN` slot into `MISSED`; it is not an arbitrary "late
- * evening" pick. Do not move it without understanding that relationship (see
- * [REVIEW_TIME_LATEST_MINUTE_OF_DAY]).
+ * notification — 23:00, as a minute-of-day. day-review-exact-alarm moved this earlier from its
+ * original 23:30: the review now rides [com.jjrapps.constanza.scheduling.DayReviewAlarmScheduler]'s
+ * exact alarm rather than anchored `WorkManager` work, but its degraded `setWindow` fallback
+ * ([com.jjrapps.constanza.scheduling.scheduleExactOrInexact]) still has a 10-minute window, and OEM
+ * background-kill/throttling can still push even an exact alarm's `WorkManager` follow-up late. A
+ * WIDER margin before the midnight sweep that turns any still-`UNKNOWN` slot into `MISSED` is the
+ * point now, not merely "late evening" — the sweep is still the hard boundary this default is
+ * chosen against (see [REVIEW_TIME_LATEST_MINUTE_OF_DAY]), just with more room to spare against it
+ * than 23:30 left. Do not move it without understanding that relationship.
  */
-const val DEFAULT_REVIEW_TIME_MINUTE_OF_DAY = 23 * 60 + 30
+const val DEFAULT_REVIEW_TIME_MINUTE_OF_DAY = 23 * 60
 
 /**
  * day-review, slice A: the latest minute-of-day the review notification's time may ever be

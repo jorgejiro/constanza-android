@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.WorkManager
+import com.jjrapps.constanza.scheduling.DayReviewAlarmScheduler
 import com.jjrapps.constanza.scheduling.WorkScheduler
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -24,6 +25,8 @@ class ConstanzaApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var workScheduler: WorkScheduler
 
+    @Inject lateinit var dayReviewAlarmScheduler: DayReviewAlarmScheduler
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
 
@@ -31,21 +34,20 @@ class ConstanzaApplication : Application(), Configuration.Provider {
         super.onCreate()
         if (!WorkManager.isInitialized()) WorkManager.initialize(this, workManagerConfiguration)
         workScheduler.scheduleAll()
-        // day-review, slice B (day-review-notification): the third job's startup enrolment, kept as
-        // its own line rather than folded into scheduleAll() itself. WorkScheduler.scheduleDayReview
-        // is suspend — its anchor depends on a DataStore read (DayReviewSettingsStore) that
-        // scheduleAll()'s other two jobs never needed — and onCreate() is not a suspend context, so
-        // this mirrors RescheduleReceivers.replanAsync's existing fire-and-forget-coroutine idiom for
-        // the same reason: a suspend reschedule triggered from a non-suspend Android callback.
-        // ExistingWorkPolicy defaults to KEEP, exactly like scheduleAll()'s own midnight-sweep
-        // enqueue, so a cold start never re-anchors an already-pending review.
+        // day-review-exact-alarm: the review's own startup arm, kept as its own line rather than
+        // folded into scheduleAll() itself — scheduleAll() is `WorkManager`-only, while
+        // DayReviewAlarmScheduler.scheduleNext arms an `AlarmManager` alarm instead, and is suspend
+        // besides (its anchor depends on a DataStore read through DayReviewSettingsStore, which
+        // scheduleAll()'s two `WorkManager` jobs never needed). onCreate() is not a suspend context,
+        // so this mirrors RescheduleReceivers.replanAsync's existing fire-and-forget-coroutine idiom
+        // for the same reason: a suspend reschedule triggered from a non-suspend Android callback.
         //
         // No dispatcher is named, for the identical reason ReplanOnResumeObserver.onResume names
-        // none (see its KDoc): the DataStore read inside scheduleDayReview and the WorkManager write
-        // it makes both already manage their own executors, so naming Dispatchers.IO here would
+        // none (see its KDoc): the DataStore read inside scheduleNext and the AlarmManager call it
+        // makes both already manage their own executors, so naming Dispatchers.IO here would
         // hardcode a dispatcher that changes nothing — which is also what detekt's InjectDispatcher
         // rule objects to. Application has no lifecycleScope/viewModelScope of its own to reuse
         // (unlike that observer), so a bare CoroutineScope(Job()) stands in for one.
-        CoroutineScope(Job()).launch { workScheduler.scheduleDayReview() }
+        CoroutineScope(Job()).launch { dayReviewAlarmScheduler.scheduleNext() }
     }
 }

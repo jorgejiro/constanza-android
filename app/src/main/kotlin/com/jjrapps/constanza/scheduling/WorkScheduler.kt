@@ -6,24 +6,15 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import androidx.work.workDataOf
 import com.jjrapps.constanza.core.di.ReconcilePeriodHours
 import com.jjrapps.constanza.core.time.TimeProvider
-import com.jjrapps.constanza.core.time.millisUntilNextLocalTime
 import com.jjrapps.constanza.core.time.millisUntilNextMidnight
-import com.jjrapps.constanza.core.time.nextLocalDateForLocalTime
-import com.jjrapps.constanza.reminding.DayReviewSettingsStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 internal const val RECONCILE_WORK_NAME = "reconcile-worker"
 internal const val MIDNIGHT_SWEEP_WORK_NAME = "midnight-sweep-worker"
-
-/** day-review, slice B (day-review-notification): [DayReviewWorker]'s own unique work name — never
- *  [MIDNIGHT_SWEEP_WORK_NAME], per this feature's own brief: two different jobs, two different
- *  names, so [ExistingWorkPolicy.KEEP]/`REPLACE` on one can never touch the other's pending request. */
-internal const val DAY_REVIEW_WORK_NAME = "day-review-worker"
 
 /**
  * design.md §9.2: enrolls work unit 4b's two workers as persistent `WorkManager` work, called once
@@ -48,11 +39,10 @@ class WorkScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
     private val timeProvider: TimeProvider,
     @ReconcilePeriodHours private val reconcilePeriodHours: Long,
-    private val dayReviewSettingsStore: DayReviewSettingsStore,
 ) {
-    /** day-review, slice B: deliberately does NOT also enqueue [DayReviewWorker] — see
-     *  [scheduleDayReview]'s own KDoc for why that startup enqueue is a separate, asynchronous call
-     *  made from [com.jjrapps.constanza.ConstanzaApplication.onCreate] instead of folded in here. */
+    /** day-review-exact-alarm: no longer also arms the day review — that startup call moved to
+     *  [com.jjrapps.constanza.ConstanzaApplication.onCreate]'s own [DayReviewAlarmScheduler] call,
+     *  mirroring this method's own prior split for the identical reason recorded there. */
     fun scheduleAll() {
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             RECONCILE_WORK_NAME,
@@ -88,50 +78,4 @@ class WorkScheduler @Inject constructor(
                 .build(),
         )
     }
-
-    /**
-     * day-review, slice B (day-review-notification): [DayReviewWorker]'s sibling of
-     * [scheduleNextMidnightSweep] — anchored to [DayReviewSettingsStore.currentReviewTimeMinuteOfDay]
-     * via [millisUntilNextLocalTime], [MidnightSweepWorker]'s own pattern generalised from a fixed
-     * midnight to an arbitrary configured time. `suspend`, unlike every other method here: the
-     * anchor depends on a `DataStore` read, which the midnight sweep's fixed boundary never needed.
-     *
-     * [DayReviewWorker.DAY_REVIEW_SCHEDULED_DATE_KEY] carries the LOCAL DATE this run targets
-     * ([nextLocalDateForLocalTime]) as the request's input data — [DayReviewWorker]'s late-fire
-     * guard reads it back and compares it against [TimeProvider.today] at run time, per this
-     * feature's own brief: a run that wakes up after its target date has ended must post nothing,
-     * because the midnight sweep has already turned every unanswered slot it would have reported
-     * into `MISSED` and rolled the date.
-     *
-     * [policy] defaults to [ExistingWorkPolicy.KEEP], for [scheduleAll]'s cold-start call — an
-     * already-pending review must not be re-anchored on every launch, mirroring
-     * [enqueueMidnightSweep]'s own `KEEP` reasoning exactly. [scheduleNextDayReview] passes
-     * `REPLACE` instead, for the identical reason [scheduleNextMidnightSweep] does: the run doing
-     * the calling still holds [DAY_REVIEW_WORK_NAME], and `KEEP` treats a `RUNNING` request as
-     * pending, which would silently drop the successor and end the self-rescheduling chain.
-     *
-     * This is also the method a future settings screen must call after writing a new
-     * [DayReviewSettingsStore.setReviewTimeMinuteOfDay] — no such screen exists yet in this slice
-     * (day-review-data only added the store; nothing in `:app` writes to it yet), so today this is
-     * reachable only from [scheduleAll]'s startup call and from [scheduleNextDayReview]'s own
-     * self-reschedule.
-     */
-    suspend fun scheduleDayReview(policy: ExistingWorkPolicy = ExistingWorkPolicy.KEEP) {
-        val minuteOfDay = dayReviewSettingsStore.currentReviewTimeMinuteOfDay()
-        val targetDate = timeProvider.nextLocalDateForLocalTime(minuteOfDay)
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            DAY_REVIEW_WORK_NAME,
-            policy,
-            OneTimeWorkRequestBuilder<DayReviewWorker>()
-                .setInitialDelay(timeProvider.millisUntilNextLocalTime(minuteOfDay), TimeUnit.MILLISECONDS)
-                .setInputData(workDataOf(DayReviewWorker.DAY_REVIEW_SCHEDULED_DATE_KEY to targetDate.toString()))
-                .build(),
-        )
-    }
-
-    /** Anchors the NEXT day-review run, called by [DayReviewWorker] at the end of every one of its
-     *  own runs — including a late-fire, guarded run, per this feature's own brief: "a missed review
-     *  is not a failure, it is a review whose moment has passed", so the chain must continue exactly
-     *  as if it had posted. See [scheduleDayReview]'s KDoc for why `REPLACE` is required here. */
-    suspend fun scheduleNextDayReview() = scheduleDayReview(ExistingWorkPolicy.REPLACE)
 }

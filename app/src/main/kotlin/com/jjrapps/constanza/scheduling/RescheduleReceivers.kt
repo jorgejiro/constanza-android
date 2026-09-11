@@ -18,14 +18,26 @@ private const val DATE_CHANGED_SWEEP_WORK_NAME = "midnight-sweep-on-date-changed
 /**
  * design.md §9.3: shared `goAsync()` + coroutine boilerplate for every reschedule-trigger receiver
  * below. All five triggers (task 4a.4's three plus [ExactAlarmPermissionReceiver]) converge on the
- * same idempotent entry point, [OccurrencePlanner.replanAll] — `goAsync()` keeps the broadcast
- * alive past `onReceive()`'s ~10s budget while the suspend planner runs.
+ * same two idempotent entry points, [OccurrencePlanner.replanAll] and
+ * [DayReviewAlarmScheduler.scheduleNext] (day-review-exact-alarm) — `goAsync()` keeps the broadcast
+ * alive past `onReceive()`'s ~10s budget while both suspend calls run.
+ *
+ * [dayReviewAlarmScheduler] joined this function, rather than each receiver pasting a second call
+ * into its own body, for the reason the same `AlarmManager` non-survival applies to BOTH alarms this
+ * app arms: `AlarmManager` alarms do not survive a reboot or a package replace, and a wall-clock
+ * `RTC_WAKEUP` target must be recomputed after a timezone/date/time change exactly as
+ * [OccurrencePlanner.replanAll]'s own per-occurrence alarms do — the day review is not a special
+ * case among these four triggers, it is the same case with a different [AlarmManager] target.
  */
-private fun BroadcastReceiver.replanAsync(planner: OccurrencePlanner) {
+private fun BroadcastReceiver.replanAsync(
+    planner: OccurrencePlanner,
+    dayReviewAlarmScheduler: DayReviewAlarmScheduler,
+) {
     val pendingResult = goAsync()
     CoroutineScope(Dispatchers.IO).launch {
         try {
             planner.replanAll()
+            dayReviewAlarmScheduler.scheduleNext()
         } finally {
             pendingResult.finish()
         }
@@ -34,40 +46,50 @@ private fun BroadcastReceiver.replanAsync(planner: OccurrencePlanner) {
 
 /** `BOOT_COMPLETED`, never `LOCKED_BOOT_COMPLETED`: Room lives in credential-encrypted storage and
  *  is unreadable before first unlock (design.md §9.3). AlarmManager alarms do not survive a reboot
- *  at all, so this receiver is the only thing keeping reminders correct after one. */
+ *  at all, so this receiver is the only thing keeping reminders — and, since day-review-exact-alarm,
+ *  the day review — correct after one. */
 @AndroidEntryPoint
 class BootReceiver : BroadcastReceiver() {
     @Inject lateinit var occurrencePlanner: OccurrencePlanner
 
+    @Inject lateinit var dayReviewAlarmScheduler: DayReviewAlarmScheduler
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
-        replanAsync(occurrencePlanner)
+        replanAsync(occurrencePlanner, dayReviewAlarmScheduler)
     }
 }
 
-/** Alarms do not survive this app's own update either (design.md §9.3). */
+/** Alarms do not survive this app's own update either (design.md §9.3) — day-review-exact-alarm's
+ *  alarm included. */
 @AndroidEntryPoint
 class PackageReplacedReceiver : BroadcastReceiver() {
     @Inject lateinit var occurrencePlanner: OccurrencePlanner
 
+    @Inject lateinit var dayReviewAlarmScheduler: DayReviewAlarmScheduler
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
-        replanAsync(occurrencePlanner)
+        replanAsync(occurrencePlanner, dayReviewAlarmScheduler)
     }
 }
 
 /** Wall-clock `RTC_WAKEUP` targets must be recomputed after a timezone, date, or time change —
- *  including the DST transition itself (design.md §9.3, task 4a.7). `ACTION_DATE_CHANGED` is also
- *  one of design.md §9.2's three redundant midnight-sweep triggers for work unit 4b: it enqueues an
- *  immediate one-shot [MidnightSweepWorker] run under a work name of its own rather than waiting
- *  for the sweep's own midnight-anchored run. */
+ *  including the DST transition itself (design.md §9.3, task 4a.7) — and that now includes the
+ *  day-review alarm (day-review-exact-alarm), not only the per-occurrence ones
+ *  [OccurrencePlanner.replanAll] re-arms. `ACTION_DATE_CHANGED` is also one of design.md §9.2's three
+ *  redundant midnight-sweep triggers for work unit 4b: it enqueues an immediate one-shot
+ *  [MidnightSweepWorker] run under a work name of its own rather than waiting for the sweep's own
+ *  midnight-anchored run. */
 @AndroidEntryPoint
 class TimeChangeReceiver : BroadcastReceiver() {
     @Inject lateinit var occurrencePlanner: OccurrencePlanner
 
+    @Inject lateinit var dayReviewAlarmScheduler: DayReviewAlarmScheduler
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action !in ALLOWED_ACTIONS) return
-        replanAsync(occurrencePlanner)
+        replanAsync(occurrencePlanner, dayReviewAlarmScheduler)
         if (intent.action == Intent.ACTION_DATE_CHANGED) enqueueMidnightSweep(context)
     }
 
@@ -91,23 +113,28 @@ class TimeChangeReceiver : BroadcastReceiver() {
 /**
  * Not one of the five mandatory triggers, but mandatory anyway (design.md §9.3, reminder-delivery:
  * Exact-Alarm Permission States): upgrades armed inexact alarms to exact **on grant**, without
- * waiting for the next app launch. [AlarmScheduler.schedule] re-checks `canScheduleExactAlarms()`
- * on every call, so simply re-running [OccurrencePlanner.replanAll] upgrades every armed occurrence
- * for free — no separate branch is needed here, and none is written.
+ * waiting for the next app launch. [AlarmScheduler.schedule]/[DayReviewAlarmScheduler.scheduleNext]
+ * both re-check `canScheduleExactAlarms()` on every call (through the shared
+ * [scheduleExactOrInexact]), so simply re-running [OccurrencePlanner.replanAll] and
+ * [DayReviewAlarmScheduler.scheduleNext] upgrades every armed alarm — the day review included, since
+ * day-review-exact-alarm — for free; no separate branch is needed here, and none is written.
  *
  * **This receiver never sees a revoke.** The platform sends
  * `ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED` on grant only, and on revoke it instead
  * cancels every one of the app's alarms and stops its process. Measured on the Pixel 10 at API 37
  * and matched to the exact-alarm guide (design.md §13.4 finding 3); an earlier version of this KDoc
  * claimed it downgraded on revoke, which was never possible. The revoke path is
- * `OccurrenceResolver.reconcile()`'s re-arm plus the `onResume()` re-check instead (task G.5).
+ * `OccurrenceResolver.reconcile()`'s re-arm plus the `onResume()` re-check instead (task G.5) — and,
+ * for the day review, the next of this app's own re-arm points listed on [replanAsync]'s KDoc.
  */
 @AndroidEntryPoint
 class ExactAlarmPermissionReceiver : BroadcastReceiver() {
     @Inject lateinit var occurrencePlanner: OccurrencePlanner
 
+    @Inject lateinit var dayReviewAlarmScheduler: DayReviewAlarmScheduler
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED) return
-        replanAsync(occurrencePlanner)
+        replanAsync(occurrencePlanner, dayReviewAlarmScheduler)
     }
 }

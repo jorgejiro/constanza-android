@@ -11,14 +11,34 @@ import javax.inject.Inject
 private const val INEXACT_WINDOW_MS = 10 * 60 * 1000L
 
 /**
- * design.md §9.1/§5.6/§11: exact-alarm scheduling with an inexact-window degrade path.
- * `canScheduleExactAlarms()` is re-checked on EVERY call to [schedule] (reminder-delivery:
- * Exact-Alarm Permission States) — never cached, never checked only once at startup.
+ * design.md §9.1/§5.6/§11: the exact/inexact decision itself, factored out of [AlarmScheduler.schedule]
+ * (day-review-exact-alarm) so a second caller with its own id scheme —
+ * [DayReviewAlarmScheduler], which has no `reminder_occurrences` row and therefore no `occurrenceId`
+ * to key on — arms its alarm through the identical decision instead of a second copy of it. This is
+ * now the ONE place "which API survives Doze" is decided; [AlarmScheduler.schedule] and
+ * [DayReviewAlarmScheduler.scheduleNext] both call it and neither re-implements the branch.
  *
- * `minSdk = 31` means `SCHEDULE_EXACT_ALARM` always exists as a concept (design.md §5.6
- * consequence 2): this class has exactly two modes, exact and inexact-window, and intentionally
- * contains NO `Build.VERSION` branch anywhere. `USE_EXACT_ALARM` is never used — it is
- * Play-policy-restricted to alarm-clock/calendar apps, which this is not.
+ * `canScheduleExactAlarms()` is re-checked on EVERY call (reminder-delivery: Exact-Alarm Permission
+ * States) — never cached, never checked only once at startup. `minSdk = 31` means
+ * `SCHEDULE_EXACT_ALARM` always exists as a concept (design.md §5.6 consequence 2): this function has
+ * exactly two modes, exact and inexact-window, and intentionally contains NO `Build.VERSION` branch
+ * anywhere. `USE_EXACT_ALARM` is never used — it is Play-policy-restricted to alarm-clock/calendar
+ * apps, which this is not.
+ */
+internal fun AlarmManager.scheduleExactOrInexact(pendingIntent: PendingIntent, atEpochMilli: Long): Boolean =
+    if (canScheduleExactAlarms()) {
+        setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atEpochMilli, pendingIntent)
+        true
+    } else {
+        setWindow(AlarmManager.RTC_WAKEUP, atEpochMilli, INEXACT_WINDOW_MS, pendingIntent)
+        false
+    }
+
+/**
+ * design.md §9.1/§5.6/§11: exact-alarm scheduling with an inexact-window degrade path, for the
+ * per-occurrence reminder pipeline. The exact/inexact decision itself now lives in
+ * [scheduleExactOrInexact] above (day-review-exact-alarm) — this class's own public surface and
+ * behaviour for its existing callers are unchanged by that extraction.
  */
 class AlarmScheduler @Inject constructor(
     private val alarmManager: AlarmManager,
@@ -26,16 +46,8 @@ class AlarmScheduler @Inject constructor(
 ) {
     /** Arms [occurrenceId]'s alarm for [atEpochMilli]. Returns `true` when armed exactly, `false`
      *  when degraded to the inexact window — the caller persists that flag as `exact` on the row. */
-    fun schedule(occurrenceId: Long, atEpochMilli: Long): Boolean {
-        val pendingIntent = pendingIntentFor(occurrenceId)
-        return if (alarmManager.canScheduleExactAlarms()) {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, atEpochMilli, pendingIntent)
-            true
-        } else {
-            alarmManager.setWindow(AlarmManager.RTC_WAKEUP, atEpochMilli, INEXACT_WINDOW_MS, pendingIntent)
-            false
-        }
-    }
+    fun schedule(occurrenceId: Long, atEpochMilli: Long): Boolean =
+        alarmManager.scheduleExactOrInexact(pendingIntentFor(occurrenceId), atEpochMilli)
 
     /** Cancels [occurrenceId]'s alarm, if one is armed. No-op otherwise. */
     fun cancel(occurrenceId: Long) {
