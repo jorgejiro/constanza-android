@@ -66,22 +66,46 @@ class DayReviewWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         val scheduledDate = inputData.getString(DAY_REVIEW_SCHEDULED_DATE_KEY)?.let(LocalDate::parse)
             ?: timeProvider.today()
-        // Reschedule FIRST and unconditionally, before the late-fire check below: a self-rescheduling
-        // worker that returned early on the guarded path without enqueuing its successor would
-        // silently end the chain the very first time it ever fired late — exactly the failure mode
-        // MidnightSweepWorker's own KDoc chain-breakage warning is about, reached here on the
-        // late-fire path specifically rather than a dropped link.
-        workScheduler.scheduleNextDayReview()
-        if (timeProvider.today() != scheduledDate) return Result.success()
-
-        val rows = components.rowsAssembler.rowsFor(scheduledDate)
-        val firesEveryNight = components.settingsStore.currentReviewFiresEveryNight()
-        when (val decision = decideDayReview(rows, firesEveryNight)) {
-            is DayReviewDecision.Post -> components.notificationPoster.postReview(decision.outstandingCount)
-            DayReviewDecision.Skip -> Unit
+        // The late-fire guard runs first, but the reschedule below must stay LAST — see
+        // [scheduleNextDayReviewLast]. Both paths reach it, so the chain continues after a guarded
+        // run exactly as it does after a posting one.
+        if (timeProvider.today() == scheduledDate) {
+            val rows = components.rowsAssembler.rowsFor(scheduledDate)
+            val firesEveryNight = components.settingsStore.currentReviewFiresEveryNight()
+            when (val decision = decideDayReview(rows, firesEveryNight)) {
+                is DayReviewDecision.Post -> components.notificationPoster.postReview(decision.outstandingCount)
+                DayReviewDecision.Skip -> Unit
+            }
         }
+        scheduleNextDayReviewLast()
         return Result.success()
     }
+
+    /**
+     * The self-reschedule, and it MUST be the last thing [doWork] does — never the first, which is
+     * what this worker originally did and what silently swallowed every notification it ever owed.
+     *
+     * [WorkScheduler.scheduleNextDayReview] enqueues under [DAY_REVIEW_WORK_NAME] with
+     * [androidx.work.ExistingWorkPolicy.REPLACE], and `REPLACE` is not "overwrite the pending
+     * request": `EnqueueRunnable` routes it through `CancelWorkRunnable.forNameInline`, which cancels
+     * every UNFINISHED WorkSpec under that name — and the run making the call is itself one of them,
+     * in state `RUNNING`. Cancelling it reaches `Processor.stopAndCancelWork` →
+     * `WorkerWrapper.interrupt` → `workerJob.cancel(WorkerStoppedException)`, and that job is the
+     * very coroutine [doWork] is suspended in. Called first, this cancels the caller before it can
+     * read a single row, so the notification never posts; the successor is still enqueued, so the
+     * chain looks healthy every night while nothing ever arrives. Read as
+     * `androidx.work:work-runtime:2.11.2` sources, not inferred from the docs, which do not say.
+     *
+     * [MidnightSweepWorker] survives the identical `REPLACE` only because it calls its own
+     * [WorkScheduler.scheduleNextMidnightSweep] after the sweep has already committed its writes —
+     * the same rule as this one, and the reason that worker never showed the defect.
+     *
+     * `TestListenableWorkerBuilder` cannot catch this: it runs the worker without ever enqueuing it
+     * under a unique name, so `REPLACE` finds nothing to cancel and every assertion passes on a run
+     * production never has. [com.jjrapps.constanza.scheduling.DayReviewWorkerTest] therefore also
+     * exercises the real enqueue path.
+     */
+    private suspend fun scheduleNextDayReviewLast() = workScheduler.scheduleNextDayReview()
 
     internal companion object {
         /** [WorkScheduler.scheduleDayReview]'s input-data key for the local date this run targets —
