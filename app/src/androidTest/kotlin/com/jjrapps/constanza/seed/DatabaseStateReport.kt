@@ -204,8 +204,7 @@ class DatabaseStateReport {
 
     private fun habitLine(habit: HabitEntity): String =
         "id=${habit.id} name=\"${habit.name}\" archived=${habit.archived} " +
-            "archivedAt=${habit.archivedAt ?: NO_VALUE} createdAt=${habit.createdAt} " +
-            "sortOrder=${habit.sortOrder}"
+            "archivedAt=${habit.archivedAt ?: NO_VALUE} createdAt=${habit.createdAt}"
 
     private fun scheduleLine(schedule: ScheduleEntity): String =
         "habitId=${schedule.habitId} kind=${schedule.kind} " +

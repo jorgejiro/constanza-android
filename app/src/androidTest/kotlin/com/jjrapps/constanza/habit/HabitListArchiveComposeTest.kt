@@ -50,7 +50,6 @@ class HabitListArchiveComposeTest {
                     archived = false,
                     archivedAt = null,
                     createdAt = Instant.parse("2026-09-01T08:00:00Z"),
-                    sortOrder = 0,
                 ),
                 Schedule.Daily(),
             )

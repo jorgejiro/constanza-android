@@ -127,7 +127,6 @@ private fun habitWithColor(colorArgb: Int): BackupHabit = BackupHabit(
     archived = false,
     archivedAt = null,
     createdAt = "2026-01-01T08:00:00Z",
-    sortOrder = 0,
     schedule = BackupSchedule(kind = "DAILY", weekStart = "MONDAY"),
     slots = emptyList(),
     entries = emptyList(),

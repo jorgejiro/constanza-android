@@ -37,7 +37,6 @@ class HabitListViewModelTest {
         archived = archived,
         archivedAt = null,
         createdAt = CREATED_AT,
-        sortOrder = 0,
     )
 
     /** No test in this class asserts on [HabitListUiState.entryCounts]; that behaviour lives in

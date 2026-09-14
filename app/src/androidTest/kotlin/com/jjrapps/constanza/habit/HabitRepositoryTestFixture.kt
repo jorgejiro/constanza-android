@@ -215,5 +215,4 @@ fun newHabit(name: String = "Read"): Habit = Habit(
     archived = false,
     archivedAt = null,
     createdAt = FIXED_INSTANT,
-    sortOrder = 0,
 )

@@ -19,7 +19,6 @@ data class HabitEntity(
     val archived: Boolean = false,
     val archivedAt: String?,
     val createdAt: String,
-    val sortOrder: Int = 0,
 )
 
 /** Exactly one row per habit — design.md §8.1's `schedules` table. */

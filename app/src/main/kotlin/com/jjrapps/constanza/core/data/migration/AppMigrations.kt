@@ -23,7 +23,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * design.md decision 3). `Migration(4, 5)`, the slot that note reserved next, was consumed by
  * [migration4To5] — the colour re-tone into `HabitColor`'s `[7:1, 11:1]` band. `Migration(5, 6)`,
  * the slot that note reserved next, is now consumed by [migration5To6] — the retirement of
- * `BLUE_GREY` — so any future rollback recipe starts from version 7 onward. Unlike
+ * `BLUE_GREY`. `Migration(6, 7)`, the slot that note reserved next, is now consumed by
+ * [migration6To7] — the removal of the dead `HabitEntity.sortOrder` column — so any future
+ * rollback recipe starts from version 8 onward. Unlike
  * [migration1To2]'s bijection, neither [HabitColorRetoneRemap.LEGACY_TO_CURRENT] nor
  * [HabitColorRetireRemap.LEGACY_TO_CURRENT] has an exact inverse to offer a rollback: both sit on a
  * clamp fallthrough ([HabitColorRetoneRemap.normalize], [HabitColorRetireRemap.normalize]) that is
@@ -64,6 +66,9 @@ internal object AppMigrations {
 
     /** Same `MagicNumber` reasoning as [SCHEMA_VERSION_3] — `6` needs a named constant too. */
     private const val SCHEMA_VERSION_6 = 6
+
+    /** Same `MagicNumber` reasoning as [SCHEMA_VERSION_3] — `7` needs a named constant too. */
+    private const val SCHEMA_VERSION_7 = 7
 
     /**
      * **The sign trap.** `0xFF8E24AA.toInt()` is a *negative* `Int` once stored in the `colorArgb`
@@ -279,6 +284,46 @@ internal object AppMigrations {
                         "WHERE colorArgb IN ($inPlaceholders)",
                     (caseArgs + inArgs).toTypedArray(),
                 )
+            }
+        }
+
+    /**
+     * remove-dead-sort-order (design decision 1). Drops `HabitEntity.sortOrder`: nothing in the app
+     * ever wrote it to anything but `0` — there is no reorder gesture — so the column advertised a
+     * feature that does not exist. Rebuilt exactly as [migration2To3] rebuilds this same table for
+     * the same reason ([migration2To3]'s KDoc has the full rationale: SQLite on `minSdk = 31` ships
+     * 3.32.2, below the 3.35 floor `ALTER TABLE ... DROP COLUMN` requires): `CREATE TABLE
+     * _new_habits` (the generated `createAllTables` DDL for `habits`, minus `sortOrder`) -> `INSERT
+     * ... SELECT` the remaining columns -> `DROP TABLE habits` -> `RENAME TO habits`. Same child-row
+     * guard as [migration2To3]'s (design.md D2): `habits` is still the parent of four
+     * `ForeignKey(onDelete = CASCADE)` tables, so counting all four before the drop and again after
+     * the rename, and throwing on any mismatch, is what stands between a rebuild bug and a silent
+     * cascade-wipe of every child row.
+     *
+     * [writer]`.write(db)` runs first, exactly as every earlier migration's does, for the same
+     * reason: a recoverable snapshot failure must never fail the migration itself.
+     */
+    fun migration6To7(writer: PreMigrationSnapshotWriter): Migration =
+        object : Migration(SCHEMA_VERSION_6, SCHEMA_VERSION_7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                writer.write(db)
+
+                val before = childRowCounts(db)
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `_new_habits` (`id` INTEGER PRIMARY KEY " +
+                        "AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `colorArgb` INTEGER NOT " +
+                        "NULL, `notes` TEXT, `archived` INTEGER NOT NULL, `archivedAt` TEXT, " +
+                        "`createdAt` TEXT NOT NULL)",
+                )
+                db.execSQL(
+                    "INSERT INTO `_new_habits` (`id`, `name`, `colorArgb`, `notes`, `archived`, " +
+                        "`archivedAt`, `createdAt`) SELECT `id`, `name`, `colorArgb`, `notes`, " +
+                        "`archived`, `archivedAt`, `createdAt` FROM `habits`",
+                )
+                db.execSQL("DROP TABLE `habits`")
+                db.execSQL("ALTER TABLE `_new_habits` RENAME TO `habits`")
+                val after = childRowCounts(db)
+                check(before == after) { "migration6To7 lost child rows: before=$before after=$after" }
             }
         }
 

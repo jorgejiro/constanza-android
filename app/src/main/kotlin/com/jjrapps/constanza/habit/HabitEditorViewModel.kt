@@ -191,7 +191,6 @@ class HabitEditorViewModel @Inject constructor(
                 archived = false,
                 archivedAt = null,
                 createdAt = timeProvider.now(),
-                sortOrder = 0,
             )
             if (state.habitId == null) {
                 habitRepository.create(habit, state.schedule, state.slots)

@@ -60,7 +60,7 @@ private const val STATE_SNOOZED = "SNOOZED"
 
 private fun habit(id: Long = HABIT_ID, name: String = "Read", colorArgb: Int = HABIT_COLOR_ARGB) = Habit(
     id = id, name = name, colorArgb = colorArgb, notes = null,
-    archived = false, archivedAt = null, createdAt = FIXED_INSTANT, sortOrder = 0,
+    archived = false, archivedAt = null, createdAt = FIXED_INSTANT,
 )
 
 private fun slot(id: Long, minuteOfDay: Int) =

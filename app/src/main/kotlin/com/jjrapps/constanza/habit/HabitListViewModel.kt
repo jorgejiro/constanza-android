@@ -31,8 +31,7 @@ import javax.inject.Inject
  * The visible order is alphabetical by [Habit.name], applied here rather than in
  * [com.jjrapps.constanza.core.data.dao.HabitDao.observeAll]: that query is shared with the Today
  * screen, which groups its rows into time-of-day sections and must keep deciding its own order.
- * `ORDER BY sortOrder` leaves this list in insertion order anyway, because nothing ever writes a
- * `sortOrder` other than `0` (there is no reorder gesture) and SQLite then falls back to `rowid`.
+ * That query is `ORDER BY id` (remove-dead-sort-order) — see its own KDoc for why.
  */
 @HiltViewModel
 class HabitListViewModel @Inject constructor(

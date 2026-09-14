@@ -144,7 +144,6 @@ private fun validBackupJson(): String = """
           "archived": false,
           "archivedAt": null,
           "createdAt": "2026-01-01T08:00:00Z",
-          "sortOrder": 0,
           "schedule": { "kind": "TIMES_PER_DAY", "weekStart": "MONDAY" },
           "slots": [ { "id": 10, "minuteOfDay": 480, "enabled": true } ],
           "entries": [

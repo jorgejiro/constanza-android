@@ -24,7 +24,6 @@ class ModelTest {
             archived = false,
             archivedAt = null,
             createdAt = Instant.parse("2026-01-01T00:00:00Z"),
-            sortOrder = 0,
         )
         assertEquals("Drink water", habit.name)
         assertNull(habit.notes)
