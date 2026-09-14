@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.Collator
 import javax.inject.Inject
 
 /**
@@ -26,6 +27,12 @@ import javax.inject.Inject
  * row already implies the counts flow has produced a value — `entryCounts[habit.id] ?: 0` is
  * therefore never a guessed default, it is the honest answer for a habit absent from the
  * `GROUP BY` result because it has zero entries.
+ *
+ * The visible order is alphabetical by [Habit.name], applied here rather than in
+ * [com.jjrapps.constanza.core.data.dao.HabitDao.observeAll]: that query is shared with the Today
+ * screen, which groups its rows into time-of-day sections and must keep deciding its own order.
+ * `ORDER BY sortOrder` leaves this list in insertion order anyway, because nothing ever writes a
+ * `sortOrder` other than `0` (there is no reorder gesture) and SQLite then falls back to `rowid`.
  */
 @HiltViewModel
 class HabitListViewModel @Inject constructor(
@@ -45,7 +52,7 @@ class HabitListViewModel @Inject constructor(
             entryDao.observeCountsByHabit(),
         ) { habits, archivedFilter, counts ->
             HabitListUiState(
-                habits = habits.filter { it.archived == archivedFilter },
+                habits = habits.filter { it.archived == archivedFilter }.sortedWith(byName()),
                 showArchived = archivedFilter,
                 entryCounts = counts.associate { it.habitId to it.count },
             )
@@ -61,6 +68,21 @@ class HabitListViewModel @Inject constructor(
     fun delete(habitId: Long) {
         viewModelScope.launch { habitRepository.delete(habitId) }
     }
+}
+
+/**
+ * Alphabetical by name through a [Collator], never [String.compareTo]: the raw comparison runs on
+ * UTF-16 code units, which sorts every capital ahead of every lowercase letter ("Cenar" before
+ * "afeitarme") and banishes accented names to the end ("Ánimo" after "Trabajar"). A collator folds
+ * case and treats the accent as a secondary difference, which is what "alphabetical" means to a
+ * reader of either language the app ships in.
+ *
+ * Built per emission instead of cached on the ViewModel: changing the language recreates the
+ * Activity but not the ViewModel, so a cached collator would keep collating under the previous
+ * locale. The list is a handful of rows — the allocation costs nothing next to that bug.
+ */
+private fun byName(): Comparator<Habit> = Collator.getInstance().let { collator ->
+    Comparator { left, right -> collator.compare(left.name, right.name) }
 }
 
 data class HabitListUiState(

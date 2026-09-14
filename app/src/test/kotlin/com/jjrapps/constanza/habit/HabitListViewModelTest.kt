@@ -56,6 +56,51 @@ class HabitListViewModelTest {
     }
 
     @Test
+    fun `the list is alphabetical by name, ignoring case and accents`() = runTest {
+        // Seeded in insertion order, which is what the unsorted list rendered. "afeitarme" is
+        // lowercase and "Ánimo" accented on purpose: a raw String comparison would sort the first
+        // after every capitalised name and the second after the whole alphabet.
+        val habits = MutableStateFlow(
+            listOf(
+                habit(1, "Trabajar 20 min al sol", archived = false),
+                habit(2, "Ánimo", archived = false),
+                habit(3, "afeitarme", archived = false),
+                habit(4, "Cenar antes de las 22h", archived = false),
+            ),
+        )
+        val habitRepository = mockk<HabitRepository> {
+            every { observeAll() } returns habits
+        }
+        val viewModel = HabitListViewModel(habitRepository, entryDao())
+
+        viewModel.uiState.test {
+            assertEquals(
+                listOf("afeitarme", "Ánimo", "Cenar antes de las 22h", "Trabajar 20 min al sol"),
+                awaitItem().habits.map { it.name },
+            )
+        }
+    }
+
+    @Test
+    fun `the archived filter is alphabetical too`() = runTest {
+        val habits = MutableStateFlow(
+            listOf(habit(1, "Zen", archived = true), habit(2, "Beber agua", archived = true)),
+        )
+        val habitRepository = mockk<HabitRepository> {
+            every { observeAll() } returns habits
+        }
+        val viewModel = HabitListViewModel(habitRepository, entryDao())
+
+        viewModel.uiState.test {
+            assertTrue(awaitItem().habits.isEmpty()) // initial: active filter, both are archived
+
+            viewModel.toggleShowArchived()
+
+            assertEquals(listOf("Beber agua", "Zen"), awaitItem().habits.map { it.name })
+        }
+    }
+
+    @Test
     fun `the active filter shows only non-archived habits by default`() = runTest {
         val habits = MutableStateFlow(listOf(habit(1, "Read", archived = false), habit(2, "Old", archived = true)))
         val habitRepository = mockk<HabitRepository> {
