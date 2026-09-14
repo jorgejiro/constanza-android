@@ -186,7 +186,6 @@ class ImminentReminderSeed {
                 archived = false,
                 archivedAt = null,
                 createdAt = now.toString(),
-                sortOrder = 0,
             ),
         )
         // The production mapper, so the persisted schedule row is byte-for-byte what the app writes.

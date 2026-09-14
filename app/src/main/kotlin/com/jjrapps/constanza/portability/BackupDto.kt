@@ -12,8 +12,17 @@ import kotlinx.serialization.Serializable
  * §8.4's Forward compatibility row). Unknown JSON fields are ignored on decode instead
  * (`Json { ignoreUnknownKeys = true }` in [com.jjrapps.constanza.portability.BackupImporter]) —
  * a deliberately different behaviour from the version gate, not a relaxation of it.
+ *
+ * `2` as of remove-dead-sort-order: removing [BackupHabit.sortOrder] is breaking for OLDER
+ * READERS, not for older files. A `formatVersion = 1` file still imports cleanly on this build —
+ * `BackupImporter`'s `ignoreUnknownKeys` drops a legacy file's now-unknown `sortOrder`, and `1 <=
+ * 2` passes the gate above. What breaks is the reverse: a file this version writes, opened by an
+ * older build expecting `sortOrder` as a required field, hits a missing-field decode failure and
+ * surfaces as a generic `SerializationException` / invalid-file error. This gate exists exactly so
+ * that case fails loud and precise instead — as [UnsupportedBackupVersionException] — which is why
+ * removing a field bumps this counter even though the file itself shrank, not grew.
  */
-const val CURRENT_BACKUP_FORMAT_VERSION = 1
+const val CURRENT_BACKUP_FORMAT_VERSION = 2
 
 private const val BACKUP_FORMAT_NAME = "constanza.backup"
 
@@ -61,7 +70,6 @@ data class BackupHabit(
     val archived: Boolean,
     val archivedAt: String?,
     val createdAt: String,
-    val sortOrder: Int,
     val schedule: BackupSchedule,
     val slots: List<BackupSlot>,
     val entries: List<BackupEntry>,

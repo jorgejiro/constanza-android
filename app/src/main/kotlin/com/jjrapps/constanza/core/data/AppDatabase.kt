@@ -52,6 +52,15 @@ import com.jjrapps.constanza.core.data.entity.ScheduleEntity
  * `HabitColorRetireRemap` carries, since `BLUE_GREY`'s `#849FAC` measures inside the `[7:1, 11:1]`
  * band and so would otherwise pass `clampToHabitBand` unchanged — registered in `DatabaseModule`,
  * same as every migration before it.
+ *
+ * `version = 7` (remove-dead-sort-order): drops `HabitEntity.sortOrder` — nothing in the app ever
+ * wrote it to anything but `0`, since there is no reorder gesture, so the column advertised a
+ * feature that does not exist. This IS a structural change — a column removed, `habits` rebuilt —
+ * unlike the data-only repaints `version = 2`, `5`, and `6` are, so `7.json`'s `identityHash`
+ * genuinely differs from `6.json`'s. `AppMigrations.migration6To7` rebuilds `habits` via CREATE /
+ * INSERT / DROP / RENAME, the same shape `migration2To3` used to drop `question` (design.md D1),
+ * with the same runtime child-row count guard (design.md D2) across `schedules`, `reminder_slots`,
+ * `entries`, and `reminder_occurrences`.
  */
 @Database(
     entities = [
@@ -61,7 +70,7 @@ import com.jjrapps.constanza.core.data.entity.ScheduleEntity
         EntryEntity::class,
         ReminderOccurrenceEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

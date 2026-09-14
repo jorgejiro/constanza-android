@@ -36,7 +36,6 @@ fun HabitEntity.toDomain(): Habit = Habit(
     archived = archived,
     archivedAt = archivedAt?.let(LocalDate::parse),
     createdAt = Instant.parse(createdAt),
-    sortOrder = sortOrder,
 )
 
 fun Habit.toEntity(): HabitEntity = HabitEntity(
@@ -47,7 +46,6 @@ fun Habit.toEntity(): HabitEntity = HabitEntity(
     archived = archived,
     archivedAt = archivedAt?.toString(),
     createdAt = createdAt.toString(),
-    sortOrder = sortOrder,
 )
 
 fun ScheduleEntity.toDomain(): Schedule {

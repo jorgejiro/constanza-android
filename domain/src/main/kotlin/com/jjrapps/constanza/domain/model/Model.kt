@@ -13,7 +13,6 @@ data class Habit(
     val archived: Boolean,
     val archivedAt: LocalDate?,
     val createdAt: Instant,
-    val sortOrder: Int,
 )
 
 /**

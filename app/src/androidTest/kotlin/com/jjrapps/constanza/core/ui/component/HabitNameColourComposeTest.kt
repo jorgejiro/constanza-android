@@ -98,7 +98,7 @@ class HabitNameColourComposeTest {
 
     private fun habitWithColor(name: String, colorArgb: Int) = Habit(
         id = 0, name = name, colorArgb = colorArgb, notes = null,
-        archived = false, archivedAt = null, createdAt = Instant.parse("2026-09-01T08:00:00Z"), sortOrder = 0,
+        archived = false, archivedAt = null, createdAt = Instant.parse("2026-09-01T08:00:00Z"),
     )
 
     private fun awaitNodeWithText(label: String) {

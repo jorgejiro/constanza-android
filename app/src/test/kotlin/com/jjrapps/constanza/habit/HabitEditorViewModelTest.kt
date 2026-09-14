@@ -118,7 +118,6 @@ class HabitEditorViewModelTest {
             archived = false,
             archivedAt = null,
             createdAt = NOW,
-            sortOrder = 0,
         )
         coEvery { habitRepository.findById(EXISTING_HABIT_ID) } returns existing
         coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns Schedule.DaysOfWeek(setOf(DayOfWeek.TUESDAY))
@@ -143,7 +142,6 @@ class HabitEditorViewModelTest {
             archived = false,
             archivedAt = null,
             createdAt = NOW,
-            sortOrder = 0,
         )
         coEvery { habitRepository.findById(EXISTING_HABIT_ID) } returns existing
         coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns Schedule.DaysOfWeek(setOf(DayOfWeek.TUESDAY))
@@ -670,7 +668,6 @@ class HabitEditorViewModelTest {
             archived = false,
             archivedAt = null,
             createdAt = NOW,
-            sortOrder = 0,
         )
         coEvery { habitRepository.findById(EXISTING_HABIT_ID) } returns existing
         coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns Schedule.DaysOfWeek(setOf(DayOfWeek.TUESDAY))

@@ -32,7 +32,6 @@ class MappersTest {
             archived = true,
             archivedAt = LocalDate.of(2026, 9, 10),
             createdAt = Instant.parse("2026-01-01T08:00:00Z"),
-            sortOrder = 3,
         )
 
         assertEquals(habit, habit.toEntity().toDomain())
@@ -48,7 +47,6 @@ class MappersTest {
             archived = false,
             archivedAt = null,
             createdAt = "2026-01-01T00:00:00Z",
-            sortOrder = 0,
         )
 
         assertNull(entity.toDomain().archivedAt)

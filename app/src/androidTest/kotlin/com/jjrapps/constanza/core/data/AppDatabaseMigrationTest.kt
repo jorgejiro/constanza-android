@@ -83,6 +83,9 @@ class AppDatabaseMigrationTest {
     /** Same reasoning as [migration1To2]: a fresh instance per test. */
     private fun migration5To6() = AppMigrations.migration5To6(PreMigrationSnapshotWriter(targetFilesDir))
 
+    /** Same reasoning as [migration1To2]: a fresh instance per test. */
+    private fun migration6To7() = AppMigrations.migration6To7(PreMigrationSnapshotWriter(targetFilesDir))
+
     @Test
     fun version1SchemaCreatesFromTheCheckedInExport() {
         migrationTestHelper.createDatabase(TEST_DB_NAME, version = 1).close()
@@ -435,5 +438,79 @@ class AppDatabaseMigrationTest {
 
         val snapshotFile = File(targetFilesDir, "pre-migration/pre-migration-v5.sql")
         assertTrue("expected the v5 pre-migration snapshot file to exist at $snapshotFile", snapshotFile.exists())
+    }
+
+    /**
+     * remove-dead-sort-order (design decision 1). Seeds a real `version = 6` database (still
+     * carrying `sortOrder`, hence its own literal INSERT rather than reusing a version-4-shaped
+     * one) with two habits, each carrying exactly one row in every CASCADE-child table of `habits`
+     * (`schedules`, `reminder_slots`, `entries`, `reminder_occurrences` — `Entities.kt`), runs the
+     * real `migration6To7`, and asserts three things: `sortOrder` is gone from `habits`, the
+     * pre-migration snapshot fired, and every child row survived, unmixed between the two habits —
+     * the same three-part shape [migration2To3DropsTheQuestionColumnAndEveryHabitsChildRowsSurviveUnmixed]
+     * uses for the other rebuild this table has been through.
+     */
+    @Test
+    fun migration6To7DropsTheSortOrderColumnAndEveryHabitsChildRowsSurviveUnmixed() {
+        val habitOneId = 1L
+        val habitTwoId = 2L
+        val slotOneId = 10L
+        val slotTwoId = 20L
+
+        migrationTestHelper.createDatabase(TEST_DB_NAME, version = 6).use { db ->
+            seedHabitV6WithChildRows(db, habitId = habitOneId, slotId = slotOneId, occurrenceId = 100L)
+            seedHabitV6WithChildRows(db, habitId = habitTwoId, slotId = slotTwoId, occurrenceId = 200L)
+        }
+
+        val migratedDb = migrationTestHelper.runMigrationsAndValidate(TEST_DB_NAME, 7, true, migration6To7())
+
+        migratedDb.query("PRAGMA table_info(habits)").use { cursor ->
+            val columnNames = generateSequence { if (cursor.moveToNext()) cursor.getString(1) else null }.toList()
+            assertFalse("sortOrder must be dropped from habits by the v6 to v7 rebuild", "sortOrder" in columnNames)
+        }
+        migratedDb.query("SELECT id FROM habits ORDER BY id").use { cursor ->
+            assertTrue(cursor.moveToNext())
+            assertEquals("the first habit row must survive the rebuild", habitOneId, cursor.getLong(0))
+            assertTrue(cursor.moveToNext())
+            assertEquals("the second habit row must survive the rebuild", habitTwoId, cursor.getLong(0))
+        }
+        assertEveryChildRowSurvives(migratedDb, habitId = habitOneId, slotId = slotOneId)
+        assertEveryChildRowSurvives(migratedDb, habitId = habitTwoId, slotId = slotTwoId)
+
+        val snapshotFile = File(targetFilesDir, "pre-migration/pre-migration-v6.sql")
+        assertTrue("expected the v6 pre-migration snapshot file to exist at $snapshotFile", snapshotFile.exists())
+    }
+
+    /** One habit plus exactly one row in each of `habits`' four CASCADE-child tables, at
+     *  `version = 6` — the same table-driven shape [seedHabitWithChildRows] uses for `version = 2`,
+     *  so a second habit costs one extra call rather than a second copy of this SQL. The `habits`
+     *  row shape is [seedHabitV4]'s (colours moved between v4 and v6, never the column set) plus the
+     *  `sortOrder` column this migration exists to drop. */
+    private fun seedHabitV6WithChildRows(db: SupportSQLiteDatabase, habitId: Long, slotId: Long, occurrenceId: Long) {
+        db.execSQL(
+            "INSERT INTO habits (id, name, colorArgb, notes, archived, archivedAt, createdAt, sortOrder) " +
+                "VALUES (?, ?, 0, NULL, 0, NULL, ?, 0)",
+            arrayOf<Any>(habitId, "Habit $habitId", "2026-01-01T08:00:00Z"),
+        )
+        db.execSQL(
+            "INSERT INTO schedules (habitId, kind, timesPerWeek, dayOfWeek, dayOfMonth, intervalDays, " +
+                "anchorDate, weekStart) VALUES (?, 'DAILY', NULL, NULL, NULL, NULL, NULL, 1)",
+            arrayOf<Any>(habitId),
+        )
+        db.execSQL(
+            "INSERT INTO reminder_slots (id, habitId, minuteOfDay, enabled) VALUES (?, ?, 480, 1)",
+            arrayOf<Any>(slotId, habitId),
+        )
+        db.execSQL(
+            "INSERT INTO entries (habitId, date, slotId, status, value, answeredAt, source) " +
+                "VALUES (?, '2026-09-01', ?, 'COMPLETED', NULL, '2026-09-01T08:00:00Z', 'IN_APP')",
+            arrayOf<Any>(habitId, slotId),
+        )
+        db.execSQL(
+            "INSERT INTO reminder_occurrences (id, habitId, slotId, scheduledDate, scheduledAtEpochMs, " +
+                "state, exact, snoozeUntilEpochMs, snoozeCount, notifiedAtEpochMs, resolveDeadlineMs) " +
+                "VALUES (?, ?, ?, '2026-09-01', 0, 'ARMED', 1, NULL, 0, NULL, 0)",
+            arrayOf<Any>(occurrenceId, habitId, slotId),
+        )
     }
 }

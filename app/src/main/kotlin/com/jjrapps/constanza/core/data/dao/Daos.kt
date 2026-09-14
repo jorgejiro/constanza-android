@@ -23,7 +23,15 @@ interface HabitDao {
     @Query("SELECT * FROM habits WHERE id = :id")
     suspend fun findById(id: Long): HabitEntity?
 
-    @Query("SELECT * FROM habits ORDER BY sortOrder")
+    /** remove-dead-sort-order: `ORDER BY id` replaces the removed `sortOrder` column, deliberately.
+     *  Every `sortOrder` value was always `0` — there is no reorder gesture anywhere in the app — so
+     *  the old `ORDER BY sortOrder` had nothing to distinguish rows by and SQLite fell back to
+     *  `rowid` order, which for this table is `id` order; this makes that fallback the explicit,
+     *  intended order instead of an accident of the old column's presence.
+     *  [com.jjrapps.constanza.tracking.TodayViewModel] consumes this query and groups its rows into
+     *  time-of-day sections; [com.jjrapps.constanza.habit.HabitListViewModel] sorts by name itself.
+     *  Do not "restore" a sort column here without a reorder gesture to justify it. */
+    @Query("SELECT * FROM habits ORDER BY id")
     fun observeAll(): Flow<List<HabitEntity>>
 
     /** Non-`Flow` snapshot for [com.jjrapps.constanza.scheduling.OccurrencePlanner], which runs

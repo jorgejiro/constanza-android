@@ -68,7 +68,6 @@ class ProgressViewModelTest {
         archived = archived,
         archivedAt = archivedAt,
         createdAt = Instant.parse("2026-01-01T00:00:00Z"),
-        sortOrder = 0,
     )
 
     private fun entry(date: String, status: String) = EntryEntity(

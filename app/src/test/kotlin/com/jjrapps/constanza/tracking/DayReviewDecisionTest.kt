@@ -15,7 +15,7 @@ private const val HABIT_COLOR_ARGB = 0xFF009688.toInt()
 
 private fun habit(id: Long, name: String = "Habit $id") = Habit(
     id = id, name = name, colorArgb = HABIT_COLOR_ARGB, notes = null,
-    archived = false, archivedAt = null, createdAt = FIXED_INSTANT, sortOrder = 0,
+    archived = false, archivedAt = null, createdAt = FIXED_INSTANT,
 )
 
 private fun entryEntity(habitId: Long, status: EntryStatus) = EntryEntity(

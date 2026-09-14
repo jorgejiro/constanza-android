@@ -27,7 +27,6 @@ fun HabitEntity.toBackup(schedule: BackupSchedule, slots: List<BackupSlot>, entr
         archived = archived,
         archivedAt = archivedAt,
         createdAt = createdAt,
-        sortOrder = sortOrder,
         schedule = schedule,
         slots = slots,
         entries = entries,
@@ -43,7 +42,6 @@ fun BackupHabit.toEntity(): HabitEntity = HabitEntity(
     archived = archived,
     archivedAt = archivedAt,
     createdAt = createdAt,
-    sortOrder = sortOrder,
 )
 
 fun ScheduleEntity.toBackup(): BackupSchedule = BackupSchedule(
