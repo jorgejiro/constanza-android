@@ -1,0 +1,25 @@
+Categories:
+  - Habit Tracker
+License: MIT
+AuthorName: Jorge
+AuthorEmail: jjrmobileapps@gmail.com
+SourceCode: https://github.com/jorgejiro/constanza-android
+IssueTracker: https://github.com/jorgejiro/constanza-android/issues
+
+AutoName: Constanza
+
+RepoType: git
+Repo: https://github.com/jorgejiro/constanza-android.git
+
+Builds:
+  - versionName: 0.1.16
+    versionCode: 17
+    commit: 4b1d379485c0102467a89f22a89e7c15ca0b7d48
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 0.1.16
+CurrentVersionCode: 17
