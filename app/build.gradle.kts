@@ -98,6 +98,13 @@ android {
         compose = true
     }
 
+    // AGP embeds the dependency list in the APK/AAB encrypted with a Google key: only Google can
+    // read it, and F-Droid rejects APKs that carry it.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     testOptions {
         unitTests {
             // Work unit 4a: AlarmSchedulerTest constructs a real android.jar Intent/PendingIntent
