@@ -90,7 +90,11 @@ Strategy `ask-on-risk` resolved to `stacked-to-main`, one PR per task (binary as
 
 ## Next step
 
-Owner decisions, not done here: push `docs/play-store-listing` and open the PR; deploy the `vps`
-site (commit `949372c`) so the privacy URL resolves before submitting; add a screenshot gallery to
-`apps/constanza/index.html` in `vps` from `docs/store-assets/capturas/`; create the app in Play
-Console, upload the signed AAB (`:app:bundleRelease`) to internal testing, paste texts and assets.
+Done 2026-09-28: branch pushed, PR #131 opened; `vps` deployed with `./deploy-contenido.sh`
+(sync OK, site 200). Anonymous HTTP 200 on `/apps/constanza/`, `/apps/constanza/privacidad/`,
+`/assets/iconos/constanza.svg`, and the Constanza card on `/apps/`. The `vps` commit `949372c` is
+deployed but not pushed to its git remote.
+
+Remaining owner steps: merge PR #131; add a screenshot gallery to `apps/constanza/index.html` in
+`vps`; create the app in Play Console, upload the signed AAB (`:app:bundleRelease`) to internal
+testing, paste texts and assets, answer the questionnaires, submit with a phased rollout.
