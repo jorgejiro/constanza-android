@@ -59,11 +59,20 @@ def seed_and_launch(serial: str, lang: str) -> None:
     ui.start_app(serial)
 
 
-def copy_phone_to_fastlane(lang: str, phone_dir: Path) -> None:
-    fastlane_images = FASTLANE_DIR / FASTLANE_LOCALE[lang] / "images" / "phoneScreenshots"
+# fastlane/supply's own naming for each Play Store screenshot bucket — see
+# https://docs.fastlane.tools/actions/supply/#images-and-screenshots.
+FASTLANE_SCREENSHOT_DIR = {
+    "phone": "phoneScreenshots",
+    "tablet7": "sevenInchScreenshots",
+    "tablet10": "tenInchScreenshots",
+}
+
+
+def copy_to_fastlane(lang: str, formato: str, out_dir: Path) -> None:
+    fastlane_images = FASTLANE_DIR / FASTLANE_LOCALE[lang] / "images" / FASTLANE_SCREENSHOT_DIR[formato]
     fastlane_images.mkdir(parents=True, exist_ok=True)
     for index, scene in enumerate(capturar.SCENES, start=1):
-        src = phone_dir / f"{scene}.png"
+        src = out_dir / f"{scene}.png"
         dest = fastlane_images / f"{index}.png"
         dest.write_bytes(src.read_bytes())
 
@@ -90,8 +99,7 @@ def run_language(serial: str, lang: str) -> None:
         results = capturar.capture_all(serial, lang, out_dir)
         capturar.write_manifest_entries(manifest_path, lang, formato, results)
         ui.force_stop(serial)
-        if formato == "phone":
-            copy_phone_to_fastlane(lang, out_dir)
+        copy_to_fastlane(lang, formato, out_dir)
 
     ui.reset_wm(serial)
     ui.exit_demo_mode(serial)

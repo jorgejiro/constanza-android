@@ -1,0 +1,61 @@
+# This file, along with all files in this directory, is managed by fastlane. See
+# https://docs.fastlane.tools/actions/supply/ for the upload_to_play_store options used here, and
+# https://developers.google.com/android-publisher/getting_started for the API/service-account
+# setup those options authenticate against.
+
+# Do not auto-generate fastlane/README.md on every run: it would be a repeated, low-value diff
+# (`fastlane lanes` reproduces the same lane list on demand), and it is not worth deciding whether
+# to gitignore it every time this file changes.
+skip_docs
+
+default_platform(:android)
+
+platform :android do
+  desc "Validate the whole Play listing (metadata, images, screenshots) against the API without publishing anything — no AAB, nothing goes live"
+  lane :validar do
+    upload_to_play_store(
+      validate_only: true,
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      # No AAB is part of this edit, so there is no version to attach a changelog to.
+      skip_upload_changelogs: true
+    )
+  end
+
+  desc "Upload only the Play listing text, icon, feature graphic and screenshots — no binary"
+  lane :ficha do
+    upload_to_play_store(
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_changelogs: true
+    )
+  end
+
+  desc "Build :app:bundleRelease and upload the signed AAB to a Play track (params: track, release_status, images)"
+  lane :subir do |options|
+    track = options[:track] || "internal"
+    release_status = options[:release_status] || "draft"
+    reupload_images = options.fetch(:images, false)
+
+    ENV["JAVA_HOME"] = "/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+
+    gradle(task: "app:bundleRelease")
+
+    aab_paths = lane_context[SharedValues::GRADLE_ALL_AAB_OUTPUT_PATHS]
+    UI.user_error!("gradle(task: 'app:bundleRelease') produced no .aab") if aab_paths.nil? || aab_paths.empty?
+
+    upload_to_play_store(
+      track: track,
+      release_status: release_status,
+      aab: aab_paths.first,
+      skip_upload_apk: true,
+      # Metadata and the changelog for this versionCode (fastlane/metadata/android/<locale>/
+      # changelogs/<versionCode>.txt) travel with every AAB upload; images/screenshots only when
+      # asked with images: true, since they rarely change together with a binary.
+      skip_upload_metadata: false,
+      skip_upload_changelogs: false,
+      skip_upload_images: !reupload_images,
+      skip_upload_screenshots: !reupload_images
+    )
+  end
+end
