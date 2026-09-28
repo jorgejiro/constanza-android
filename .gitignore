@@ -21,3 +21,10 @@ keystore.properties
 # Python (docs/store-assets/generar-capturas)
 __pycache__/
 *.pyc
+
+# fastlane — report.xml is a per-run log; the service-account JSON key must never live in the
+# repo (fastlane/Appfile reads it from SUPPLY_JSON_KEY or ~/.config/play/, outside the tree, but
+# this stays as a second line of defence). fastlane/README.md is not generated at all (`skip_docs`
+# in the Fastfile), so it needs no entry here.
+fastlane/report.xml
+fastlane/*.json

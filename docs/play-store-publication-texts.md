@@ -43,6 +43,67 @@ editas un texto aquí, vuelve a pasar el script para que el conteo no mienta.
 
 ---
 
+## Subir a Google Play con fastlane
+
+Desde `odd/tasks/fastlane-supply.md`: en vez de pegar 42 imágenes y los textos a mano en Play
+Console, `fastlane supply` (action `upload_to_play_store`, ver `fastlane/Fastfile`) los sube con
+un comando, leyendo `fastlane/metadata/android/` y `fastlane/Appfile`. Nada de esto sustituye el
+checklist de arriba: las comprobaciones y el recorrido manual siguen siendo el mismo paso 1-4
+antes de generar el AAB.
+
+### Configuración inicial (una sola vez, la hace el dueño de la cuenta)
+
+La API de Google Play no puede hacer nada de esto por ti; son pasos manuales previos a la primera
+subida por `fastlane`:
+
+1. Crear la app en Play Console (nombre de paquete `com.jjrapps.constanza`).
+2. Subir el primer AAB **a mano**, desde Play Console. La API de Android Publisher no puede crear
+   la primera versión de una app nueva; solo puede actuar sobre una app que ya tiene al menos una
+   subida.
+3. Crear una cuenta de servicio en Google Cloud (mismo proyecto o uno nuevo) y habilitar la
+   **Google Play Android Developer API** en ese proyecto.
+4. Generar una clave JSON para esa cuenta de servicio y descargarla.
+5. En Play Console → **Usuarios y permisos**, invitar la cuenta de servicio (su email
+   `...@....iam.gserviceaccount.com`) con permisos de **Gestión de versiones** (release) y
+   **Ficha de Play Store** (store listing) sobre esta app.
+6. Guardar la clave JSON **fuera del repositorio**, en `~/.config/play/constanza-play.json` (la
+   ruta por defecto de `fastlane/Appfile`) o en cualquier otra ruta, exportándola como
+   `SUPPLY_JSON_KEY` antes de invocar `fastlane`. La clave nunca debe entrar en el repositorio ni
+   subirse a ningún sitio.
+
+Hasta que estos seis pasos estén hechos, ningún comando de `fastlane` de más abajo tiene
+credenciales con las que autenticarse.
+
+### Comandos
+
+- `fastlane validar` — valida toda la ficha (textos, capturas, icono, gráfico de función) contra
+  la API sin publicar nada; no sube ningún AAB. Útil para comprobar que la clave y los permisos
+  funcionan antes de tocar nada real.
+- `fastlane ficha` — sube solo la ficha (textos + capturas + icono + gráfico de función), sin
+  ningún binario.
+- `fastlane subir track:internal` — compila `:app:bundleRelease` y sube el AAB firmado a la pista
+  indicada (`internal` por defecto) con estado `draft` (por defecto no publica, solo lo deja listo
+  para revisar en Play Console). Admite también `release_status:` y `images:true` si además hay
+  que resubir capturas o icono junto con el binario.
+
+### Lo que sigue siendo manual
+
+- **Los cuestionarios de "Contenido de la app"** (clasificación de contenido/IARC, público
+  objetivo, anuncios, acceso a la app): la API de Android Publisher no los expone; se rellenan
+  siempre desde Play Console, ver la sección "Contenido de la app" más abajo en este documento.
+- **Seguridad de los datos**: el endpoint de la API espera el CSV que exporta la propia Play
+  Console para esta sección, no texto libre; para Constanza el formulario entero es un único
+  "No" (ver la sección "Seguridad de los datos" más abajo), así que rellenarlo a mano en Play
+  Console sigue siendo más simple que fabricar ese CSV.
+
+### Referencias
+
+- Acciones y opciones de `supply`: <https://docs.fastlane.tools/actions/supply/>.
+- Configuración de la Google Play Android Developer API (proyecto de Google Cloud, cuenta de
+  servicio, habilitar la API): <https://developers.google.com/android-publisher/getting_started>.
+
+---
+
 ## Ficha principal — App name
 
 Límite: 30 caracteres. El nombre de la ficha está decidido (`Constanza - Buenos hábitos`); lo que
