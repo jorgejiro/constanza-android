@@ -17,3 +17,7 @@ captures/
 keystore.properties
 *.jks
 *.keystore
+
+# Python (docs/store-assets/generar-capturas)
+__pycache__/
+*.pyc

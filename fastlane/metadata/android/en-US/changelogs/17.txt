@@ -1,0 +1,7 @@
+The first version of Constanza on Google Play.
+
+• Habits with six schedule types and reminders answered Yes/No/Snooze from the notification.
+• Current streak, best streak, and last-30-days compliance per habit.
+• A nightly review notification for what is still open, and a file backup of your data.
+
+No accounts, no cloud, no ads, no tracking.
