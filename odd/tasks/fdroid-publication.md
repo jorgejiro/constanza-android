@@ -45,10 +45,10 @@ on the recipe, then the MR pipeline.
 - [x] T1 · `dependenciesInfo { includeInApk = false; includeInBundle = false }` in
   `app/build.gradle.kts`; unsigned `assembleRelease` builds. Route: inline (one mechanical file).
 - [x] T2 · Recipe + `LEEME.md`, linted. Route: inline (adapted from sleep-noise-android).
-- [ ] T3 · Push branch, open GitHub PR; fork branch `com.jjrapps.constanza` in `jorgejiro/fdroiddata`,
+- [x] T3 · Push branch, open GitHub PR; fork branch `com.jjrapps.constanza` in `jorgejiro/fdroiddata`,
   commit `metadata/com.jjrapps.constanza.yml`, open MR `New app: Constanza` with the differentiators.
   Route: inline (glab/gh state operations).
-- [ ] T4 · MR pipeline green or failures explained. Route: inline.
+- [x] T4 · MR pipeline green or failures explained. Route: inline.
 
 ## Progress
 
@@ -59,6 +59,18 @@ on the recipe, then the MR pipeline.
   (fdroidserver 2.4.5, fdroiddata `config/categories.yml`) clean; `fdroid rewritemeta` leaves it
   unchanged.
 
+- T3 · PR #134 merged with a merge commit (6793c00); `4b1d379` verified ancestor of `origin/main`.
+  Fork branch `com.jjrapps.constanza` commit `933da19`; MR
+  https://gitlab.com/fdroid/fdroiddata/-/merge_requests/50477 (`allow_collaboration`). Its
+  "Why another habit tracker" section only claims differences verified in the source of Loop,
+  Habits, Habit-Maker, Frequent Habits and Table Habit: several answerable occurrences per day,
+  day-of-month schedule, automatic "Missed" at midnight, nightly review, Today grouping
+  (`TodayModel.kt` `groupTodayRows`). Weekday schedules credited to Frequent Habits too;
+  notification answering not claimed as unique (Loop has it).
+- T4 · Pipeline 2890432313 green: fdroid build, check apk, check source code, checkupdates, lint,
+  rewritemeta, schema validation.
+
 ## Next step
 
-T3.
+Wait for volunteer review of MR !50477 and answer comments. Future versions need no MR: tag
+`vX.Y.Z` and add `fastlane/metadata/android/{en-US,es-ES}/changelogs/<versionCode>.txt`.
