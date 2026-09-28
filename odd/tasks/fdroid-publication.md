@@ -42,9 +42,9 @@ on the recipe, then the MR pipeline.
 
 ## Tasks
 
-- [ ] T1 · `dependenciesInfo { includeInApk = false; includeInBundle = false }` in
+- [x] T1 · `dependenciesInfo { includeInApk = false; includeInBundle = false }` in
   `app/build.gradle.kts`; unsigned `assembleRelease` builds. Route: inline (one mechanical file).
-- [ ] T2 · Recipe + `LEEME.md`, linted. Route: inline (adapted from sleep-noise-android).
+- [x] T2 · Recipe + `LEEME.md`, linted. Route: inline (adapted from sleep-noise-android).
 - [ ] T3 · Push branch, open GitHub PR; fork branch `com.jjrapps.constanza` in `jorgejiro/fdroiddata`,
   commit `metadata/com.jjrapps.constanza.yml`, open MR `New app: Constanza` with the differentiators.
   Route: inline (glab/gh state operations).
@@ -52,6 +52,13 @@ on the recipe, then the MR pipeline.
 
 ## Progress
 
+- T1 · `4b1d379`. `:app:assembleRelease` without `keystore.properties` produces
+  `app-release-unsigned.apk`; `testDebugUnitTest` green. RDD assess: medium, `under_budget`, no
+  review due.
+- T2 · `cb125c4`. Recipe pins `4b1d379` (contains 56 `fastlane/` files). `fdroid lint -f`
+  (fdroidserver 2.4.5, fdroiddata `config/categories.yml`) clean; `fdroid rewritemeta` leaves it
+  unchanged.
+
 ## Next step
 
-T1.
+T3.
