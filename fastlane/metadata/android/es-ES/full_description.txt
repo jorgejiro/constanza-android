@@ -1,0 +1,26 @@
+Constanza es una app de hábitos que se abre y se usa en segundos. No pide cuenta, no sincroniza nada en la nube y no tiene anuncios ni analítica: no declara siquiera el permiso de internet, así que no podría conectarse aunque quisiera.
+
+Cada hábito tiene su propio color -de una paleta de 21, o uno personalizado con su propio selector de tono, saturación y brillo- y su propia frecuencia: todos los días, varias veces al día, un número de veces por semana, días concretos de la semana, un día del mes, o cada N días. Cualquier frecuencia puede llevar una o varias horas de recordatorio.
+
+La pantalla Hoy agrupa lo que toca ahora, lo que toca más tarde y lo que ya has contestado, y puedes navegar a cualquier día pasado para ver qué ocurrió. Responder es un toque: Sí o No, sin abrir ningún diálogo. Y cuando llega el recordatorio, puedes responder directamente desde la notificación -Sí, No o Aplazar- sin ni siquiera desbloquear el teléfono.
+
+Un día que no contestas no desaparece: a medianoche, cualquier hueco sin responder pasa a "No hecho". Constanza no oculta lo que dejaste pasar para hacerte sentir mejor; lo registra, y ese registro es la base de la racha y del cumplimiento. Progreso muestra la racha actual, la mejor racha y el porcentaje de cumplimiento de los últimos 30 días de cada hábito.
+
+Los recordatorios sobreviven a un reinicio del teléfono y a un cambio de hora o de zona horaria: no hace falta volver a abrir la app para que sigan sonando. Si tu teléfono no concede el permiso de alarmas exactas por defecto, Constanza te avisa sin bloquear nada y te lleva al ajuste; si prefieres no concedérselo, los recordatorios igualmente siguen llegando, solo que pueden hacerlo con algunos minutos de margen.
+
+Cada noche, a las 23:00 por defecto, un aviso de repaso te recuerda lo que quedó pendiente ese día -o solo si de verdad quedó algo, si así lo prefieres-. Y en Ajustes puedes cambiar cuánto dura un aplazamiento, elegir el idioma (siguiendo al sistema, español o inglés), y exportar o importar todos tus datos como un archivo, con el selector de archivos del propio sistema: es tu copia, no la nuestra.
+
+La interfaz es oscura siempre, sin modo claro. No es un olvido: el fondo es deliberadamente neutro para que el único color de la pantalla sea el que tú le has puesto a cada hábito.
+
+Qué incluye:
+
+• Hábitos con seis tipos de frecuencia y una o varias horas de recordatorio.
+• 21 colores más un selector personalizado de tono, saturación y brillo.
+• Recordatorios con respuesta Sí/No/Aplazar directamente desde la notificación.
+• Un día sin contestar se registra como "No hecho" a medianoche, nunca se oculta.
+• Racha actual, mejor racha y cumplimiento de los últimos 30 días por hábito.
+• Aviso de repaso nocturno, configurable, o solo si queda algo pendiente.
+• Exportación e importación de datos a un archivo, con el selector del sistema.
+• Recordatorios que sobreviven a reinicios y a cambios de hora.
+• Español e inglés.
+• Sin cuentas, sin nube, sin anuncios, sin seguimiento, sin permiso de internet.

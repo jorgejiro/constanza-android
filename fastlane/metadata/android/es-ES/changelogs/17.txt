@@ -1,0 +1,7 @@
+Primera versión de Constanza en Google Play.
+
+• Hábitos con seis tipos de frecuencia y recordatorios con respuesta Sí/No/Aplazar desde la notificación.
+• Racha actual, mejor racha y cumplimiento de los últimos 30 días por hábito.
+• Aviso de repaso nocturno de lo pendiente, y copia de tus datos a un archivo.
+
+Sin cuentas, sin nube, sin anuncios, sin seguimiento.
