@@ -36,7 +36,7 @@ without credentials where possible; screenshot copies match the source set byte 
 
 - [x] T1 — Install fastlane, add Appfile/Fastfile, tablet screenshot copies, .gitignore for the key,
       doc. Route: delegated (writer trigger).
-- [ ] T2 — First real upload once the owner provides the key (metadata + images, then AAB to
+- [x] T2 — First real upload once the owner provides the key (metadata + images, then AAB to
       internal/production as the owner decides). Route: inline, bounded action.
 
 ## Progress / evidence
@@ -50,6 +50,12 @@ without credentials where possible; screenshot copies match the source set byte 
   constanza-0.1.16.aab`, jarsigner verified, signer `CN=Constanza, OU=jjrapps` (upload key),
   package com.jjrapps.constanza, versionCode 17, versionName 0.1.16.
 
+- T2 done 2026-09-28: shared key `~/.config/play/jjrmobileapps.json`
+  (`play-publisher@jjrmobileapps.iam.gserviceaccount.com`), commit `efc58b7`. First `fastlane validar`
+  failed "The caller does not have permission" (invite not yet in place); after the owner invited the
+  account it succeeded. `fastlane ficha`: 42 screenshots + icon + feature graphic per locale, en-US and
+  es-ES texts, "Successfully finished the upload to Google Play".
+
 ## Next step
 
-Owner: create the app, upload that AAB by hand, create the service account + key. Then T2.
+Future releases: `fastlane subir track:<track>` (default internal, draft). Branch not pushed yet.
