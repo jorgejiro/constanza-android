@@ -72,6 +72,12 @@ def run_language(serial: str, lang: str) -> None:
     if lang not in LOCALE_DIR:
         raise SystemExit(f"Unknown language '{lang}', expected 'es' or 'en'")
 
+    # The DEVICE's system locale — status bar chrome, the notification shade's own "Clear all" —
+    # only takes effect after a reboot (see set_system_locale_and_reboot's own KDoc for what was
+    # actually measured). Once per LANGUAGE pass, not per format: the reboot resets demo mode's
+    # broadcast-driven state and wm size/density, so everything below re-applies them fresh.
+    print(f"== {lang}: setting system locale and rebooting ==", flush=True)
+    ui.set_system_locale_and_reboot(serial, lang)
     prepare_device(serial)
     ui.set_app_locale(serial, lang)
 

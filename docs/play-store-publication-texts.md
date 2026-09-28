@@ -190,9 +190,9 @@ El orden importa: en Play se ven las dos primeras sin desplazarse.
 | 2 | Notificación de recordatorio en la sombra, con Sí/No/Aplazar | La razón de instalar: contestar sin abrir la app |
 | 3 | Editor de hábito con las opciones de frecuencia | La segunda razón: hábitos con la forma que tú quieras, no una plantilla |
 | 4 | Selector de color, paleta y personalizado | Cada hábito es su color; lo personalizable se ve, no se cuenta |
-| 5 | Progreso: racha, mejor racha, cumplimiento del 30 % | La recompensa de usar la app más de un día |
-| 6 | Lista de hábitos | Cómo se gestionan varios hábitos a la vez |
-| 7 | Ajustes: repaso del día y copia de seguridad | Que existen el idioma, el repaso nocturno y la copia, y que no hay nada raro dentro |
+| 5 | Lista de hábitos | Cómo se gestionan varios hábitos a la vez |
+| 6 | Ajustes: repaso del día y copia de seguridad | Que existen el idioma, el repaso nocturno y la copia, y que no hay nada raro dentro |
+| 7 | Progreso: racha, mejor racha, cumplimiento del 30 % | La recompensa de usar la app más de un día |
 
 Los ficheros van en `docs/store-assets/capturas/<idioma>/<formato>/`, con el idioma primero
 porque así es como Play Console las pide: una ficha por idioma, y dentro sus formatos. Ver la

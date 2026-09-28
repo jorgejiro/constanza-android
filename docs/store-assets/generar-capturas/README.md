@@ -1,7 +1,10 @@
 # Generador de capturas para Google Play — Constanza
 
 Genera las capturas de la ficha de Play para Constanza: 7 escenas × 2 idiomas (es, en) × 3 formatos
-(phone, tablet7, tablet10) = 42 imágenes, más el juego de teléfono copiado a
+(phone, tablet7, tablet10) = 42 imágenes, en el orden 1 Hoy · 2 Notificación · 3 Editor de hábito ·
+4 Selector de color · 5 Lista de hábitos · 6 Ajustes · 7 Progreso (Progreso va último a propósito:
+es UI real y honesta —tres líneas de texto—, no una escena vistosa, así que no compite por los dos
+huecos que Play enseña sin desplazarse), más el juego de teléfono copiado a
 `fastlane/metadata/android/{es-ES,en-US}/images/phoneScreenshots/`. Puerto del pipeline que
 `sleep-noise-android` ya resolvió (`docs/decisions/003-capturas-de-la-ficha-automatizadas.md` en
 ese repo), adaptado a que Constanza tiene una base de datos Room real: aquí no basta con abrir la
@@ -59,21 +62,41 @@ través de los DAO y mappers de producción — nunca una base de datos en memor
 a mano —, y está anotada `@SeedOnly` para que `:app:connectedDebugAndroidTest` la excluya siempre
 (esa tarea desinstala los dos APK al terminar, lo que destruiría los datos sembrados).
 
-Siembra 5 hábitos, uno por cada tipo de programación con hora fija más uno con varias horas al día:
+Siembra 5 hábitos, elegidos para que las TRES secciones de Hoy (`groupTodayRows` — Ahora/Más
+tarde/Contestados) salgan siempre pobladas, de forma determinista, sin importar la hora real a la
+que corra el pipeline:
 
-1. **Beber agua** (varias veces al día) — el ancla de la escena de notificación: además de sus
-   horas fijas, arma un hueco extra a 2 minutos vista para que la notificación de recordatorio sea
-   **real** (mismo alarm real que `ImminentReminderSeed` prueba), nunca simulada.
-2. **Leer 20 minutos** (diaria) — la racha más cuidada, reservada para la captura de Progreso.
-3. **Caminar** (N veces por semana) — con una semana por debajo de cuota en su historial, para que
-   se vea una racha que se rompió una vez.
-4. **Meditar** (días concretos de la semana) — configurado alrededor de HOY, para que siempre esté
-   pendiente sin importar qué día real se ejecute el pipeline.
-5. **Estirar** (cada N días) — anclado en HOY por la misma razón.
+1. **Beber agua** (varias veces al día) — el ancla de la escena de notificación. Sus tres horas
+   fijas históricas se resuelven también como contestadas HOY, a través del mismo
+   `EntryWriter.answerInApp` que usa la propia pantalla Hoy, y solo el cuarto hueco —armado 2
+   minutos vista— se deja pendiente. Su hora siempre queda en el futuro en el momento de capturar
+   Hoy, así que esta fila cae siempre en "Más tarde" mostrando "En progreso", nunca en "Ahora": la
+   notificación real (Sí/No/Aplazar) llega un par de minutos después de esa captura.
+2. **Leer 20 minutos** (diaria) — resuelto Sí (COMPLETED) para hoy por el mismo camino de
+   producción, así que cae en "Contestados" con el visto verde. También la racha más cuidada,
+   reservada para la captura de Progreso, y el hábito EXISTENTE cuyo editor abren las escenas 3 y 4
+   (ver más abajo).
+3. **Caminar** (N veces por semana) — deliberadamente SIN hora de recordatorio: la propia regla de
+   `TodayModel` ("un hueco sin hora y sin contestar siempre es 'Ahora'") es lo que coloca esta fila,
+   nunca el reloj. También lleva una semana por debajo de cuota en su historial, para que se vea una
+   racha que se rompió una vez.
+4. **Meditar** (días concretos de la semana) — resuelto No (MISSED) para hoy, la pareja del "Sí" de
+   Leer, para que "Contestados" enseñe los dos glifos de respuesta, no solo visto buenos.
+   Configurado alrededor de HOY, para que siempre esté pendiente sin importar qué día real se
+   ejecute el pipeline.
+5. **Estirar** (cada N días) — anclado en HOY por la misma razón, sin contestar, con su
+   recordatorio en el futuro: cae siempre en "Más tarde" junto a Beber agua.
 
 Se ejecuta una vez por idioma (instrumentación con `-e language es` o `-e language en`), y es
 idempotente: cada ejecución borra cualquier hábito sembrado antes (cascada sobre programaciones,
 horas y respuestas) y cancela sus alarmas reales antes de insertar el juego nuevo.
+
+**Por qué el reloj del emulador no se congela.** Este AVD (`google_apis_playstore`, como todos los
+que usan la etiqueta Play Store) es un build de producción: `adb root` responde "adbd cannot run as
+root in production builds", y sin root `adb shell date -s ...` falla con "Operation not permitted"
+— comprobado en vivo, no asumido. La alternativa que sí funciona sin root es la que se usa aquí:
+sembrar SIEMPRE en relativo a la hora real del dispositivo (desplazamientos `now + N minutos`,
+nunca una hora de reloj fija — ver la lección de más abajo), no un reloj de referencia congelado.
 
 ```bash
 adb -s emulator-5554 shell pm grant com.jjrapps.constanza android.permission.POST_NOTIFICATIONS
@@ -111,8 +134,12 @@ si se escribe como filas `MISSED` reales, igual que las dejaría ese barrido.
 - **Un elemento de Compose que solo aparece "al final de la lista" no está en el volcado de
   `uiautomator` si la lista lo compone perezosamente fuera de la pantalla.** El botón "Añadir
   hábito" de la propia pantalla Hoy es así cuando ya hay hábitos: la fila vive al final, bajo el
-  último hábito, y con 5 hábitos sembrados normalmente no entra en el viewport. Localizarlo
-  primero por FAB fijo (pantalla de Lista de hábitos) evita depender de scroll para abrir el editor.
+  último hábito, y con 5 hábitos sembrados normalmente no entra en el viewport. Esto dejó de importar
+  en la práctica una vez que las escenas 3/4 pasaron a abrir el editor de un hábito EXISTENTE
+  tocando su propia fila en la Lista de hábitos (`HabitRow`'s `Modifier.clickable {
+  onEditHabit(habit.id) }`) en vez de crear uno nuevo — pero la lección en sí sigue siendo válida
+  para cualquier otro elemento fuera de pantalla: localízalo por un punto de entrada que SÍ esté
+  siempre en el viewport, no confíes en que scroll_until_text lo alcance.
 - **Un `input tap` puede acertar contenido de la persiana de notificaciones en vez del de la app**
   si una notificación con aviso emergente (heads-up) está en pantalla en ese instante — no hace
   falta haber deslizado nada. Limpiar notificaciones ajenas ANTES de cada escena (no solo antes de
@@ -156,19 +183,56 @@ si se escribe como filas `MISSED` reales, igual que las dejaría ese barrido.
   dos. También importa leer ambos recuentos (propias y totales) de UN solo volcado de `dumpsys`: dos
   llamadas separadas pueden ver estados distintos si el resumen aparece y desaparece entre medias
   (se observó en vivo: `own=2, total=1`, imposible bajo una lectura consistente).
-- **La navegación Atrás no siempre vuelve un solo nivel en la pila esperada.** Desde Progreso
-  (alcanzado Hoy → Hábitos → Progreso), una única pulsación Atrás no vuelve a la Lista de hábitos:
-  sale directamente a Hoy, y una segunda pulsación —pensada para volver de la Lista a Hoy— sale del
-  todo a la pantalla de inicio del lanzador. Y ajustes se comportó todavía distinto: ni una ni dos
-  pulsaciones Atrás devolvían a Hoy de forma fiable. En vez de adivinar la profundidad exacta de la
-  pila para cada pantalla, la solución robusta fue relanzar la app entera (`force-stop` + arranque
-  en frío) después de Progreso, que siempre abre en Hoy, y no navegar Atrás en absoluto después de
-  Ajustes, que es la última escena del lote de todas formas.
+- **La navegación Atrás no siempre vuelve un solo nivel en la pila esperada, y no es solo un caso
+  aislado.** Se midió en tres pantallas distintas alcanzadas a través del menú de la Lista de
+  hábitos: desde Progreso, una única pulsación Atrás no vuelve a la Lista, sale directamente a Hoy
+  (y una segunda pulsación sale del todo al lanzador); desde Ajustes, ni una ni dos pulsaciones
+  volvían a Hoy de forma fiable; y el editor de un hábito EXISTENTE se comportó igual de raro tras
+  tocar el desplegable de Frecuencia. En vez de adivinar la profundidad de pila de cada pantalla —ya
+  falló dos veces seguidas con hipótesis distintas—, la solución robusta y uniforme adoptada en
+  todas partes es relanzar la app entera (`force-stop` + arranque en frío, que siempre abre en Hoy
+  porque la siembra deja el onboarding hecho) en vez de encadenar pulsaciones Atrás.
 - **Las cabeceras de sección de Ajustes se renderizan en VERSALITAS por el propio composable
   (`.uppercase()`), nunca con el `casing` original del recurso de cadena.** Buscar
   "Datos y copia de seguridad" (con mayúscula solo inicial) nunca aparece, así que un scroll que
   busca ese texto se agota siempre, aunque la sección ya esté en pantalla sin necesidad de scroll.
   El texto correcto a buscar es "DATOS Y COPIA DE SEGURIDAD".
+- **Un `adb shell input swipe` de magnitud "exacta", calculada para llevar un elemento localizado
+  a una posición de píxel concreta, no converge.** `input swipe` siempre termina como un fling: la
+  duración pedida solo cambia la velocidad que alimenta la MISMA curva de deceleración que usaría un
+  golpe real, así que es la física de scroll de la propia `LazyColumn` de Compose —no una
+  traslación 1:1— la que decide dónde acaba aterrizando. Se probó en vivo: tres correcciones
+  "exactas" sucesivas oscilaron sin asentarse nunca dentro de un margen de 40 px. Lo que sí converge
+  son pasos pequeños de magnitud FIJA (la misma forma de gesto que ya usaba `scroll_down`),
+  remedidos tras cada uno y parando en cuanto el elemento buscado cae dentro de una tolerancia
+  amplia (150 px) — más intentos, pasos más pequeños, en vez de un gesto grande "perfecto".
+- **A veces el contenido sencillamente no cabe en una pantalla de teléfono con todas las cabeceras
+  intactas, sin importar a qué posición se haga scroll.** En Ajustes, llevar la cabecera de "Repaso
+  del día" al borde superior deja siempre la cola de "Duración de aplazamiento" (unas opciones "2 h
+  / 3 h / 4 h" huérfanas, sin cabecera encima) en el marco — medido en vivo: la posición de scroll
+  máxima posible ya deja esa cabecera a 1732 px del borde, muy lejos del objetivo, y scrolls
+  adicionales no mueven nada más porque no queda más contenido por revelar. La densidad más alta del
+  formato `phone` (@420, frente a @288 de las tabletas) es justo lo que hace que cinco secciones NO
+  quepan juntas aquí aunque sí quepan en tableta. La solución fue no perseguir una posición de scroll
+  intermedia imposible, sino usar la parte de arriba SIN NINGÚN scroll (Duración + Datos y copia +
+  Idioma, las tres con su cabecera intacta y nada huérfano) en vez de perseguir Repaso del día.
+- **Sembrar la respuesta de HOY con el mismo slotId "0" que usa el historial no basta para que
+  Hoy la reconozca como contestada, si ese hábito SÍ tiene una hora de recordatorio configurada.**
+  `TodayModel.toTodaySlot` empareja cada entrada por su `slotId` REAL (el id de
+  `ReminderSlotEntity`, nunca el sentinel `0`) contra la fila de hoy que construye para ESE hueco
+  concreto — el sentinel `0` solo es válido para hábitos sin ninguna hora configurada. Sin pasar el
+  id real, la fila se queda "sin contestar" a ojos de la pantalla Hoy aunque la base de datos tenga
+  la entrada. La única forma correcta, y la que usa `ListingScreenshotSeed`, es contestar a través
+  de `EntryWriter.answerInApp` con el id real del hueco y de su ocurrencia armada — el mismo camino
+  que usa `TodayViewModel.answer` en producción, nunca un `INSERT` a mano.
+- **Un bucle de "historial" que construye fechas por semana puede escribir sin querer una fila para
+  HOY mismo.** El bucle de Caminar generaba sus fechas completadas con `week.with(dayOfWeek)`
+  filtrado por `!date.isAfter(today)` — que incluye HOY cuando hoy mismo cae en uno de los días de
+  la semana elegidos (lunes, miércoles o viernes). Se detectó en vivo un lunes: Caminar aparecía ya
+  "Contestado" en vez de en "Ahora", porque el propio bucle de historial le había escrito una
+  entrada COMPLETED para hoy sin que ninguna llamada explícita lo pidiera. El filtro correcto es
+  estrictamente `date.isBefore(today)` — nunca `!isAfter`— en cualquier bucle de historial que
+  construya fechas hacia adelante en vez de retroceder desde "hoy menos N días".
 - **Una diferencia media de píxel de toda la imagen es un mal indicador de "mismo idioma
   capturado dos veces" en una app con fondo mayoritariamente uniforme.** El tema oscuro de
   Constanza (`Dark-Only Rendering`) hace que el texto traducido —la única diferencia real entre
@@ -176,6 +240,18 @@ si se escribe como filas `MISSED` reales, igual que las dejaría ese barrido.
   media por canal de toda la imagen puede quedar por debajo de 1.0 incluso entre dos capturas
   genuinamente distintas (medido en vivo en cinco pares reales). La señal robusta es la PROPORCIÓN
   de píxeles que difieren de forma apreciable (`revisar.py`'s `PIXEL_DIFF_THRESHOLD`), no la media.
+
+- **`cmd locale set-app-locales` solo cambia el idioma de LA APP; la persiana y la barra de estado
+  siguen el idioma del SISTEMA, y ese no cambia en caliente con un simple `settings put`.** La
+  escena de notificación mezcla las dos cosas en una sola captura: el texto de Constanza (app) junto
+  al "Clear all"/"Borrar todo" de la persiana (sistema). Escribir
+  `settings put system system_locales es-ES` y volcar la persiana de inmediato seguía mostrando
+  inglés — comprobado en vivo, con y sin *broadcast* `LOCALE_CHANGED`, con y sin gesto nuevo. Lo que
+  sí funciona, medido igual de directamente, es reiniciar el dispositivo (`adb reboot`) después de
+  escribir el ajuste — la misma técnica que usan las herramientas de test de idioma instrumentadas.
+  Cuesta un reinicio completo por PASADA DE IDIOMA (no por formato), y todo el estado que depende de
+  *broadcasts* en tiempo de ejecución —modo demo, `wm size`/`wm density`— hay que volver a aplicarlo
+  después, porque el reinicio los resetea.
 
 ## `revisar.py`
 
@@ -190,3 +266,7 @@ Comprueba, y falla con código 1 en cualquier incumplimiento:
 6. Que la escena de notificación no tenga ninguna notificación ajena colada, cruzando con
    `manifest.json` (que `capturar.py` escribe en el momento de la captura, con el recuento real de
    notificaciones activas — un PNG ya terminado no puede probar esto por sí solo).
+7. Que no se haya colado ningún texto del idioma equivocado en la propia persiana del sistema en la
+   escena de notificación (`system_locale_leak`, también cruzado contra `manifest.json`) — la propia
+   `capturar.py` ya corta el lote de inmediato si lo detecta en el momento de capturar, así que esta
+   comprobación es sobre todo para un manifiesto de una ejecución previa que quedó a medias.

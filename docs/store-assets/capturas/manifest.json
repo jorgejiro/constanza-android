@@ -8,18 +8,19 @@
         "path": "en/phone/03-editor-habito.png"
       },
       "habit_list": {
-        "path": "en/phone/06-lista-habitos.png"
+        "path": "en/phone/05-lista-habitos.png"
       },
       "notification": {
         "own_notifications": 1,
         "path": "en/phone/02-notificacion.png",
+        "system_locale_leak": null,
         "total_notifications": 1
       },
       "progress": {
-        "path": "en/phone/05-progreso.png"
+        "path": "en/phone/07-progreso.png"
       },
       "settings": {
-        "path": "en/phone/07-ajustes.png"
+        "path": "en/phone/06-ajustes.png"
       },
       "today": {
         "path": "en/phone/01-hoy.png"
@@ -33,18 +34,19 @@
         "path": "en/tablet10/03-editor-habito.png"
       },
       "habit_list": {
-        "path": "en/tablet10/06-lista-habitos.png"
+        "path": "en/tablet10/05-lista-habitos.png"
       },
       "notification": {
         "own_notifications": 1,
         "path": "en/tablet10/02-notificacion.png",
+        "system_locale_leak": null,
         "total_notifications": 1
       },
       "progress": {
-        "path": "en/tablet10/05-progreso.png"
+        "path": "en/tablet10/07-progreso.png"
       },
       "settings": {
-        "path": "en/tablet10/07-ajustes.png"
+        "path": "en/tablet10/06-ajustes.png"
       },
       "today": {
         "path": "en/tablet10/01-hoy.png"
@@ -58,18 +60,19 @@
         "path": "en/tablet7/03-editor-habito.png"
       },
       "habit_list": {
-        "path": "en/tablet7/06-lista-habitos.png"
+        "path": "en/tablet7/05-lista-habitos.png"
       },
       "notification": {
         "own_notifications": 1,
         "path": "en/tablet7/02-notificacion.png",
+        "system_locale_leak": null,
         "total_notifications": 1
       },
       "progress": {
-        "path": "en/tablet7/05-progreso.png"
+        "path": "en/tablet7/07-progreso.png"
       },
       "settings": {
-        "path": "en/tablet7/07-ajustes.png"
+        "path": "en/tablet7/06-ajustes.png"
       },
       "today": {
         "path": "en/tablet7/01-hoy.png"
@@ -85,18 +88,19 @@
         "path": "es/phone/03-editor-habito.png"
       },
       "habit_list": {
-        "path": "es/phone/06-lista-habitos.png"
+        "path": "es/phone/05-lista-habitos.png"
       },
       "notification": {
         "own_notifications": 1,
         "path": "es/phone/02-notificacion.png",
+        "system_locale_leak": null,
         "total_notifications": 1
       },
       "progress": {
-        "path": "es/phone/05-progreso.png"
+        "path": "es/phone/07-progreso.png"
       },
       "settings": {
-        "path": "es/phone/07-ajustes.png"
+        "path": "es/phone/06-ajustes.png"
       },
       "today": {
         "path": "es/phone/01-hoy.png"
@@ -110,18 +114,19 @@
         "path": "es/tablet10/03-editor-habito.png"
       },
       "habit_list": {
-        "path": "es/tablet10/06-lista-habitos.png"
+        "path": "es/tablet10/05-lista-habitos.png"
       },
       "notification": {
         "own_notifications": 1,
         "path": "es/tablet10/02-notificacion.png",
+        "system_locale_leak": null,
         "total_notifications": 1
       },
       "progress": {
-        "path": "es/tablet10/05-progreso.png"
+        "path": "es/tablet10/07-progreso.png"
       },
       "settings": {
-        "path": "es/tablet10/07-ajustes.png"
+        "path": "es/tablet10/06-ajustes.png"
       },
       "today": {
         "path": "es/tablet10/01-hoy.png"
@@ -135,18 +140,19 @@
         "path": "es/tablet7/03-editor-habito.png"
       },
       "habit_list": {
-        "path": "es/tablet7/06-lista-habitos.png"
+        "path": "es/tablet7/05-lista-habitos.png"
       },
       "notification": {
         "own_notifications": 1,
         "path": "es/tablet7/02-notificacion.png",
+        "system_locale_leak": null,
         "total_notifications": 1
       },
       "progress": {
-        "path": "es/tablet7/05-progreso.png"
+        "path": "es/tablet7/07-progreso.png"
       },
       "settings": {
-        "path": "es/tablet7/07-ajustes.png"
+        "path": "es/tablet7/06-ajustes.png"
       },
       "today": {
         "path": "es/tablet7/01-hoy.png"

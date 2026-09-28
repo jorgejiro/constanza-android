@@ -21,10 +21,14 @@ import com.jjrapps.constanza.core.time.SystemTimeProvider
 import com.jjrapps.constanza.core.ui.theme.HabitColor
 import com.jjrapps.constanza.domain.model.EntryStatus
 import com.jjrapps.constanza.domain.model.Schedule
+import com.jjrapps.constanza.localization.AppLocaleController
+import com.jjrapps.constanza.reminding.NotificationPoster
 import com.jjrapps.constanza.reminding.ReminderSettingsStore
 import com.jjrapps.constanza.scheduling.AlarmScheduler
 import com.jjrapps.constanza.scheduling.OccurrencePlanner
 import com.jjrapps.constanza.scheduling.SchedulingDaos
+import com.jjrapps.constanza.tracking.EntryWriter
+import com.jjrapps.constanza.tracking.InAppEntryStatus
 import dagger.hilt.android.EntryPointAccessors
 import java.time.DayOfWeek
 import java.time.Instant
@@ -50,50 +54,64 @@ private const val MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR
 /** Mirrors [ImminentReminderSeed]'s constant of the same name. */
 private const val SEED_RESOLVE_DEADLINE_HOURS = 24L
 
-/** Instrumentation argument this fixture reads to decide which language its habit names, notes
- *  and instrumentation-side text checks use — independent of the emulator's system/app locale,
- *  which the capture pipeline drives separately with `cmd locale set-app-locales` (or, on an
- *  API<33 image, the in-app picker's own `language_tag` DataStore key). Run twice, once per
- *  language, e.g.:
- *
- *  ```
- *  adb -s <serial> shell am instrument -w -r \
- *    -e class com.jjrapps.constanza.seed.ListingScreenshotSeed \
- *    -e language es \
- *    com.jjrapps.constanza.test/androidx.test.runner.AndroidJUnitRunner
- *  ```
- */
 private const val ARG_LANGUAGE = "language"
 private const val LANGUAGE_EN = "en"
 
-private const val ENTRY_SOURCE_IN_APP = "IN_APP"
 private const val ENTRY_SOURCE_SWEEP = "SWEEP"
+
+/** A single habit's insert result plus the slot ids the main test needs afterwards to resolve
+ *  today's answers through [EntryWriter] — never invented, always the id Room actually assigned. */
+private data class SeededHabit(val habitId: Long, val todaySlotId: Long?)
 
 /**
  * NOT A BEHAVIOURAL TEST — a manual, on-device seeding fixture for the Google Play listing
  * screenshots (odd/tasks/play-store-listing.md, T3). Writes a small, deliberately varied set of
  * habits with ~30 days of realistic answer history to the app's REAL database, through the same
- * production DAOs and mappers [ImminentReminderSeed] uses, so the capture pipeline photographs
- * exactly what a real long-time user's data looks like — never a mocked or hand-drawn screen.
+ * production DAOs, mappers and — for today's own answers — [EntryWriter] that [ImminentReminderSeed]
+ * and the app's own Today screen use, so the capture pipeline photographs exactly what a real
+ * long-time user's data looks like, never a mocked or hand-drawn screen.
  *
  * ## What it seeds
  *
- * Five habits, one per schedule kind that takes a fixed reminder time, plus one that takes several
- * ([Schedule.TimesPerDay]):
+ * Five habits, chosen so Today's three groups (`groupTodayRows` — Ahora/Más tarde/Contestados) are
+ * ALL populated, deterministically, regardless of the real wall-clock time the pipeline happens to
+ * run at:
  *
- * 1. **Water** ([Schedule.TimesPerDay], three reminders/day) — the notification-scene anchor. Two
- *    of today's slots are answered or pending depending on wall-clock time, and one extra ad-hoc
- *    slot is armed [SEED_LEAD_MINUTES] minutes from seeding time so the capture pipeline can wait
- *    for a REAL posted reminder notification with working Yes/No/Snooze actions, the same
- *    real-alarm technique [ImminentReminderSeed] proved.
- * 2. **Read** ([Schedule.Daily]) — the best-looking streak, reserved for the Progress screenshot.
- * 3. **Walk** ([Schedule.NTimesPerWeek]) — a quota habit with one under-quota week in its history,
- *    so [com.jjrapps.constanza.domain.StreakCalculator]'s weekly streak visibly breaks once.
- * 4. **Meditate** ([Schedule.DaysOfWeek]) — configured to include TODAY's weekday plus two others
- *    spread through the week, so it is always due today regardless of which day the pipeline runs.
- * 5. **Stretch** ([Schedule.EveryNDays], anchored on today) — always due today for the same reason.
+ * 1. **Water** ([Schedule.TimesPerDay], three reminders/day) — the notification-scene anchor. Its
+ *    three historical reminder times are resolved as answered FOR TODAY too, through
+ *    [EntryWriter.answerInApp] against their own real occurrences, and only the fourth, ad-hoc slot
+ *    — armed [SEED_LEAD_MINUTES] minutes from seeding time — is left pending. Its `actionableInstant`
+ *    is therefore always in the future at Today-capture time, so this row always lands in
+ *    "Más tarde" showing "En progreso", never in "Ahora": the real posted reminder notification
+ *    (Yes/No/Snooze) that scene waits for arrives a couple of minutes after Today is captured.
+ * 2. **Read** ([Schedule.Daily]) — resolved COMPLETED (Sí) for today through the same production
+ *    path, landing in "Contestados" with the completed glyph. Also the best-looking streak,
+ *    reserved for the Progress screenshot.
+ * 3. **Walk** ([Schedule.NTimesPerWeek]) — deliberately configured with NO reminder slot at all
+ *    (`enabledSlots.isEmpty()` in `TodayModel.buildTodayHabitRow`), so its single synthetic slot is
+ *    untimed. `TodayModel.placement`'s own rule — an untimed unanswered slot is always
+ *    "overdue or untimed" — makes this row land in "Ahora" unconditionally, with no dependence on
+ *    the clock at all. Its history also carries one under-quota week, so
+ *    [com.jjrapps.constanza.domain.StreakCalculator]'s weekly streak visibly breaks once.
+ * 4. **Meditate** ([Schedule.DaysOfWeek]) — resolved MISSED (No) for today through the same
+ *    production path, landing in "Contestados" with the missed glyph — the deliberate "No" pairing
+ *    Read's "Sí" needs so the group shows both answer glyphs, not just ticks. Its schedule is
+ *    configured to include TODAY's weekday plus two others spread through the week, so it is always
+ *    due today regardless of which real day the pipeline runs.
+ * 5. **Stretch** ([Schedule.EveryNDays], anchored on today) — left unanswered, with its reminder a
+ *    future offset from seeding time, so it always lands in "Más tarde" alongside Water.
  *
- * ## Why explicit MISSED rows, not gaps
+ * ## Why "later" reminder slots are offsets from now, never a fixed clock hour
+ *
+ * `OccurrencePlanner` arms whatever epoch millis a slot's minute-of-day resolves to for TODAY even
+ * when that instant has already passed, and `AlarmManager` then fires an already-due alarm almost
+ * immediately. A first full-pipeline run measured this directly: Meditate (fixed 07:30) and Stretch
+ * (fixed 09:00) posted their own unplanned notifications during a mid-afternoon run, polluting the
+ * Water-only notification scene. Every "later" slot here is therefore `now + offset minutes`
+ * ([laterToday]), guaranteed to stay in the future for the whole capture session, while Water's own
+ * dedicated near-term slot remains the only one anywhere close to firing.
+ *
+ * ## Why explicit MISSED rows in history, not gaps
  *
  * [com.jjrapps.constanza.domain.EntryResolution] resolves an absent row to `UNKNOWN`, a pass-through
  * that neither breaks nor extends a streak (design.md §8, StreakCalculator's own KDoc) — that is
@@ -142,6 +160,15 @@ class ListingScreenshotSeed {
                 reminderOccurrenceDao = database.reminderOccurrenceDao(),
             )
             val planner = OccurrencePlanner(daos, database.entryDao(), alarmScheduler, timeProvider, SEED_RESOLVE_DEADLINE_HOURS)
+            val settings = reminderSettingsDataStore(context)
+            val entryWriter = EntryWriter(
+                database = database,
+                entryDao = database.entryDao(),
+                reminderOccurrenceDao = daos.reminderOccurrenceDao,
+                alarmScheduler = alarmScheduler,
+                notificationPoster = NotificationPoster(context, AppLocaleController(context, ReminderSettingsStore(settings))),
+                timeProvider = timeProvider,
+            )
 
             removeExistingHabits(daos, alarmScheduler)
             // A reminder posted by a previous run would otherwise still be in the shade, and the
@@ -149,22 +176,36 @@ class ListingScreenshotSeed {
             // it disappear, because the occurrence it belongs to was just deleted above. Clearing
             // them here means the only Constanza notification that can appear is this run's.
             context.getSystemService(NotificationManager::class.java).cancelAll()
-            markOnboardingDone(context)
+            markOnboardingDone(settings)
 
             val now = timeProvider.now()
             val zone = timeProvider.zone()
             val today = now.atZone(zone).toLocalDate()
             val nowMinuteOfDay = now.atZone(zone).let { it.hour * MINUTES_PER_HOUR + it.minute }
 
-            seedWaterHabit(database, daos, now, zone, today, english)
-            seedReadHabit(database, daos, now, today, english, nowMinuteOfDay)
-            seedWalkHabit(database, daos, now, today, english, nowMinuteOfDay)
-            seedMeditateHabit(database, daos, now, today, english, nowMinuteOfDay)
+            val water = seedWaterHabit(database, daos, now, zone, today, english)
+            val read = seedReadHabit(database, daos, now, today, english, nowMinuteOfDay)
+            seedWalkHabit(database, daos, now, today, english)
+            val meditate = seedMeditateHabit(database, daos, now, today, english, nowMinuteOfDay)
             seedStretchHabit(database, daos, now, today, english, nowMinuteOfDay)
 
-            // The whole point of the fixture: production code, not this fixture, arms every alarm,
-            // including the imminent water slot the notification-scene capture step waits on.
+            // Production code arms every alarm from here, including the imminent water slot the
+            // notification-scene capture step waits on — this fixture never constructs an
+            // occurrence or touches AlarmManager directly.
             planner.replanAll()
+
+            // Today's "already answered" rows, THROUGH the exact same write path the Today screen
+            // itself uses (never a raw EntryEntity insert): resolves the real occurrence armed by
+            // replanAll() above, so the row's slotId, its occurrence state and its cancelled alarm
+            // are all byte-for-byte what tapping Yes/No in the app would have produced.
+            // Only the 3 FIXED slots, never `water.todaySlotId` — that id is the ad-hoc IMMINENT
+            // slot itself (see seedWaterHabit), and resolving it here would answer the exact slot
+            // the notification scene is waiting to fire, defeating the whole point of seeding it.
+            resolveWaterFixedSlotsToday(entryWriter, daos, water.habitId, today)
+            resolveTodayAnswer(entryWriter, daos, read.habitId, read.todaySlotId, today, InAppEntryStatus.COMPLETED)
+            resolveTodayAnswer(entryWriter, daos, meditate.habitId, meditate.todaySlotId, today, InAppEntryStatus.MISSED)
+            // Walk and Stretch are deliberately left unanswered — see the class KDoc for why each
+            // lands in "Ahora" (Walk, untimed) or "Más tarde" (Stretch, a future offset) for it.
 
             Log.i(TAG, "SEEDED language=$language today=$today")
         } finally {
@@ -180,6 +221,10 @@ class ListingScreenshotSeed {
         Log.i(TAG, "Removed any previously seeded habits.")
     }
 
+    private fun reminderSettingsDataStore(context: Context): DataStore<Preferences> =
+        EntryPointAccessors.fromApplication(context, ReminderSettingsDataStoreEntryPoint::class.java)
+            .reminderSettingsDataStore()
+
     /** Onboarding's write-once completion flag, and the "already asked" notification-permission
      *  latch, both through [ReminderSettingsDataStoreEntryPoint] — the same sanctioned androidTest
      *  route `CoreFlowTestFixture` uses (design.md §8.1). Setting both means the app opens straight
@@ -187,14 +232,46 @@ class ListingScreenshotSeed {
      *  real system permission was also granted (`adb shell pm grant ... POST_NOTIFICATIONS`, a
      *  pipeline pre-step this fixture cannot itself perform: `am instrument` has no permission to
      *  grant permissions to the very APK it is instrumenting). */
-    private suspend fun markOnboardingDone(context: Context) {
-        val settings: DataStore<Preferences> =
-            EntryPointAccessors.fromApplication(context, ReminderSettingsDataStoreEntryPoint::class.java)
-                .reminderSettingsDataStore()
+    private suspend fun markOnboardingDone(settings: DataStore<Preferences>) {
         settings.edit {
             it[ReminderSettingsStore.ONBOARDING_DONE_KEY] = true
             it[ReminderSettingsStore.REQUESTED_NOTIFICATION_PERMISSION_KEY] = true
         }
+    }
+
+    /** Resolves ONE habit's today slot through [EntryWriter.answerInApp] — looks up the real
+     *  occurrence [OccurrencePlanner.replanAll] just armed for it and answers exactly that, the
+     *  same call `TodayViewModel.answer` makes. A habit with no slot at all ([todaySlotId] `null`,
+     *  Walk's case) is never routed here — see the class KDoc for why it stays unanswered instead. */
+    private suspend fun resolveTodayAnswer(
+        entryWriter: EntryWriter,
+        daos: SchedulingDaos,
+        habitId: Long,
+        todaySlotId: Long?,
+        today: LocalDate,
+        status: InAppEntryStatus,
+    ) {
+        if (todaySlotId == null) return
+        val occurrence = daos.reminderOccurrenceDao.findByHabitSlotDate(habitId, todaySlotId, today.toString())
+        entryWriter.answerInApp(habitId, today, todaySlotId, status, occurrence?.id)
+    }
+
+    /** Water's three historical reminder times (see [seedWaterHabit]) are ALSO resolved answered
+     *  for today, through the same [EntryWriter] path, so the only slot left pending is the
+     *  dedicated imminent one — deterministically, regardless of how many of the three fixed times
+     *  have or have not "really" passed at seeding time. */
+    private suspend fun resolveWaterFixedSlotsToday(
+        entryWriter: EntryWriter,
+        daos: SchedulingDaos,
+        habitId: Long,
+        today: LocalDate,
+    ) {
+        daos.reminderSlotDao.findByHabitId(habitId)
+            .filter { it.minuteOfDay in WATER_FIXED_MINUTES }
+            .forEach { slot ->
+                val occurrence = daos.reminderOccurrenceDao.findByHabitSlotDate(habitId, slot.id, today.toString())
+                entryWriter.answerInApp(habitId, today, slot.id, InAppEntryStatus.COMPLETED, occurrence?.id)
+            }
     }
 
     // ---------------------------------------------------------------------------------------
@@ -208,7 +285,7 @@ class ListingScreenshotSeed {
         zone: ZoneId,
         today: LocalDate,
         english: Boolean,
-    ) {
+    ): SeededHabit {
         val habitId = daos.habitDao.insert(
             HabitEntity(
                 name = if (english) "Drink water" else "Beber agua",
@@ -221,8 +298,7 @@ class ListingScreenshotSeed {
         )
         daos.scheduleDao.upsert(Schedule.TimesPerDay().toEntity(habitId))
 
-        val fixedMinutes = listOf(8 * MINUTES_PER_HOUR, 13 * MINUTES_PER_HOUR, 19 * MINUTES_PER_HOUR)
-        val fixedSlotIds = fixedMinutes.map { minute ->
+        val fixedSlotIds = WATER_FIXED_MINUTES.map { minute ->
             minute to daos.reminderSlotDao.insert(ReminderSlotEntity(habitId = habitId, minuteOfDay = minute, enabled = true))
         }
 
@@ -236,27 +312,22 @@ class ListingScreenshotSeed {
             }
         }
 
-        // Today: any fixed slot already in the past is answered; the rest — including the new
-        // imminent slot below — are left pending, whatever time of day the pipeline happens to run.
+        // The imminent slot — the ONLY slot left pending after resolveWaterFixedSlotsToday runs,
+        // and the one the notification-scene capture step waits on.
         val nowMinuteOfDay = now.atZone(zone).let { it.hour * MINUTES_PER_HOUR + it.minute }
-        fixedSlotIds.forEach { (minute, slotId) ->
-            if (minute < nowMinuteOfDay) {
-                database.entryDao().insert(historyEntry(habitId, today, slotId, EntryStatus.COMPLETED, hour = minute / MINUTES_PER_HOUR))
-            }
-        }
-
         val imminentMinute = nowMinuteOfDay + SEED_LEAD_MINUTES
         assertTrue(
             "Local time is ${now.atZone(zone)}: a $SEED_LEAD_MINUTES-minute lead would roll past " +
                 "midnight, scheduling today's occurrence in the past. Re-run after midnight.",
             imminentMinute < MINUTES_PER_DAY,
         )
-        daos.reminderSlotDao.insert(ReminderSlotEntity(habitId = habitId, minuteOfDay = imminentMinute, enabled = true))
+        val imminentSlotId = daos.reminderSlotDao.insert(ReminderSlotEntity(habitId = habitId, minuteOfDay = imminentMinute, enabled = true))
         Log.i(TAG, "SEEDED water habitId=$habitId imminentMinuteOfDay=$imminentMinute")
+        return SeededHabit(habitId, imminentSlotId)
     }
 
     // ---------------------------------------------------------------------------------------
-    // Read — Schedule.Daily, reserved as the Progress-screen hero (best-looking streak).
+    // Read — Schedule.Daily, resolved Sí for today; also reserved as the Progress-screen hero.
     // ---------------------------------------------------------------------------------------
 
     private suspend fun seedReadHabit(
@@ -266,7 +337,7 @@ class ListingScreenshotSeed {
         today: LocalDate,
         english: Boolean,
         nowMinuteOfDay: Int,
-    ) {
+    ): SeededHabit {
         val habitId = daos.habitDao.insert(
             HabitEntity(
                 name = if (english) "Read 20 minutes" else "Leer 20 minutos",
@@ -278,7 +349,7 @@ class ListingScreenshotSeed {
             ),
         )
         daos.scheduleDao.upsert(Schedule.Daily().toEntity(habitId))
-        daos.reminderSlotDao.insert(
+        val slotId = daos.reminderSlotDao.insert(
             ReminderSlotEntity(habitId = habitId, minuteOfDay = laterToday(nowMinuteOfDay, READ_OFFSET_MINUTES), enabled = true),
         )
 
@@ -293,30 +364,19 @@ class ListingScreenshotSeed {
             }
             database.entryDao().insert(historyEntry(habitId, date, slotId = 0, status = status, hour = 21))
         }
-        // Answered for TODAY unconditionally (unlike Water's today slots, which depend on
-        // wall-clock time): the Today scene's "answered and pending slots" requirement must not
-        // depend on what hour the pipeline happens to run at, so this one habit is always the
-        // guaranteed "answered" row regardless of Water's own state.
-        database.entryDao().insert(
-            historyEntry(habitId, today, slotId = 0, status = EntryStatus.COMPLETED, hour = 21),
-        )
         Log.i(TAG, "SEEDED read habitId=$habitId")
+        return SeededHabit(habitId, slotId)
     }
 
     // ---------------------------------------------------------------------------------------
-    // Walk — Schedule.NTimesPerWeek(3): the WEEK is the unit of obligation (design D8), so history
-    // is written per-week, not per-day — StreakCalculator's weekly path only counts COMPLETED rows
-    // against the week's quota and never reads MISSED for this schedule kind at all.
+    // Walk — Schedule.NTimesPerWeek(3), deliberately WITHOUT a reminder slot: TodayModel's own
+    // "untimed unanswered is always Ahora" rule (see class KDoc) is what places this row, not the
+    // clock. The WEEK is the unit of obligation (design D8), so history is written per-week, not
+    // per-day — StreakCalculator's weekly path only counts COMPLETED rows against the week's quota
+    // and never reads MISSED for this schedule kind at all.
     // ---------------------------------------------------------------------------------------
 
-    private suspend fun seedWalkHabit(
-        database: AppDatabase,
-        daos: SchedulingDaos,
-        now: Instant,
-        today: LocalDate,
-        english: Boolean,
-        nowMinuteOfDay: Int,
-    ) {
+    private suspend fun seedWalkHabit(database: AppDatabase, daos: SchedulingDaos, now: Instant, today: LocalDate, english: Boolean) {
         val habitId = daos.habitDao.insert(
             HabitEntity(
                 name = if (english) "Walk" else "Caminar",
@@ -328,9 +388,6 @@ class ListingScreenshotSeed {
             ),
         )
         daos.scheduleDao.upsert(Schedule.NTimesPerWeek(times = WALK_TIMES_PER_WEEK).toEntity(habitId))
-        daos.reminderSlotDao.insert(
-            ReminderSlotEntity(habitId = habitId, minuteOfDay = laterToday(nowMinuteOfDay, WALK_OFFSET_MINUTES), enabled = true),
-        )
 
         val weekStart = today.minusDays((HISTORY_DAYS - 1).toLong()).with(DayOfWeek.MONDAY)
         var week = weekStart
@@ -341,19 +398,26 @@ class ListingScreenshotSeed {
             val completedCount = if (weekIndex == WALK_UNDER_QUOTA_WEEK_INDEX) WALK_TIMES_PER_WEEK - 1 else WALK_TIMES_PER_WEEK
             WALK_WEEKDAYS.take(completedCount).forEach { dayOfWeek ->
                 val date = week.with(dayOfWeek)
-                if (!date.isAfter(today) && !date.isBefore(weekStart)) {
+                // Strictly BEFORE today, never `!date.isAfter(today)`: today is itself one of
+                // WALK_WEEKDAYS whenever the pipeline happens to run on a Monday, Wednesday or
+                // Friday, and `!isAfter` would silently write today's own "history" entry —
+                // exactly the bug a live run caught (Walk showing fully "Done" instead of
+                // unanswered). Walk's whole point is staying unanswered for today — see the class
+                // KDoc — so history must never reach into it.
+                if (date.isBefore(today) && !date.isBefore(weekStart)) {
                     database.entryDao().insert(historyEntry(habitId, date, slotId = 0, status = EntryStatus.COMPLETED, hour = 18))
                 }
             }
             week = week.plusWeeks(1)
             weekIndex++
         }
-        Log.i(TAG, "SEEDED walk habitId=$habitId")
+        Log.i(TAG, "SEEDED walk habitId=$habitId (no reminder slot — always due 'Ahora' when unanswered)")
     }
 
     // ---------------------------------------------------------------------------------------
-    // Meditate — Schedule.DaysOfWeek, configured around TODAY so it is always due when the
-    // pipeline runs, whatever the real calendar day is.
+    // Meditate — Schedule.DaysOfWeek, resolved No (MISSED) for today — Read's "Sí" counterpart, so
+    // "Contestados" shows both answer glyphs, not just ticks. Configured around TODAY so it is
+    // always due when the pipeline runs, whatever the real calendar day is.
     // ---------------------------------------------------------------------------------------
 
     private suspend fun seedMeditateHabit(
@@ -363,7 +427,7 @@ class ListingScreenshotSeed {
         today: LocalDate,
         english: Boolean,
         nowMinuteOfDay: Int,
-    ) {
+    ): SeededHabit {
         val habitId = daos.habitDao.insert(
             HabitEntity(
                 name = if (english) "Meditate" else "Meditar",
@@ -376,7 +440,7 @@ class ListingScreenshotSeed {
         )
         val days = setOf(today.dayOfWeek, today.dayOfWeek.plus(2), today.dayOfWeek.plus(4))
         daos.scheduleDao.upsert(Schedule.DaysOfWeek(days = days).toEntity(habitId))
-        daos.reminderSlotDao.insert(
+        val slotId = daos.reminderSlotDao.insert(
             ReminderSlotEntity(habitId = habitId, minuteOfDay = laterToday(nowMinuteOfDay, MEDITATE_OFFSET_MINUTES), enabled = true),
         )
 
@@ -389,10 +453,12 @@ class ListingScreenshotSeed {
             database.entryDao().insert(historyEntry(habitId, date, slotId = 0, status = status, hour = MEDITATE_HISTORY_HOUR))
         }
         Log.i(TAG, "SEEDED meditate habitId=$habitId days=$days")
+        return SeededHabit(habitId, slotId)
     }
 
     // ---------------------------------------------------------------------------------------
     // Stretch — Schedule.EveryNDays, anchored on today so it is always due when the pipeline runs.
+    // Left unanswered with a future-offset reminder, so it always lands in "Más tarde".
     // ---------------------------------------------------------------------------------------
 
     private suspend fun seedStretchHabit(
@@ -445,19 +511,12 @@ class ListingScreenshotSeed {
         }
 
     /**
-     * A future clock-time slot for a habit whose OWN due-ness must always hold regardless of which
-     * real day the pipeline runs (Meditate, Stretch), or whose reminder is not the notification-scene
-     * anchor (Read, Walk) — never a fixed clock hour. A fixed hour (e.g. "09:00") is only future at
-     * seed time by chance: `OccurrencePlanner` arms whatever epoch millis a slot's minute-of-day
-     * resolves to for TODAY even when that instant has already passed, and `AlarmManager` then fires
-     * it almost immediately — which is exactly how a first full-pipeline run posted two unplanned
-     * Meditate/Stretch notifications during the Water-only notification scene (both had fixed
-     * morning slots, and the pipeline ran mid-afternoon). Offsetting from `nowMinuteOfDay` instead
-     * guarantees every one of these fires long after the capture session (see [NOTIFICATION_WAIT_SECONDS]
-     * in capturar.py) has already moved on, while Water's own dedicated near-term slot remains the
-     * only one anywhere close. Clamped rather than asserted: unlike Water's imminent slot, a
-     * same-day roll-past-midnight here is harmless (it only pushes a decorative slot time), so
-     * clamping to 23:59 is preferable to failing the whole seed over it.
+     * A future clock-time slot for a habit whose reminder is not the notification-scene anchor
+     * (Read, Meditate, Stretch) — never a fixed clock hour. See the class KDoc's "Why 'later'
+     * reminder slots are offsets from now" section for the exact failure this avoids. Clamped
+     * rather than asserted: unlike Water's imminent slot, a same-day roll-past-midnight here is
+     * harmless (it only pushes a decorative slot time), so clamping to 23:59 is preferable to
+     * failing the whole seed over it.
      */
     private fun laterToday(nowMinuteOfDay: Int, offsetMinutes: Int): Int =
         minOf(nowMinuteOfDay + offsetMinutes, MINUTES_PER_DAY - 1)
@@ -471,7 +530,7 @@ class ListingScreenshotSeed {
             status = status.name,
             value = null,
             answeredAt = answeredAt.toString(),
-            source = if (status == EntryStatus.MISSED) ENTRY_SOURCE_SWEEP else ENTRY_SOURCE_IN_APP,
+            source = if (status == EntryStatus.MISSED) ENTRY_SOURCE_SWEEP else "IN_APP",
         )
     }
 
@@ -491,11 +550,12 @@ class ListingScreenshotSeed {
         const val MEDITATE_HISTORY_HOUR = 7
         const val STRETCH_INTERVAL_DAYS = 3
 
+        val WATER_FIXED_MINUTES = listOf(8 * MINUTES_PER_HOUR, 13 * MINUTES_PER_HOUR, 19 * MINUTES_PER_HOUR)
+
         // Distinct, generously spaced offsets from "now" for every live reminder slot except
         // Water's dedicated SEED_LEAD_MINUTES one — see [laterToday]'s KDoc for why none of these
         // may ever be a fixed clock hour.
         const val READ_OFFSET_MINUTES = 45
-        const val WALK_OFFSET_MINUTES = 75
         const val MEDITATE_OFFSET_MINUTES = 105
         const val STRETCH_OFFSET_MINUTES = 135
     }

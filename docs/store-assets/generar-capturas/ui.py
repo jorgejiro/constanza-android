@@ -133,6 +133,46 @@ def scroll_until_text(serial: str, text: str, max_scrolls: int = 8) -> ET.Elemen
     raise UiTimeout(f"'{text}' never appeared after {max_scrolls} scroll attempts")
 
 
+def scroll_up(serial: str, amount: int = 500) -> None:
+    shell(serial, "input", "swipe", "540", "900", "540", str(900 + amount), "300")
+
+
+def scroll_heading_to_top(serial: str, heading_text: str, top_margin: int = 300, tolerance: int = 150, max_attempts: int = 12) -> None:
+    """Scrolls so `heading_text` — a section heading, never mid-list content — ends up near
+    `top_margin` px from the top, instead of scrolling by a blind fixed chunk until SOME text
+    appears anywhere on screen. `scroll_until_text` alone can leave the viewport starting mid-way
+    through the PREVIOUS section (an orphaned run of option rows with no heading above them) if the
+    target text happens to land just inside the bottom of the frame — measured live on the phone
+    format's Settings screen.
+
+    One large swipe sized to the exact remaining distance was tried first and measured NOT to
+    converge: `adb shell input swipe` always ends as a fling (the requested duration only sets the
+    computed velocity fed to the same fling-decay curve a real flick would use), so a Compose
+    LazyColumn's own overscroll/deceleration physics — not a 1:1 pixel translation — decide where
+    it actually lands, and three successive "exact" corrections oscillated rather than settling.
+    Small, fixed-magnitude steps in the proven [scroll_down]/[scroll_up] gesture shape, re-measured
+    after every single one and stopping as soon as the heading is within `tolerance`, converges
+    reliably where one large precisely-sized swipe did not — still entirely text-anchored, just
+    anchored to "is the heading close enough yet", not to a computed pixel-perfect swipe."""
+    for _ in range(max_attempts):
+        root = dump_ui(serial)
+        matches = find_all(root, heading_text)
+        if not matches:
+            scroll_down(serial)
+            time.sleep(0.3)
+            continue
+        _, heading_y = find_bounds(matches[0])
+        distance = heading_y - top_margin
+        if abs(distance) <= tolerance:
+            return
+        if distance > 0:
+            scroll_down(serial, amount=min(distance, 500))
+        else:
+            scroll_up(serial, amount=min(-distance, 500))
+        time.sleep(0.3)
+    raise UiTimeout(f"Could not settle '{heading_text}' within {tolerance}px of {top_margin}px from the top after {max_attempts} attempts")
+
+
 # --------------------------------------------------------------------------------------------
 # Navigation primitives
 # --------------------------------------------------------------------------------------------
@@ -209,6 +249,89 @@ def set_app_locale(serial: str, language: str) -> None:
     """API 33+ only (all local AVDs used here are API 37) — below that, the app's own in-app
     picker (Settings, `language_tag` DataStore key) would be the fallback, but is not needed here."""
     shell(serial, "cmd", "locale", "set-app-locales", PACKAGE, "--user", "0", "--locales", language)
+
+
+SYSTEM_LOCALE_TAG = {"es": "es-ES", "en": "en-US"}
+
+
+def wait_for_boot(serial: str, timeout: float = 120.0) -> None:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        result = subprocess.run(["adb", "-s", serial, "wait-for-device"], capture_output=True, timeout=timeout)
+        if result.returncode == 0:
+            booted = shell(serial, "getprop", "sys.boot_completed", check=False).strip()
+            if booted == "1":
+                return
+        time.sleep(2.0)
+    raise UiTimeout(f"Device {serial} did not report sys.boot_completed within {timeout}s")
+
+
+def current_system_locale(serial: str) -> str:
+    return shell(serial, "settings", "get", "system", "system_locales", check=False).strip()
+
+
+def set_system_locale_and_reboot(serial: str, language: str, max_attempts: int = 3) -> None:
+    """`set_app_locale` alone only changes CONSTANZA's own screens — it never touches system
+    chrome (status bar, quick-settings tiles, the notification shade's own "Clear all"/"Mobile
+    data" strings), which follows the device's `system_locales` setting instead. That setting
+    ITSELF does not take effect live from a raw `settings put` — measured directly: writing it and
+    re-dumping the still-open notification shade immediately after showed the OLD language
+    unchanged, with or without a `LOCALE_CHANGED` broadcast, with or without a fresh swipe gesture.
+    A full reboot after the write is what actually applies it (also the standard technique
+    instrumented Android locale-testing tooling uses) — measured working the FIRST time (es):
+    system chrome strings ("Clear all" → "Borrar todo") flipped after the reboot.
+
+    The SECOND reboot in the same session (es -> en) measured a genuine regression, though: the
+    setting read back as the OLD locale (`es-ES`) after `sys.boot_completed=1`, as if the write
+    had never happened. `settings put` on its own does not block until the SettingsProvider's
+    write-behind cache has actually flushed to disk — issuing `adb reboot` immediately afterwards
+    can interrupt that flush, so the device boots back up from the LAST persisted value instead of
+    the one just written. A short settle delay before rebooting, plus verifying the setting
+    actually stuck once booted (retrying the whole write-reboot-verify cycle if not, since a single
+    settle delay is a guess, not a proof), is what closes that race instead of merely making it
+    rarer."""
+    tag = SYSTEM_LOCALE_TAG[language]
+    for attempt in range(max_attempts):
+        shell(serial, "settings", "put", "system", "system_locales", tag)
+        time.sleep(2.0)  # let SettingsProvider's write-behind cache flush before the reboot below
+        if current_system_locale(serial) != tag:
+            continue  # did not even take in-memory; retry the write before spending a reboot on it
+        adb(serial, "reboot")
+        time.sleep(3.0)
+        wait_for_boot(serial)
+        time.sleep(3.0)  # let SystemUI/system_server finish initializing past boot_completed=1
+        if current_system_locale(serial) == tag:
+            return
+    raise UiTimeout(
+        f"system_locales stayed at '{current_system_locale(serial)}' instead of '{tag}' after "
+        f"{max_attempts} write+reboot attempts"
+    )
+
+
+# Giveaway system-chrome strings that can ONLY appear if the DEVICE system locale — not
+# Constanza's own per-app override — is still in the wrong language. Deliberately words that are
+# always translated (never a brand name like "Wi-Fi" or "Quick Share", which stay the same in both
+# languages and would tell us nothing).
+SYSTEM_CHROME_LEAK_STRINGS = {
+    # English system-chrome strings that must NOT appear in the es pass — deliberately excludes
+    # Constanza's own per-app strings (e.g. "Snooze"/"Aplazar"), which follow the APP locale
+    # (`set_app_locale`) rather than the DEVICE one this check is specifically isolating.
+    "es": ["Clear all", "Mobile data", "Security & privacy", "Set a screen lock"],
+    "en": ["Borrar todo", "Datos móviles", "Seguridad y privacidad", "Establece un bloqueo de pantalla"],
+}
+
+
+def system_locale_leak(serial: str, lang: str) -> str | None:
+    """Dumps the CURRENT screen and returns the first wrong-language system-chrome string found, or
+    None. Called right after the notification shade is opened — that view is where system chrome
+    (the quick-settings peek row, "Clear all") sits alongside Constanza's own per-app-localized
+    notification text, so it is the one scene a per-app-only locale override cannot fake past."""
+    root = dump_ui(serial)
+    visible_text = {n.get("text") for n in root.iter("node") if n.get("text")}
+    for leak_string in SYSTEM_CHROME_LEAK_STRINGS[lang]:
+        if leak_string in visible_text:
+            return leak_string
+    return None
 
 
 def grant_permissions(serial: str) -> None:

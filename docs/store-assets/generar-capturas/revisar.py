@@ -32,9 +32,9 @@ SCENES = [
     "02-notificacion",
     "03-editor-habito",
     "04-selector-color",
-    "05-progreso",
-    "06-lista-habitos",
-    "07-ajustes",
+    "05-lista-habitos",
+    "06-ajustes",
+    "07-progreso",
 ]
 FORMATS: dict[str, tuple[int, int]] = {
     "phone": (1080, 2400),
@@ -143,6 +143,32 @@ def check_notification_scene(problems: list[str]) -> None:
                 )
 
 
+def check_system_locale(problems: list[str]) -> None:
+    """Cross-checks capturar.py's own live `ui.system_locale_leak` reading, recorded into the
+    manifest at the exact moment the notification-scene shade was open. capturar.py already raises
+    immediately on a detected leak (failing the whole batch before a bad screenshot is even saved),
+    so a leak recorded here would mean an OLDER manifest entry survived past a re-run that changed
+    the code but was not actually re-executed — still worth catching, cheaply, from data already
+    collected rather than re-deriving it from pixels."""
+    manifest_path = CAPTURAS_DIR / "manifest.json"
+    if not manifest_path.exists():
+        return  # already reported by check_notification_scene
+    manifest = json.loads(manifest_path.read_text())
+    for lang in LANGS:
+        for formato in FORMATS:
+            entry = manifest.get(lang, {}).get(formato, {}).get("notification")
+            if entry is None:
+                continue  # already reported by check_notification_scene
+            leak = entry.get("system_locale_leak")
+            if leak:
+                fail(
+                    problems,
+                    f"SYSTEM LOCALE LEAK {lang}/{formato}: found '{leak}' in the notification scene, "
+                    f"which belongs to the other language — the device's system_locales setting was "
+                    f"not applied for this pass.",
+                )
+
+
 def main() -> int:
     problems: list[str] = []
     paths = check_files_present(problems)
@@ -150,6 +176,7 @@ def main() -> int:
     check_not_blank(problems, paths)
     check_languages_differ(problems, paths)
     check_notification_scene(problems)
+    check_system_locale(problems)
 
     if problems:
         print(f"revisar.py: {len(problems)} problem(s) found:\n")
