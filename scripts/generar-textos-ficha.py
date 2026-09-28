@@ -205,7 +205,7 @@ subida por `fastlane`:
 5. En Play Console → **Usuarios y permisos**, invitar la cuenta de servicio (su email
    `...@....iam.gserviceaccount.com`) con permisos de **Gestión de versiones** (release) y
    **Ficha de Play Store** (store listing) sobre esta app.
-6. Guardar la clave JSON **fuera del repositorio**, en `~/.config/play/constanza-play.json` (la
+6. Guardar la clave JSON **fuera del repositorio**, en `~/.config/play/jjrmobileapps.json` (la
    ruta por defecto de `fastlane/Appfile`) o en cualquier otra ruta, exportándola como
    `SUPPLY_JSON_KEY` antes de invocar `fastlane`. La clave nunca debe entrar en el repositorio ni
    subirse a ningún sitio.

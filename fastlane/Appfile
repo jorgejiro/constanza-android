@@ -3,4 +3,4 @@ package_name("com.jjrapps.constanza")
 # Never inside the repo: the service-account JSON key authenticates as Constanza's Play
 # Console account. SUPPLY_JSON_KEY lets the owner point at wherever they keep it; the default
 # below is only a convenience path outside the working tree.
-json_key_file(ENV["SUPPLY_JSON_KEY"] || File.expand_path("~/.config/play/constanza-play.json"))
+json_key_file(ENV["SUPPLY_JSON_KEY"] || File.expand_path("~/.config/play/jjrmobileapps.json"))

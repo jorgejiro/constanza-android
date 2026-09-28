@@ -42,7 +42,7 @@ without credentials where possible; screenshot copies match the source set byte 
 ## Progress / evidence
 
 - T1 done, commit `9681c8e`: fastlane 2.240.1 (Homebrew); `fastlane/Appfile` (key from
-  `SUPPLY_JSON_KEY`, default `~/.config/play/constanza-play.json`); `fastlane/Fastfile` lanes
+  `SUPPLY_JSON_KEY`, default `~/.config/play/jjrmobileapps.json`); `fastlane/Fastfile` lanes
   `validar`, `ficha`, `subir` (default track internal, status draft); 28 tablet copies, sha256-equal
   to sources; pipeline copies all three formats; setup section in the publication doc. Checks:
   `fastlane lanes` lists 3 lanes; generator exit 0; revisar.py exit 0; no key or report in git.
