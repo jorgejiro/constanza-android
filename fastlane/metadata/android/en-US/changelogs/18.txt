@@ -1,0 +1,5 @@
+Constanza 1.0.0.
+
+• One fewer permission: the network-state access that a bundled Android library added is gone. Constanza has never had internet access, and now it cannot even check whether you are connected.
+
+No accounts, no cloud, no ads, no tracking.

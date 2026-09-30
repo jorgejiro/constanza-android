@@ -1,0 +1,5 @@
+Constanza 1.0.0.
+
+• Un permiso menos: se elimina el acceso al estado de la red que añadía una biblioteca de Android incluida en la app. Constanza nunca ha tenido acceso a internet, y ahora ni siquiera puede ver si estás conectado.
+
+Sin cuentas, sin nube, sin anuncios, sin seguimiento.
