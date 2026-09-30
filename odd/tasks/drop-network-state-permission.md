@@ -27,8 +27,8 @@ TDD: off (no project/session setting). Runner: Gradle.
 
 ## Tasks
 
-- [ ] T1 · Manifest removal + bump + changelogs, checks green. Route: inline (3 mechanical files).
-- [ ] T2 · Privacy page updated and deployed before the Play upload. Route: inline (1 file, vps).
+- [x] T1 · Manifest removal + bump + changelogs, checks green. Route: inline (3 mechanical files).
+- [x] T2 · Privacy page updated and deployed before the Play upload. Route: inline (1 file, vps).
 - [ ] T3 · PR merged, tag `v1.0.0`, GitHub Release `constanza-1.0.0.apk`. Route: inline.
 - [ ] T4 · Play production upload via `fastlane subir`. Route: inline.
 - [ ] T5 · Recipe build block for 1.0.0 in `docs/fdroid` and the fork branch, MR comment. Route: inline.
@@ -37,5 +37,7 @@ TDD: off (no project/session setting). Runner: Gradle.
 
 - T1 · release APK permissions: SCHEDULE_EXACT_ALARM, POST_NOTIFICATIONS, RECEIVE_BOOT_COMPLETED,
   WAKE_LOCK, FOREGROUND_SERVICE (no ACCESS_NETWORK_STATE); badging vc18 / 1.0.0. Unit tests, detekt,
-  androidTest compile green. Matrix: pending.
+  androidTest compile green. Matrix (`emulatorMatrixGroupDebugAndroidTest`, 8m19s): API 31 206
+  tests 0 failed 3 skipped, API 37 206 tests 0 failed 6 skipped, `CoreFlowE2ETest` included. Commit
+  `c52c642`; RDD assess medium, `under_budget`, no review due.
 - T2 · vps `5a44b47`, deployed, live page carries the new text (curl).
