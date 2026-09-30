@@ -5,6 +5,11 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- work-runtime declares this for NetworkType constraints. No request here sets one, and the
+         app has no INTERNET permission, so it would only be an unexplained entry in the listing. -->
+    <uses-permission
+        android:name="android.permission.ACCESS_NETWORK_STATE"
+        tools:node="remove" />
 
     <!-- The habit database never leaves the device on its own. Auto Backup was on - explicitly
          written, but also the platform default, so it read as template rather than as a decision -
