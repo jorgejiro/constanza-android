@@ -29,9 +29,9 @@ TDD: off (no project/session setting). Runner: Gradle.
 
 - [x] T1 · Manifest removal + bump + changelogs, checks green. Route: inline (3 mechanical files).
 - [x] T2 · Privacy page updated and deployed before the Play upload. Route: inline (1 file, vps).
-- [ ] T3 · PR merged, tag `v1.0.0`, GitHub Release `constanza-1.0.0.apk`. Route: inline.
-- [ ] T4 · Play production upload via `fastlane subir`. Route: inline.
-- [ ] T5 · Recipe build block for 1.0.0 in `docs/fdroid` and the fork branch, MR comment. Route: inline.
+- [x] T3 · PR merged, tag `v1.0.0`, GitHub Release `constanza-1.0.0.apk`. Route: inline.
+- [x] T4 · Play production upload via `fastlane subir`. Route: inline.
+- [x] T5 · Recipe build block for 1.0.0 in `docs/fdroid` and the fork branch, MR comment. Route: inline.
 
 ## Evidence
 
@@ -41,3 +41,15 @@ TDD: off (no project/session setting). Runner: Gradle.
   tests 0 failed 3 skipped, API 37 206 tests 0 failed 6 skipped, `CoreFlowE2ETest` included. Commit
   `c52c642`; RDD assess medium, `under_budget`, no review due.
 - T2 · vps `5a44b47`, deployed, live page carries the new text (curl).
+- T3 · PR #136 merged (`1e9a15d`), tag `v1.0.0`. Release APK from main: `CN=Constanza`, vc18 / 1.0.0,
+  no NETWORK permission. https://github.com/jorgejiro/constanza-android/releases/tag/v1.0.0, asset
+  `constanza-1.0.0.apk` HTTP 200 anonymously.
+- T4 · `fastlane subir track:production release_status:completed` succeeded; production track reads
+  `[18]`. Uploaded AAB manifest lists no ACCESS_NETWORK_STATE.
+- T5 · Recipe build block `1e9a15dcf4784416349ff0d8b1e051534c51dfbd`, CurrentVersion 1.0.0/18.
+  `fdroid lint` clean, `rewritemeta` unchanged. Fork commit `d7695b66`, MR head updated; reply note
+  3931400333 on MR !50477.
+
+## Next step
+
+Wait for the MR pipeline and the reviewers. Play review of 1.0.0 is Google's; nothing to do.
