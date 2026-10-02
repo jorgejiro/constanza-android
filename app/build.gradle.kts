@@ -1,3 +1,7 @@
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermissions
+import java.util.Base64
 import java.util.Properties
 
 plugins {
@@ -14,7 +18,37 @@ plugins {
 }
 
 /**
- * The upload signing key, when it is present.
+ * The upload signing key, preferably from Bitwarden Secrets Manager.
+ *
+ * `con-claves './gradlew :app:assembleRelease'` injects CONSTANZA_KEYSTORE_B64 (the `.jks`,
+ * base64) plus CONSTANZA_STORE_PASSWORD, CONSTANZA_KEY_ALIAS and CONSTANZA_KEY_PASSWORD. When all
+ * four are non-blank the keystore is decoded to `app/build/signing/release.jks`, readable by the
+ * owner only, and wins over `keystore.properties`. Secret values are never logged.
+ */
+fun signingEnv(key: String): String? =
+    System.getenv("CONSTANZA_$key")?.takeIf { it.isNotBlank() }
+
+fun decodeKeystore(base64: String, target: File): File {
+    target.parentFile.mkdirs()
+    target.delete()
+    target.createNewFile()
+    // Best effort: POSIX permissions are unsupported on some filesystems (e.g. Windows).
+    runCatching {
+        Files.setPosixFilePermissions(target.toPath(), PosixFilePermissions.fromString("rw-------"))
+    }
+    target.writeBytes(Base64.getDecoder().decode(base64.trim()))
+    return target
+}
+
+val envStorePassword = signingEnv("STORE_PASSWORD")
+val envKeyAlias = signingEnv("KEY_ALIAS")
+val envKeyPassword = signingEnv("KEY_PASSWORD")
+val envKeystoreFile = signingEnv("KEYSTORE_B64")
+    ?.takeIf { envStorePassword != null && envKeyAlias != null && envKeyPassword != null }
+    ?.let { decodeKeystore(it, layout.buildDirectory.file("signing/release.jks").get().asFile) }
+
+/**
+ * The local fallback for the upload signing key, when it is present.
  *
  * `keystore.properties` and the `.jks` it points at are deliberately outside version control
  * (see `.gitignore`), so the `exists()` guard is load-bearing rather than defensive: without it a
@@ -63,9 +97,16 @@ android {
     }
 
     signingConfigs {
-        // Registered only when the properties file was actually found, so a keyless clone
-        // configures cleanly instead of throwing on a missing `storeFile`.
-        if (keystoreProperties.containsKey("storeFile")) {
+        // Registered only when the env vars or the properties file were actually found, so a
+        // keyless clone configures cleanly instead of throwing on a missing `storeFile`.
+        if (envKeystoreFile != null) {
+            create("release") {
+                storeFile = envKeystoreFile
+                storePassword = envStorePassword
+                keyAlias = envKeyAlias
+                keyPassword = envKeyPassword
+            }
+        } else if (keystoreProperties.containsKey("storeFile")) {
             create("release") {
                 storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
                 storePassword = keystoreProperties["storePassword"] as String
