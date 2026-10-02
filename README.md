@@ -187,6 +187,21 @@ cd constanza-android
 ./gradlew check           # both modules' tests + the detekt clock-access rule
 ```
 
+### Release signing
+
+The signing key is not in this repository. It lives in Bitwarden Secrets Manager as
+`CONSTANZA_KEYSTORE_B64` (the `.jks`, base64), `CONSTANZA_STORE_PASSWORD`, `CONSTANZA_KEY_ALIAS` and
+`CONSTANZA_KEY_PASSWORD`. `con-claves` injects them and the build decodes the keystore into
+`app/build/signing/` (owner-only), so any machine with access to the secrets can build a release:
+
+```bash
+con-claves './gradlew :app:assembleRelease'
+```
+
+No local copy of the keystore is kept. Without those variables the build falls back to a
+git-ignored `keystore.properties` at the repo root; with neither, the release APK is left unsigned
+and debug builds are unaffected.
+
 ### Linting
 
 `./gradlew detekt` alone is a no-op for the clock-access rule: it is PSI-only and never resolves
