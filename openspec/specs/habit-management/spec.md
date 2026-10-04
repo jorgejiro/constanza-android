@@ -125,14 +125,20 @@ un-archival, without back-filling reminders for dates missed while archived.
 
 ### Requirement: Habit Colour Palette
 
-The system MUST offer a palette of standard, mutually distinguishable colours in the habit colour
-picker, and MUST additionally allow any colour to be chosen freely. Offered colours are NOT required
-to belong to the warm-dark palette (see `visual-design-system`): breadth of coverage takes
-precedence over harmony with the app's own accent, because a palette constrained to that accent's
-lightness band cannot express whole colour families at all.
+The system MUST offer a palette of exactly twelve standard, muted, mutually distinguishable colours
+in the habit colour picker, and MUST additionally allow any colour to be chosen freely. A habit's
+colour is shown as a small identity dot beside its name, never as the name's text colour, so the
+palette is chosen for calm on the neutral graphite ground (see `visual-design-system`): desaturated
+tones across the hue families a person names (greens, blues, sands, reds, violets and neutrals), no
+two of which read as the same colour.
 
-Every offered colour MUST clear the ratified non-text contrast floor against the app's surfaces. A
-freely chosen colour is exempt, because the person choosing it can see what they are choosing.
+Every offered colour MUST clear the non-text contrast floor (3:1) against every surface the dot is
+drawn on. A freely chosen colour MUST be produced inside the custom-colour band the visual design
+system defines, which guarantees that same floor and keeps it no louder than the lightest preset.
+
+(Previously: a palette of twenty-one saturated colours chosen for breadth of coverage, painted on
+the habit's name text and therefore held to a `[7:1, 11:1]` text band; before that, exactly six
+colours, every one a member of the warm-dark palette.)
 
 (Previously: required exactly six colours, every one a member of the warm-dark palette. That
 constraint was the defect rather than the selection: confined to the accent's lightness band, whole
@@ -140,8 +146,8 @@ families were unreachable — a pastel brown is beige and a pastel navy is just 
 closest swatches measured only 23.9 apart. Free choice and the collapsed-row obligations did not
 exist.)
 
-The picker MUST open collapsed, showing a single row of colours plus the free-choice affordance,
-and MUST offer a way to reveal the rest. The colours in that collapsed row MUST be chosen for
+The picker MUST open collapsed, showing a single row of five colours plus the free-choice
+affordance, and MUST offer a way to reveal the remaining seven. The colours in that collapsed row MUST be chosen for
 maximum mutual distinguishability rather than being the first N of the full set, and the default
 colour for a new habit MUST be one the collapsed row draws.
 
@@ -180,6 +186,28 @@ colour the user had deliberately chosen would be data loss rather than repair.
 
 The one-to-one rewrite behaviour is retained where it is still needed: importing a backup whose
 declared schema version predates the first palette change (see `data-portability`).
+
+**Exception: design-system repaints.** When the design system itself retires the offered presets,
+a database migration MUST rewrite every habit still holding a retired *preset* onto its designated
+counterpart in the new palette, by a fixed table, and backup import MUST apply the same table to
+files older than that repaint. Colours that were never presets are not touched by such a repaint.
+This is what happened at database version 8 (graphite redesign): the 21 legible-band presets were
+mapped onto the 12 muted ones by nearest perceptual distance within the same hue family, so a
+habit the user had put on "green" stays green. A preset is a choice of *family* made from a list the
+app offered; a repaint of that list carries the choice forward instead of orphaning it. (The
+earlier legible-band re-tone and `BLUE_GREY` retirement, database versions 5 and 6, were repaints
+of the same kind; they additionally pulled out-of-band custom colours into the then-required text
+band.)
+
+#### Scenario: A retired preset is repainted onto its muted counterpart
+- GIVEN a habit persisted on one of the retired legible-band presets
+- WHEN the app upgrades its database to version 8
+- THEN the habit holds the muted preset that preset maps to, and the picker shows it selected
+
+#### Scenario: A custom colour survives a design-system repaint
+- GIVEN a habit persisted with a freely chosen colour that was never an offered preset
+- WHEN the app upgrades its database to version 8
+- THEN the habit's colour is unchanged
 
 #### Scenario: An existing habit keeps its colour after the palette widens
 - GIVEN a habit persisted with a colour that the newly offered palette does not contain

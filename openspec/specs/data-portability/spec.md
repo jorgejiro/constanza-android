@@ -98,6 +98,22 @@ off-palette habit colour when imported afterwards.
 - WHEN the user imports that file after the app has moved to the warm-dark palette
 - THEN the imported habit's colour is normalized to pink
 
+#### Scenario: A legible-band preset normalizes to its muted counterpart on import
+- GIVEN a file declaring backup schema version 4 or earlier (exported before the graphite muted
+  palette), containing a habit on one of the 21 retired legible-band presets
+- WHEN the user imports that file
+- THEN the imported habit's colour is the muted preset the database migration to version 8 maps
+  that preset to, and a custom colour in the same file is imported unchanged
+
+#### Scenario: A schema 5 file passes through
+- GIVEN a file declaring backup schema version 5, the current version
+- WHEN the user imports that file
+- THEN every habit colour, preset or custom, is imported unchanged
+
+Each normalization stage applies only to files older than the palette change it describes: a file
+already past a change skips that change's stage, so a stage never touches colours its own epoch
+never produced.
+
 ### Requirement: Child Records Survive A Schema Migration
 
 A schema migration that rebuilds a table referenced by another table's foreign key MUST NOT
@@ -157,7 +173,7 @@ colour values.
 - THEN the archived habit, its archive state, and its full entry history are restored identically
 
 #### Scenario: Current-version round trip preserves colour exactly
-- GIVEN a dataset containing a habit with a colour from the current warm-dark palette
+- GIVEN a dataset containing a habit with a colour from the current muted palette
 - WHEN the user exports, wipes all app data, and imports that same file
 - THEN the habit's colour is restored exactly as exported, unchanged
 
