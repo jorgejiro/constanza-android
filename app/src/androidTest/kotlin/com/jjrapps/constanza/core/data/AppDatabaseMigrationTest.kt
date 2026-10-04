@@ -8,11 +8,13 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.jjrapps.constanza.core.data.entity.ScheduleEntity
 import com.jjrapps.constanza.core.data.mapper.toDomain
 import com.jjrapps.constanza.core.data.migration.AppMigrations
+import com.jjrapps.constanza.core.data.migration.HabitColorMutedRemap
 import com.jjrapps.constanza.core.data.migration.HabitColorRemap
 import com.jjrapps.constanza.core.data.migration.HabitColorRetireRemap
 import com.jjrapps.constanza.core.data.migration.HabitColorRetoneRemap
 import com.jjrapps.constanza.core.data.migration.PreMigrationSnapshotWriter
 import com.jjrapps.constanza.core.ui.theme.HabitBandGround
+import com.jjrapps.constanza.core.ui.theme.HabitPalette
 import com.jjrapps.constanza.core.ui.theme.LEGACY_HABIT_BAND_CEILING
 import com.jjrapps.constanza.core.ui.theme.LEGACY_HABIT_BAND_FLOOR
 import com.jjrapps.constanza.core.ui.theme.LEGACY_HABIT_BAND_TOLERANCE
@@ -88,6 +90,9 @@ class AppDatabaseMigrationTest {
 
     /** Same reasoning as [migration1To2]: a fresh instance per test. */
     private fun migration6To7() = AppMigrations.migration6To7(PreMigrationSnapshotWriter(targetFilesDir))
+
+    /** Same reasoning as [migration1To2]: a fresh instance per test. */
+    private fun migration7To8() = AppMigrations.migration7To8(PreMigrationSnapshotWriter(targetFilesDir))
 
     @Test
     fun version1SchemaCreatesFromTheCheckedInExport() {
@@ -486,6 +491,63 @@ class AppDatabaseMigrationTest {
 
         val snapshotFile = File(targetFilesDir, "pre-migration/pre-migration-v6.sql")
         assertTrue("expected the v6 pre-migration snapshot file to exist at $snapshotFile", snapshotFile.exists())
+    }
+
+    /**
+     * Graphite redesign T2 (`AppMigrations.migration7To8`), tested the same way every earlier colour
+     * repaint is: seed real `version = 7` rows, run the real migration, read the VALUES back. Every
+     * one of the 21 retired legible-band presets must come out on its muted counterpart from
+     * [HabitColorMutedRemap.LEGACY_TO_CURRENT] (and so on a current [HabitPalette] preset), while a
+     * custom colour — even one far outside any band — and a habit already on a muted preset survive
+     * byte-identical. Data-only: `8.json`'s identity hash equals `7.json`'s, which
+     * `runMigrationsAndValidate(..., validateDroppedTables = true)` checks.
+     */
+    @Test
+    fun migration7To8RepaintsEveryRetiredPresetAndLeavesCustomColoursUntouched() {
+        val legacyToExpected = HabitColorMutedRemap.LEGACY_TO_CURRENT.toList()
+        val customId = (legacyToExpected.size + 1).toLong()
+        val alreadyMutedId = (legacyToExpected.size + 2).toLong()
+        val alreadyMuted = HabitPalette.DEFAULT
+
+        migrationTestHelper.createDatabase(TEST_DB_NAME, version = 7).use { db ->
+            legacyToExpected.forEachIndexed { index, (legacyColor, _) ->
+                seedHabitV7(db, id = index + 1L, colorArgb = legacyColor)
+            }
+            seedHabitV7(db, id = customId, colorArgb = OUT_OF_BAND_CUSTOM_ARGB)
+            seedHabitV7(db, id = alreadyMutedId, colorArgb = alreadyMuted)
+        }
+
+        val migratedDb = migrationTestHelper.runMigrationsAndValidate(TEST_DB_NAME, 8, true, migration7To8())
+
+        migratedDb.query("SELECT id, colorArgb FROM habits ORDER BY id").use { cursor ->
+            legacyToExpected.forEachIndexed { index, (_, expectedColor) ->
+                assertTrue("expected a row for retired preset index $index", cursor.moveToNext())
+                assertEquals((index + 1).toLong(), cursor.getLong(0))
+                assertEquals("retired preset at row ${index + 1} was not repainted", expectedColor, cursor.getInt(1))
+                assertTrue("row ${index + 1} must land on a current preset", HabitPalette.contains(cursor.getInt(1)))
+            }
+
+            assertTrue("expected the custom colour row", cursor.moveToNext())
+            assertEquals(customId, cursor.getLong(0))
+            assertEquals("a custom colour must survive byte-identical", OUT_OF_BAND_CUSTOM_ARGB, cursor.getInt(1))
+
+            assertTrue("expected the already-muted row", cursor.moveToNext())
+            assertEquals(alreadyMutedId, cursor.getLong(0))
+            assertEquals("a current preset must survive byte-identical", alreadyMuted, cursor.getInt(1))
+        }
+
+        val snapshotFile = File(targetFilesDir, "pre-migration/pre-migration-v7.sql")
+        assertTrue("expected the v7 pre-migration snapshot file to exist at $snapshotFile", snapshotFile.exists())
+    }
+
+    /** A `version = 7` `habits` row: [seedHabitV4]'s shape minus the `sortOrder` column `migration6To7`
+     *  dropped. */
+    private fun seedHabitV7(db: SupportSQLiteDatabase, id: Long, colorArgb: Int) {
+        db.execSQL(
+            "INSERT INTO habits (id, name, colorArgb, notes, archived, archivedAt, createdAt) " +
+                "VALUES (?, ?, ?, NULL, 0, NULL, ?)",
+            arrayOf<Any>(id, "Habit $id", colorArgb, "2026-01-01T08:00:00Z"),
+        )
     }
 
     /** One habit plus exactly one row in each of `habits`' four CASCADE-child tables, at
