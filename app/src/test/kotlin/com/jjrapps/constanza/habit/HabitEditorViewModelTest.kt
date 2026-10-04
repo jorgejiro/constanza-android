@@ -30,6 +30,7 @@ import kotlin.test.assertTrue
 private const val EXISTING_HABIT_ID = 7L
 private val NOW = Instant.parse("2026-09-01T08:00:00Z")
 private val TODAY = LocalDate.parse("2026-09-01")
+private val TUESDAYS_ONLY = Schedule.DaysOfWeek(setOf(DayOfWeek.TUESDAY))
 
 /**
  * Task 6a.2/6a.3/6a.1 (habit-management: Creation requires a name, Habit Editing; habit-scheduling:
@@ -120,7 +121,7 @@ class HabitEditorViewModelTest {
             createdAt = NOW,
         )
         coEvery { habitRepository.findById(EXISTING_HABIT_ID) } returns existing
-        coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns Schedule.DaysOfWeek(setOf(DayOfWeek.TUESDAY))
+        coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns TUESDAYS_ONLY
         coEvery { habitRepository.findSlotsFor(EXISTING_HABIT_ID) } returns emptyList()
         val viewModel = newViewModel()
 
@@ -129,7 +130,7 @@ class HabitEditorViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(EXISTING_HABIT_ID, state.habitId)
         assertEquals("Read", state.name)
-        assertEquals(Schedule.DaysOfWeek(setOf(DayOfWeek.TUESDAY)), state.schedule)
+        assertEquals(TUESDAYS_ONLY, state.schedule)
     }
 
     @Test
@@ -144,7 +145,7 @@ class HabitEditorViewModelTest {
             createdAt = NOW,
         )
         coEvery { habitRepository.findById(EXISTING_HABIT_ID) } returns existing
-        coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns Schedule.DaysOfWeek(setOf(DayOfWeek.TUESDAY))
+        coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns TUESDAYS_ONLY
         coEvery { habitRepository.findSlotsFor(EXISTING_HABIT_ID) } returns emptyList()
         coEvery { habitRepository.update(any(), any(), any()) } returns Unit
         val viewModel = newViewModel()
@@ -154,7 +155,7 @@ class HabitEditorViewModelTest {
         viewModel.save()
 
         coVerify(exactly = 1) {
-            habitRepository.update(match { it.name == "Read daily" }, Schedule.DaysOfWeek(setOf(DayOfWeek.TUESDAY)), emptyList())
+            habitRepository.update(match { it.name == "Read daily" }, TUESDAYS_ONLY, emptyList())
         }
         coVerify(exactly = 0) { habitRepository.create(any(), any(), any()) }
     }
@@ -670,7 +671,7 @@ class HabitEditorViewModelTest {
             createdAt = NOW,
         )
         coEvery { habitRepository.findById(EXISTING_HABIT_ID) } returns existing
-        coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns Schedule.DaysOfWeek(setOf(DayOfWeek.TUESDAY))
+        coEvery { habitRepository.findScheduleFor(EXISTING_HABIT_ID) } returns TUESDAYS_ONLY
         coEvery { habitRepository.findSlotsFor(EXISTING_HABIT_ID) } returns slots
     }
 }

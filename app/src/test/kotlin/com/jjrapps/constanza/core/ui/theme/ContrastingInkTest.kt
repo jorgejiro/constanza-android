@@ -68,24 +68,17 @@ class ContrastingInkTest {
      */
     @Test
     fun `no colour in the sRGB cube can push the tick below the guaranteed floor`() {
-        var worstRatio = Double.MAX_VALUE
-        var worstArgb = 0
-        for (r in 0..CHANNEL_MAX step CHANNEL_STEP) {
-            for (g in 0..CHANNEL_MAX step CHANNEL_STEP) {
-                for (b in 0..CHANNEL_MAX step CHANNEL_STEP) {
-                    val argb = OPAQUE or (r shl RED_SHIFT) or (g shl GREEN_SHIFT) or b
-                    val ratio = contrastingInkRatio(argb)
-                    if (ratio < worstRatio) {
-                        worstRatio = ratio
-                        worstArgb = argb
-                    }
-                }
-            }
+        val channel = 0..CHANNEL_MAX step CHANNEL_STEP
+        val swept = channel.flatMap { r ->
+            channel.flatMap { g -> channel.map { b -> OPAQUE or (r shl RED_SHIFT) or (g shl GREEN_SHIFT) or b } }
         }
+        val (worstArgb, worstRatio) = swept.map { it to contrastingInkRatio(it) }.minBy { it.second }
         assertTrue(
             worstRatio >= GUARANTEED_FLOOR,
-            "the worst colour swept, 0x%08X, measured %.3f:1 against its own tick, below the %.2f:1 this rule guarantees"
-                .format(worstArgb, worstRatio, GUARANTEED_FLOOR),
+            (
+                "the worst colour swept, 0x%08X, measured %.3f:1 against its own tick, " +
+                    "below the %.2f:1 this rule guarantees"
+                ).format(worstArgb, worstRatio, GUARANTEED_FLOOR),
         )
     }
 

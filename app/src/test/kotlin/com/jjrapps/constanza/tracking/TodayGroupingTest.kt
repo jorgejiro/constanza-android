@@ -25,7 +25,13 @@ private fun slot(
 ) = TodaySlot(slotId, minuteOfDay, status, occurrenceId = null, snoozedUntilEpochMs = snoozedUntilEpochMs)
 
 private fun row(id: Long, vararg slots: TodaySlot) =
-    TodayHabitRow(habitId = id, habitName = "Habit$id", dayStatus = DayStatus.PENDING, colorArgb = 0, slots = slots.toList())
+    TodayHabitRow(
+        habitId = id,
+        habitName = "Habit$id",
+        dayStatus = DayStatus.PENDING,
+        colorArgb = 0,
+        slots = slots.toList(),
+    )
 
 /**
  * Task today-grouped-sections, design.md: coverage for [groupTodayRows], the pure join that

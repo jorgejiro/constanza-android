@@ -101,6 +101,7 @@ class DayReviewSettingsViewModelTest {
             every { this@mockk.reviewFiresEveryNight } returns MutableStateFlow(reviewFiresEveryNight)
         }
         val dayReviewAlarmScheduler = mockk<DayReviewAlarmScheduler>(relaxUnitFun = true)
-        return Triple(DayReviewSettingsViewModel(settingsStore, dayReviewAlarmScheduler), settingsStore, dayReviewAlarmScheduler)
+        val viewModel = DayReviewSettingsViewModel(settingsStore, dayReviewAlarmScheduler)
+        return Triple(viewModel, settingsStore, dayReviewAlarmScheduler)
     }
 }

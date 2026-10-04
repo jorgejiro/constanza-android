@@ -100,7 +100,9 @@ class DayReviewUnansweredCountTest {
         val rows = rowsFor(
             habits = listOf(h),
             schedules = mapOf(h.id to Schedule.TimesPerDay()),
-            slotsByHabit = mapOf(h.id to listOf(slot(MORNING_SLOT_ID, h.id, 8 * 60), slot(EVENING_SLOT_ID, h.id, 20 * 60))),
+            slotsByHabit = mapOf(
+                h.id to listOf(slot(MORNING_SLOT_ID, h.id, 8 * 60), slot(EVENING_SLOT_ID, h.id, 20 * 60)),
+            ),
             entries = listOf(entryEntity(h.id, slotId = MORNING_SLOT_ID, status = EntryStatus.COMPLETED)),
         )
 
