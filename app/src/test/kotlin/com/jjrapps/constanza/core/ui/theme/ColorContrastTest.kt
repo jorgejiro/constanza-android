@@ -159,7 +159,12 @@ class ColorContrastTest {
     fun `muted labels clear the AA body floor on the surface containers`() {
         listOf("Surface" to ConstanzaColors.Surface, "SurfaceRaised" to ConstanzaColors.SurfaceRaised)
             .forEach { (name, surface) ->
-                assertRatioAtLeast(ConstanzaColors.OnBackgroundMuted, surface, CONTRAST_FLOOR, "OnBackgroundMuted on $name")
+                assertRatioAtLeast(
+                    ConstanzaColors.OnBackgroundMuted,
+                    surface,
+                    CONTRAST_FLOOR,
+                    "OnBackgroundMuted on $name",
+                )
             }
     }
 

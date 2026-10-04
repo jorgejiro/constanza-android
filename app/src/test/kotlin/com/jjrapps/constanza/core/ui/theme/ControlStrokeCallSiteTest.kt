@@ -189,7 +189,8 @@ class ControlStrokeCallSiteTest {
         /** :app held 72 Kotlin files under this root when the guard was written; a floor, not a count. */
         const val MINIMUM_EXPECTED_SOURCE_FILES = 40
 
-        /** The `StepperButton` (EditorFields.kt), the `DayOfWeekPicker` chip (ScheduleEditors.kt) and the onboarding ask button. */
+        /** The `StepperButton` (EditorFields.kt), the `DayOfWeekPicker` chip (ScheduleEditors.kt)
+         *  and the onboarding ask button. */
         const val MINIMUM_EXPECTED_GUARDED_CALL_SITES = 3
 
         val CONSTANZA_BORDER_ARGUMENT = Regex("""^\s*border\s*=\s*ConstanzaControlDefaults\s*\.""")

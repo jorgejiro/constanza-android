@@ -9,10 +9,22 @@ import kotlin.test.assertNull
 private const val COLOR_ARGB = 0xFF7D9CC4.toInt()
 
 private fun slot(minuteOfDay: Int?, status: EntryStatus = EntryStatus.UNKNOWN) =
-    TodaySlot(slotId = minuteOfDay?.toLong(), minuteOfDay = minuteOfDay, status = status, occurrenceId = null, snoozedUntilEpochMs = null)
+    TodaySlot(
+        slotId = minuteOfDay?.toLong(),
+        minuteOfDay = minuteOfDay,
+        status = status,
+        occurrenceId = null,
+        snoozedUntilEpochMs = null,
+    )
 
 private fun row(id: Long, vararg slots: TodaySlot) =
-    TodayHabitRow(habitId = id, habitName = "Habit $id", dayStatus = DayStatus.PENDING, colorArgb = COLOR_ARGB, slots = slots.toList())
+    TodayHabitRow(
+        habitId = id,
+        habitName = "Habit $id",
+        dayStatus = DayStatus.PENDING,
+        colorArgb = COLOR_ARGB,
+        slots = slots.toList(),
+    )
 
 /**
  * Graphite Today: the header's "N of M" line and the multi-reminder "x of N · next HH:MM" line are

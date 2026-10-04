@@ -59,9 +59,9 @@ class HabitPaletteTest {
     }
 
     /**
-     * Neighbouring cells are what a person compares side by side, so this walks the grid as it is drawn — six wide, checking
-     * across **and** down — and requires every neighbouring pair to be far more separated than the
-     * rejected pair was.
+     * Neighbouring cells are what a person compares side by side, so this walks the grid as it is
+     * drawn — six wide, checking across **and** down — and requires every neighbouring pair to be
+     * far more separated than the rejected pair was.
      *
      * Cell five of the first row is the custom wheel, which is a gradient and has no ΔE, so it is
      * modelled here as a hole rather than skipped silently: getting that index wrong would quietly
