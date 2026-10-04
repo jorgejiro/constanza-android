@@ -101,12 +101,19 @@ surface and the raised surface: primary text at least 12:1, secondary text at le
 labels and the destructive tone at least 4.5:1. The stroke that draws an operable control (switch
 thumbs and track borders, outlined-field borders, unselected chip outlines) MUST meet at least 3:1
 (WCAG 2.1 SC 1.4.11) against every surface such a control can sit on. A purely decorative divider
-is exempt and MUST stay quieter than the control stroke.
+is exempt and MUST stay quieter than the control stroke. Where a control marks its selected part by
+fill alone (the time picker's hour/minute and AM/PM halves), the selected and unselected fills MUST
+be at least 3:1 apart, and each part's numerals at least 4.5:1 on their own fill.
 
 #### Scenario: A design tone below its floor is nudged, not shipped
 - GIVEN a tone from the approved design that measures below its floor on any of those surfaces
 - WHEN the theme is built
 - THEN the shipped token is the minimal same-cast lighter step that clears the floor
+
+#### Scenario: The time picker's selected half is distinguishable
+- GIVEN the reminder-time picker with its hour half selected
+- WHEN the hour and minute halves are compared
+- THEN their fills measure at least 3:1 apart and each half's numerals at least 4.5:1 on their fill
 
 #### Scenario: Divider and control stroke stay separate
 - GIVEN the app's colour scheme
