@@ -103,7 +103,7 @@ class TodayAdaptiveComposeTest {
         val eveningBounds = eveningNode.fetchSemanticsNode().boundsInRoot
         assertTrue("slot rows must not overlap vertically", morningBounds.bottom <= eveningBounds.top)
 
-        val answerButtons = composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).fetchSemanticsNodes()
+        val answerButtons = composeTestRule.onAllNodes(isAnswerYesButton()).fetchSemanticsNodes()
         assertEquals(ANSWER_BUTTON_COUNT_PER_HABIT, answerButtons.size)
     }
 }

@@ -67,7 +67,7 @@ class TodayComposeTest {
 
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
         composeTestRule.onNodeWithText(text(R.string.today_expand)).performClick()
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes))[0].performClick()
+        composeTestRule.onAllNodes(isAnswerYesButton())[0].performClick()
         // today-status-icons: the answered slot's glyph carries the localised label as its
         // `contentDescription` now, not `EntryStatus.COMPLETED.name` — which is what this row used
         // to render as a word (today-row-answering-is-cramped-and-always-on, defect 2). Keeping the
@@ -81,7 +81,7 @@ class TodayComposeTest {
         // is pending by definition — so the sibling slot's untouched state is proven by its own Sí
         // pill still being on screen instead, exactly one now that the first slot's has collapsed
         // into a glyph.
-        composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).assertExists()
+        composeTestRule.onNode(isAnswerYesButton()).assertExists()
 
         val entries = fixture.database.entryDao().findByHabitId(habitId)
         assertEquals(1, entries.size)
@@ -128,18 +128,18 @@ class TodayComposeTest {
 
         // Collapsed: the expand affordance is on screen, so no slot line is.
         composeTestRule.onNodeWithText(text(R.string.today_expand)).assertExists()
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).assertCountEquals(0)
+        composeTestRule.onAllNodes(isAnswerYesButton()).assertCountEquals(0)
 
         // Answer one slot through the expanded view, then collapse again, so the row has a rollup
         // that is neither "all done" nor untouched — PARTIAL is the state a collapsed row is least
         // able to imply from anything else on screen.
         composeTestRule.onNodeWithText(text(R.string.today_expand)).performClick()
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes))[0].performClick()
+        composeTestRule.onAllNodes(isAnswerYesButton())[0].performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.COMPLETED)
         composeTestRule.onNodeWithText(text(R.string.today_collapse)).performClick()
 
         composeTestRule.onNodeWithText(text(R.string.today_expand)).assertExists()
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).assertCountEquals(0)
+        composeTestRule.onAllNodes(isAnswerYesButton()).assertCountEquals(0)
         composeTestRule.onNodeWithText(text(R.string.today_status_partial), substring = true).assertExists()
     }
 
@@ -171,7 +171,7 @@ class TodayComposeTest {
         viewModel.awaitRows(1)
 
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
-        composeTestRule.onNodeWithText(text(R.string.today_answer_no)).performClick()
+        composeTestRule.onNode(isAnswerNoButton()).performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.MISSED)
 
         val changeDescription = ApplicationProvider.getApplicationContext<Context>()

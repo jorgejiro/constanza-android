@@ -186,22 +186,16 @@ class ColorContrastTest {
     }
 
     // ------------------------------------------------------------------------------------------
-    // today-status-icons: the two answered-slot glyph tints, asserted the same way the habit
-    // palette above is — a real computed ratio on every surface the glyph can sit on, not a
-    // hand-typed number trusted from a KDoc paragraph.
+    // Graphite Today: answered-slot glyphs are neutral — the tick in OnBackgroundVariant, the
+    // cross and the skipped dash in OnBackgroundMuted. Asserted as real computed ratios on every
+    // surface a glyph can sit on, against the non-text floor (SC 1.4.11).
     // ------------------------------------------------------------------------------------------
 
     @Test
-    fun `the completed status glyph clears the non-text floor on every surface it can sit on`() {
+    fun `the neutral answered glyph tones clear the non-text floor on every surface they can sit on`() {
         surfacesGlyphsSitOn().forEach { (name, surface) ->
-            assertRatioAtLeast(ConstanzaColors.StatusCompleted, surface, NON_TEXT_FLOOR, "StatusCompleted on $name")
-        }
-    }
-
-    @Test
-    fun `the missed status glyph clears the non-text floor on every surface it can sit on`() {
-        surfacesGlyphsSitOn().forEach { (name, surface) ->
-            assertRatioAtLeast(ConstanzaColors.StatusMissed, surface, NON_TEXT_FLOOR, "StatusMissed on $name")
+            assertRatioAtLeast(ConstanzaColors.OnBackgroundVariant, surface, NON_TEXT_FLOOR, "tick on $name")
+            assertRatioAtLeast(ConstanzaColors.OnBackgroundMuted, surface, NON_TEXT_FLOOR, "cross/dash on $name")
         }
     }
 

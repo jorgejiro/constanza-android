@@ -68,7 +68,7 @@ class TodayClearAnswerComposeTest {
         viewModel.awaitRows(1)
 
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
-        composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).performClick()
+        composeTestRule.onNode(isAnswerYesButton()).performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.COMPLETED)
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_completed)).assertExists()
 
@@ -84,11 +84,11 @@ class TodayClearAnswerComposeTest {
         // Cleared: glyph gone, pending pills back — the same shape as a never-answered slot.
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.UNKNOWN)
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_completed)).assertDoesNotExist()
-        composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).assertExists()
-        composeTestRule.onNodeWithText(text(R.string.today_answer_no)).assertExists()
+        composeTestRule.onNode(isAnswerYesButton()).assertExists()
+        composeTestRule.onNode(isAnswerNoButton()).assertExists()
 
         // Re-answering after clearing writes the new answer normally.
-        composeTestRule.onNodeWithText(text(R.string.today_answer_no)).performClick()
+        composeTestRule.onNode(isAnswerNoButton()).performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.MISSED)
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_missed)).assertExists()
 

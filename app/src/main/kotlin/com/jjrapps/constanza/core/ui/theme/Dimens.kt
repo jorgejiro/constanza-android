@@ -50,17 +50,18 @@ object Spacing {
  * `Icons.Filled.Check`/`Close` actually draw inside that same square, since Material's vector
  * glyphs do not fill their full viewport.
  *
- * [AnswerPillWidth]/[AnswerPillHeight] (today-one-line-row) are the pending Today slot's Sí/No
- * pills, straight from the owner-approved `TodayOneLineRowPrototype`. The same paint/hit split
- * [Swatch]/[SwatchTouchTarget] already established applies here: 46x28dp is the pill's own PAINT,
- * below the 48dp minimum touch target on its short 28dp side, so [AnswerPillTouchTarget] is the
- * square hit box the pill is centred inside rather than a size the pill itself ever draws at.
+ * [AnswerButton]/[AnswerButtonTouchTarget] (graphite redesign) are the pending Today slot's round
+ * ✕/✓ controls: painted as a 44dp circle, hit as a 48dp square around it — the same paint/hit
+ * split [Swatch]/[SwatchTouchTarget] already established.
  *
- * [CompactIconButton] is the graphite 44dp icon button (Today's header actions and day chevrons);
- * [ProgressBar] is the Today progress line's thickness.
+ * [HabitDot] is the habit-colour dot leading a row, the only place a habit's colour is painted.
+ * [CompactIconButton] is the graphite 44dp icon button (Today's header actions, day chevrons and
+ * the multi-reminder expander); [ProgressBar] is the Today progress line's thickness, and
+ * [ReminderSegmentWidth]/[ReminderSegmentHeight] one segment of a multi-reminder habit's
+ * per-reminder bar.
  *
  * [MinTouchTarget] (today-one-line-row, vertical-rhythm correction) is the standard 48dp Android
- * accessible minimum, same value as [SwatchTouchTarget]/[AnswerPillTouchTarget] but named
+ * accessible minimum, same value as [SwatchTouchTarget]/[AnswerButtonTouchTarget] but named
  * generically because it is applied to a whole Today ROW now, not one small control inside it: an
  * answered row's line is itself the tap target that opens the change dialog, and text/glyph
  * content alone measures well under 48dp on a muted (Contestados) row. A pending row takes the
@@ -78,10 +79,12 @@ object Dimens {
     val StatusGlyph = 18.dp
     val StatusGlyphDashWidth = 12.dp
     val StatusGlyphDashHeight = 2.dp
-    val AnswerPillWidth = 46.dp
-    val AnswerPillHeight = 28.dp
-    val AnswerPillTouchTarget = 48.dp
+    val AnswerButton = 44.dp
+    val AnswerButtonTouchTarget = 48.dp
+    val HabitDot = 8.dp
     val CompactIconButton = 44.dp
     val ProgressBar = 4.dp
+    val ReminderSegmentWidth = 22.dp
+    val ReminderSegmentHeight = 4.dp
     val MinTouchTarget = 48.dp
 }
