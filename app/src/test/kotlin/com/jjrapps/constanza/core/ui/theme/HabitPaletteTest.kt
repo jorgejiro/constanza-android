@@ -207,7 +207,7 @@ class HabitPaletteTest {
      * The invariant this re-tone exists to create: a habit's own colour is now painted directly on
      * its name text, so no preset may read as either dimmer or louder than another. Every preset must
      * sit inside the `[HABIT_BAND_FLOOR, HABIT_BAND_CEILING]` contrast band against
-     * [ConstanzaColors.Background], widened by [HABIT_BAND_TOLERANCE] — the same tolerance
+     * [HabitBandGround], widened by [HABIT_BAND_TOLERANCE] — the same tolerance
      * `clampToHabitBand` itself checks against, and for the same reason (`HabitColorBand.kt`'s KDoc):
      * these presets were produced by that clamp's own reasoning, and an exact `7.0`/`11.0` is not
      * itself a reachable 8-bit value. The previous 23-colour palette spanned 5.31:1 to 16.01:1, a
@@ -217,7 +217,7 @@ class HabitPaletteTest {
     fun `every preset sits inside the legible contrast band against Background`() {
         val band = (HABIT_BAND_FLOOR - HABIT_BAND_TOLERANCE)..(HABIT_BAND_CEILING + HABIT_BAND_TOLERANCE)
         HabitPalette.ORDERED.forEach { habitColor ->
-            val ratio = contrastRatio(Color(habitColor.argb), ConstanzaColors.Background)
+            val ratio = contrastRatio(Color(habitColor.argb), HabitBandGround)
             assertTrue(
                 ratio in band,
                 "${habitColor.name} measured %.2f:1 against Background, outside the [%.1f, %.1f] band"

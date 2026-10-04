@@ -4,6 +4,8 @@
         The pre-Compose window background (used by themes.xml's android:windowBackground). Must
         match ConstanzaColors.Background exactly, or the cold-start frame flashes a different colour
         than the first Compose frame (spec "Cold-Start Window Background And System Bar Icons").
+        The launcher icon background (ic_launcher_background.xml) is deliberately NOT tied to this
+        value: it keeps its own colour.
     -->
-    <color name="window_background">#110B06</color>
+    <color name="window_background">#141416</color>
 </resources>
