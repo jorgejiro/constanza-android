@@ -4,6 +4,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwitchColors
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 
@@ -99,5 +101,22 @@ object ConstanzaControlDefaults {
         selectedBorderColor = MaterialTheme.colorScheme.primary,
         borderWidth = ChipBorderWidth,
         selectedBorderWidth = ChipBorderWidth,
+    )
+
+    /**
+     * Graphite redesign: the neutral `Switch`. Checked is the light interactive chrome track
+     * ([ConstanzaColors.ChromeInteractive]) with a dark thumb; unchecked is a track on the screen
+     * background outlined, with its thumb, in the control stroke ([ConstanzaColors.ControlStroke],
+     * 3.53:1) — no accent hue in either state. Material's own defaults land close to this through the
+     * theme mapping, but pinning the roles here keeps the switch from drifting if a role is rebound.
+     */
+    @Composable
+    fun switchColors(): SwitchColors = SwitchDefaults.colors(
+        checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+        checkedTrackColor = MaterialTheme.colorScheme.primary,
+        checkedBorderColor = MaterialTheme.colorScheme.primary,
+        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+        uncheckedTrackColor = MaterialTheme.colorScheme.background,
+        uncheckedBorderColor = MaterialTheme.colorScheme.outline,
     )
 }

@@ -228,16 +228,44 @@ listed, not only within the habit editor.
 #### Scenario: Colour visible on the habit list
 - GIVEN two habits with different assigned colours
 - WHEN the user views the habit list screen
-- THEN each habit's row visibly displays its own colour, distinguishing the two habits from each
-  other
+- THEN each habit's row visibly displays its own colour in its leading dot, distinguishing the two
+  habits from each other, and neither name is rendered in its habit colour
 
 ### Requirement: Habit List Row Actions And Name Display
 
+A habit list row MUST show, in order: the habit's colour dot, the habit's name in the text colour,
+a schedule subtitle under the name, and a trailing overflow menu launcher.
+
+The schedule subtitle MUST name the habit's schedule kind ("Daily", "Several times a day",
+the abbreviated days of a specific-days schedule in week order, "N times a week",
+"Monthly on day N", "Every N days") followed by ` · ` and its reminder: the earliest enabled
+reminder time, formatted with the app's time format, or — for a several-times-a-day habit — the
+number of enabled reminders. When the habit has no enabled reminder, the ` · ` part MUST be
+omitted. Counts MUST use plural-aware copy. The subtitle MUST follow schedule edits without a
+reload.
+
 The habit list row's trailing content MUST show only one overflow menu launcher; it MUST NOT
 render Progress, Archive/Un-archive, or Delete as always-visible buttons. Opening the menu MUST
-offer Progress, Archive or Un-archive (matching the habit's current state), and Delete as items.
+offer Progress, Archive or Un-archive (matching the habit's current state), and Delete as items,
+on a neutral raised surface, with Delete alone in the destructive tone.
 The habit's name MUST wrap across up to two lines before truncating, and MUST be ellipsized only
 once both lines are full.
+
+#### Scenario: The row shows the schedule and reminder
+- GIVEN a daily habit with an enabled reminder at 9:30
+- WHEN the habit list renders
+- THEN its row shows the subtitle "Daily · 9:30 AM" on a 12-hour device ("Diaria · 09:30" in
+  Spanish on a 24-hour device)
+
+#### Scenario: A several-times-a-day habit counts its reminders
+- GIVEN a several-times-a-day habit with three enabled reminders and one disabled
+- WHEN the habit list renders
+- THEN its subtitle reads "Several times a day · 3 reminders"
+
+#### Scenario: No enabled reminder omits the time
+- GIVEN a three-times-a-week habit with no enabled reminder
+- WHEN the habit list renders
+- THEN its subtitle reads "3 times a week" with no separator or time
 
 #### Scenario: The row shows only the overflow launcher
 - GIVEN a habit list row

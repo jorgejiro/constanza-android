@@ -3,32 +3,42 @@
 package com.jjrapps.constanza.habit
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,18 +49,32 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jjrapps.constanza.R
-import com.jjrapps.constanza.core.ui.rememberTimeOfDayFormat
+import com.jjrapps.constanza.core.ui.component.HabitDot
+import com.jjrapps.constanza.core.ui.icons.ConstanzaIcons
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
+import com.jjrapps.constanza.core.ui.theme.ConstanzaControlDefaults
+import com.jjrapps.constanza.core.ui.theme.Dimens
+import com.jjrapps.constanza.core.ui.theme.Spacing
+
+/** The row's left inset — the same 16dp gutter Today's rows use. */
+private val ROW_INSET = Spacing.lg
+
+/** Dot-to-name gap, matching Today's rows so the two lists line up. */
+private val DOT_TEXT_GAP = 14.dp
+
+/** A one-line row is still a comfortable 64dp target, as on Today. */
+private val ROW_MIN_HEIGHT = 64.dp
+
+/** The overflow menu's corner (direction E board "E · Hábitos"). */
+private val MENU_CORNER = 14.dp
 
 /**
  * Task 6a.4 (habit-management: Habit Archiving) — container. No navigation library is used
@@ -146,11 +170,7 @@ fun HabitListScreen(state: HabitListUiState, actions: HabitListActions) {
     }
     Scaffold(
         topBar = { HabitListTopBar(actions.onBack) },
-        floatingActionButton = {
-            FloatingActionButton(onClick = actions.onCreateHabit) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.habit_list_add_habit))
-            }
-        },
+        floatingActionButton = { HabitListFab(actions.onCreateHabit) },
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
             HabitListContent(state, actions, onRequestDelete = { pendingDeleteId = it })
@@ -159,32 +179,53 @@ fun HabitListScreen(state: HabitListUiState, actions: HabitListActions) {
 }
 
 /** habit-list-back-navigation. Deliberately the same shape as `HabitEditorScreen`'s
- *  `HabitEditorTopBar`: an [Icons.AutoMirrored.Filled.ArrowBack] in the leading navigation slot,
- *  not the `actions`-slot "Back" text button `ProgressScreen`/`SnoozeSettingsScreen` use. Those two
- *  are read-only leaves a user glances at; this screen is somewhere a user does work and must be
- *  able to walk out of, and the leading slot is where every Android user already looks for that. The
- *  icon ships in `material-icons-core` — already this project's only icon artifact — and its
- *  auto-mirrored variant flips itself in right-to-left locales. `contentDescription` reuses the
- *  existing `action_back` string rather than adding a second resource with the same word in it. */
+ *  `HabitEditorTopBar`: a back icon in the leading navigation slot, not the `actions`-slot "Back"
+ *  text button `ProgressScreen`/`SnoozeSettingsScreen` use. Those two are read-only leaves a user
+ *  glances at; this screen is somewhere a user does work and must be able to walk out of, and the
+ *  leading slot is where every Android user already looks for that. `contentDescription` reuses the
+ *  existing `action_back` string rather than adding a second resource with the same word in it.
+ *
+ *  Graphite redesign: the thin auto-mirrored [ConstanzaIcons.ChevronStart] (Today's own chevron)
+ *  replaces the Material arrow, and the bar sits on the screen background rather than the raised
+ *  surface; the title keeps `TopAppBar`'s `titleLarge` (22sp/600), left-aligned. */
 @Composable
 private fun HabitListTopBar(onBack: () -> Unit) {
     TopAppBar(
         title = { Text(stringResource(R.string.habit_list_title)) },
         navigationIcon = {
             IconButton(onClick = onBack) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.action_back),
-                )
+                Icon(ConstanzaIcons.ChevronStart, contentDescription = stringResource(R.string.action_back))
             }
         },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.background,
+            scrolledContainerColor = MaterialTheme.colorScheme.background,
+        ),
     )
+}
+
+/** Graphite redesign: the same light-filled, flat FAB on the 18dp `shapes.large` corner as Today's
+ *  add-habit button (`tracking.TodayAddHabitFab`) — see its KDoc for why it carries no shadow. */
+@Composable
+private fun HabitListFab(onCreateHabit: () -> Unit) {
+    FloatingActionButton(
+        onClick = onCreateHabit,
+        shape = MaterialTheme.shapes.large,
+        containerColor = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+        elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
+    ) {
+        Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.habit_list_add_habit))
+    }
 }
 
 @Composable
 private fun HabitListContent(state: HabitListUiState, actions: HabitListActions, onRequestDelete: (Long) -> Unit) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        item { ShowArchivedRow(state.showArchived, actions.onToggleShowArchived) }
+        item {
+            ShowArchivedRow(state.showArchived, actions.onToggleShowArchived)
+            HorizontalDivider(modifier = Modifier.padding(horizontal = ROW_INSET))
+        }
         if (state.items.isEmpty()) {
             item {
                 val emptyRes = if (state.showArchived) {
@@ -192,7 +233,12 @@ private fun HabitListContent(state: HabitListUiState, actions: HabitListActions,
                 } else {
                     R.string.habit_list_empty_active
                 }
-                Text(stringResource(emptyRes), modifier = Modifier.padding(16.dp))
+                Text(
+                    stringResource(emptyRes),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ConstanzaColors.OnBackgroundVariant,
+                    modifier = Modifier.padding(ROW_INSET),
+                )
             }
         }
         items(state.items, key = { it.habit.id }) { item ->
@@ -211,6 +257,9 @@ private fun HabitListContent(state: HabitListUiState, actions: HabitListActions,
  * reader an orphan label and a control with no name, shrank the target to the switch alone, and made
  * `onNodeWithText(label).performClick()` a no-op — which is how `HabitListArchiveComposeTest` found
  * it. The test was right and the row was wrong.
+ *
+ * Graphite redesign: the label steps back to the secondary tone so the habits lead the screen, and
+ * the switch takes [ConstanzaControlDefaults.switchColors].
  */
 @Composable
 private fun ShowArchivedRow(showArchived: Boolean, onToggleShowArchived: () -> Unit) {
@@ -222,33 +271,37 @@ private fun ShowArchivedRow(showArchived: Boolean, onToggleShowArchived: () -> U
                 onValueChange = { onToggleShowArchived() },
                 role = Role.Switch,
             )
-            .padding(16.dp),
+            .padding(ROW_INSET),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(stringResource(R.string.habit_list_show_archived))
-        Switch(checked = showArchived, onCheckedChange = null)
+        Text(
+            stringResource(R.string.habit_list_show_archived),
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
+            color = ConstanzaColors.OnBackgroundVariant,
+        )
+        Switch(checked = showArchived, onCheckedChange = null, colors = ConstanzaControlDefaults.switchColors())
     }
 }
 
 /**
- * Design.md D5 — this supersedes decision 2 of `archive/2026-09-03-habit-deletion/design.md`,
- * which put Progress and Archive/Un-archive inline as always-visible [TextButton]s and moved only
- * Delete behind the trailing [IconButton]'s [DropdownMenu]. That shape ran out of room once
- * `question` stopped being displayed and the name column widened to use the freed space (habit
- * name column measured at 509 px before, 723 px after, both at the row's unchanged 168 px height):
- * three trailing controls plus a two-line name no longer fit one row. `trailingContent` is now the
- * bare launcher; Progress, Archive/Un-archive and Delete are all [DropdownMenuItem]s, in that
- * order — matching the `habit-management` spec scenario's order and leaving the irreversible item
- * farthest from where the finger lands. Every item sets `menuExpanded = false` before invoking its
- * action, mirroring Delete's [onRequestDelete] callback. The accepted residual risk is that Archive
- * and Delete are now adjacent menu rows; that is bounded by [DeleteHabitDialog]'s confirmation and
- * by Archive being reversible.
+ * Graphite redesign (`habit-management`: the list row is dot, name, schedule subtitle and overflow
+ * menu). The habit's colour lives only in the leading [HabitDot]; the name renders in the text
+ * colour through `Text`'s own `color` — no colour span any more, so `HabitNameColourComposeTest`
+ * reads the dot's [com.jjrapps.constanza.core.ui.component.HabitDotColor] and the name's laid-out
+ * style instead. Under the name, [HabitScheduleSummary] names the schedule and its reminder.
  *
- * `supportingContent` (the `question` line) is deleted outright, not merely emptied — Phase 3 of
- * `remove-habit-question-field` removes the field itself, and this row is one of its call sites.
- * `headlineContent` gains `maxLines = 2, overflow = TextOverflow.Ellipsis`: a name that needs a
- * third line is capped and ellipsized rather than growing the row indefinitely.
+ * The name keeps `maxLines = 2, overflow = TextOverflow.Ellipsis`: a name that needs a third line is
+ * capped and ellipsized rather than growing the row indefinitely. It is composed before the
+ * subtitle, so the merged row node's text layout is still the name's (`HabitListRowMenuComposeTest`
+ * reads it).
+ *
+ * Design.md D5 (unchanged) — Progress, Archive/Un-archive and Delete are all items of the trailing
+ * overflow menu, in that order, leaving the irreversible item farthest from where the finger lands.
+ * Every item sets `menuExpanded = false` before invoking its action. The accepted residual risk is
+ * that Archive and Delete are adjacent menu rows; that is bounded by [DeleteHabitDialog]'s
+ * confirmation and by Archive being reversible. The menu itself is a neutral raised surface with
+ * 14dp corners and a hairline edge; Delete alone takes the destructive tone (M3 `error`).
  */
 @Composable
 private fun HabitRow(
@@ -260,80 +313,92 @@ private fun HabitRow(
 ) {
     val habit = item.habit
     var menuExpanded by remember { mutableStateOf(false) }
-    ListItem(
-        // Colour overhaul: the habit's identity colour used to sit in a leading dot ahead of the
-        // name; it now paints the name text itself (see `TodayScreen.HabitRollupHeader`'s own KDoc
-        // for why), and there is no leading content left to reserve room for. Dropping `leadingContent`
-        // outright — rather than leaving an empty slot — is what lets `ListItem`'s own default
-        // padding put the name back at the screen's plain 16dp margin instead of the dot's old 48dp.
-        //
-        // Built as an `AnnotatedString` with an explicit `SpanStyle`, the same shape
-        // `TodayScreen.demotedSuffix` uses for the identical colour, rather than `Text`'s own `color`
-        // parameter: a plain-string `Text`'s `color` paints at the layout layer only, so it never
-        // reaches `SemanticsProperties.Text` for a test to read back, while a `SpanStyle` embedded in
-        // the `AnnotatedString` is part of the rendered content itself and is what
-        // `HabitNameColourComposeTest` asserts against on both screens.
-        headlineContent = {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onEditHabit(habit.id) }
+            .heightIn(min = ROW_MIN_HEIGHT)
+            .padding(start = ROW_INSET, end = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HabitDot(habit.colorArgb)
+        Spacer(Modifier.width(DOT_TEXT_GAP))
+        Column(modifier = Modifier.weight(1f).padding(vertical = Spacing.md)) {
             Text(
-                buildAnnotatedString { withStyle(SpanStyle(color = Color(habit.colorArgb))) { append(habit.name) } },
+                habit.name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = ConstanzaColors.OnBackground,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-        },
-        supportingContent = item.schedule?.let { schedule -> { HabitScheduleSummary(schedule) } },
-        trailingContent = {
-            Box {
-                IconButton(onClick = { menuExpanded = true }) {
-                    Icon(
-                        Icons.Filled.MoreVert,
-                        contentDescription = stringResource(R.string.habit_list_more_options),
-                    )
-                }
-                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.habit_list_progress)) },
-                        onClick = {
-                            menuExpanded = false
-                            onShowProgress(habit.id)
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                stringResource(
-                                    if (habit.archived) {
-                                        R.string.habit_list_unarchive
-                                    } else {
-                                        R.string.habit_list_archive
-                                    },
-                                ),
-                            )
-                        },
-                        onClick = {
-                            menuExpanded = false
-                            onArchiveToggle(habit.id, !habit.archived)
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.habit_list_delete)) },
-                        onClick = {
-                            menuExpanded = false
-                            onRequestDelete(habit.id)
-                        },
-                    )
-                }
+            item.schedule?.let { HabitScheduleSummary(it) }
+        }
+        Box {
+            IconButton(onClick = { menuExpanded = true }) {
+                Icon(
+                    Icons.Filled.MoreVert,
+                    contentDescription = stringResource(R.string.habit_list_more_options),
+                    tint = ConstanzaColors.OnBackgroundVariant,
+                )
             }
-        },
-        modifier = Modifier.fillMaxWidth().clickable { onEditHabit(habit.id) },
-    )
+            HabitRowMenu(
+                expanded = menuExpanded,
+                archived = habit.archived,
+                onDismiss = { menuExpanded = false },
+                onChoice = { choice ->
+                    when (choice) {
+                        RowMenuChoice.PROGRESS -> onShowProgress(habit.id)
+                        RowMenuChoice.ARCHIVE_TOGGLE -> onArchiveToggle(habit.id, !habit.archived)
+                        RowMenuChoice.DELETE -> onRequestDelete(habit.id)
+                    }
+                },
+            )
+        }
+    }
+}
+
+/** The overflow menu's three items, in their on-screen order. */
+private enum class RowMenuChoice { PROGRESS, ARCHIVE_TOGGLE, DELETE }
+
+/** See [HabitRow]'s KDoc for the order and the tones. Each item dismisses the menu first. */
+@Composable
+private fun HabitRowMenu(
+    expanded: Boolean,
+    archived: Boolean,
+    onDismiss: () -> Unit,
+    onChoice: (RowMenuChoice) -> Unit,
+) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(MENU_CORNER),
+        containerColor = ConstanzaColors.SurfaceRaised,
+        tonalElevation = 0.dp,
+        border = BorderStroke(Dimens.FieldBorder, ConstanzaColors.Divider),
+    ) {
+        val archiveRes = if (archived) R.string.habit_list_unarchive else R.string.habit_list_archive
+        MenuItem(stringResource(R.string.habit_list_progress), ConstanzaColors.OnBackground) {
+            onDismiss()
+            onChoice(RowMenuChoice.PROGRESS)
+        }
+        MenuItem(stringResource(archiveRes), ConstanzaColors.OnBackground) {
+            onDismiss()
+            onChoice(RowMenuChoice.ARCHIVE_TOGGLE)
+        }
+        MenuItem(stringResource(R.string.habit_list_delete), MaterialTheme.colorScheme.error) {
+            onDismiss()
+            onChoice(RowMenuChoice.DELETE)
+        }
+    }
 }
 
 @Composable
-private fun HabitScheduleSummary(schedule: HabitSchedule) {
-    val strings = rememberScheduleSummaryStrings()
-    val timeFormat = rememberTimeOfDayFormat()
-    val locale = LocalConfiguration.current.locales[0]
-    Text(scheduleSummary(schedule.schedule, schedule.slots, strings, timeFormat, locale))
+private fun MenuItem(label: String, color: Color, onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text(label, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal)) },
+        onClick = onClick,
+        colors = MenuDefaults.itemColors(textColor = color),
+    )
 }
 
 /** habit-management: Habit Deletion (design.md D4). Same [AlertDialog] shape as
@@ -341,15 +406,27 @@ private fun HabitScheduleSummary(schedule: HabitSchedule) {
  *  dialog this one names the subject and the exact count destroyed. [entryCount] renders through
  *  [pluralStringResource] rather than a hand-picked string, so zero renders as the honest "0
  *  recorded answers will be…" via the `other` category — English has no CLDR `zero`, and nothing
- *  branches on the count beyond its own copy. */
+ *  branches on the count beyond its own copy.
+ *
+ *  Graphite redesign: the dialog sits on the neutral raised surface and the confirm button alone
+ *  takes the destructive tone (M3 `error`); Cancel stays in the neutral interactive tone. */
 @Composable
 private fun DeleteHabitDialog(habitName: String, entryCount: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = ConstanzaColors.SurfaceRaised,
         title = { Text(stringResource(R.string.habit_delete_dialog_title, habitName)) },
-        text = { Text(pluralStringResource(R.plurals.habit_delete_dialog_body, entryCount, entryCount)) },
+        text = {
+            Text(
+                pluralStringResource(R.plurals.habit_delete_dialog_body, entryCount, entryCount),
+                color = ConstanzaColors.OnBackgroundVariant,
+            )
+        },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text(stringResource(R.string.habit_delete_dialog_confirm)) }
+            TextButton(
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) { Text(stringResource(R.string.habit_delete_dialog_confirm)) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }

@@ -2,10 +2,15 @@ package com.jjrapps.constanza.habit
 
 import android.content.res.Resources
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalResources
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.TimeOfDayFormat
+import com.jjrapps.constanza.core.ui.rememberTimeOfDayFormat
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
 import java.time.DayOfWeek
@@ -71,6 +76,19 @@ private fun dayList(days: Set<DayOfWeek>, weekStart: DayOfWeek, locale: Locale):
     days.sortedBy { (it.value - weekStart.value + DAYS_PER_WEEK) % DAYS_PER_WEEK }
         .joinToString(DAY_SEPARATOR) { it.getDisplayName(TextStyle.SHORT, locale) }
         .replaceFirstChar { it.titlecase(locale) }
+
+/** The habit-list row's subtitle, in the secondary tone — see [scheduleSummary]. */
+@Composable
+internal fun HabitScheduleSummary(schedule: HabitSchedule) {
+    val strings = rememberScheduleSummaryStrings()
+    val timeFormat = rememberTimeOfDayFormat()
+    val locale = LocalConfiguration.current.locales[0]
+    Text(
+        scheduleSummary(schedule.schedule, schedule.slots, strings, timeFormat, locale),
+        style = MaterialTheme.typography.bodyMedium,
+        color = ConstanzaColors.OnBackgroundVariant,
+    )
+}
 
 /** [ScheduleSummaryStrings] backed by the composition's resources, so a per-app language override
  *  reaches the subtitle exactly as it reaches `stringResource`. */
