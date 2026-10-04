@@ -76,8 +76,8 @@ android {
         applicationId = "com.jjrapps.constanza"
         minSdk = 31
         targetSdk = 37
-        versionCode = 18
-        versionName = "1.0.0"
+        versionCode = 19
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
