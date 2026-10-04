@@ -80,5 +80,11 @@ Hand-off notes:
 - **T5:** `CustomColorDialog` sliders unchanged in UX; editing an old custom colour lighter than 9:1 seeds the slider at 1f and re-solves on confirm.
 - Native review: not run by the writer (parent owns RDD assessment).
 
+### Native review log
+- T1 `131117e`..`7f55a2a` (775 lines): granted → approved, acknowledged (lineage review-fca3c9fb01a9e39f). 2 WARNING + 1 SUGGESTION informational (migration test ground → fixed in T2; ReminderTimeField selected contrast → T5; spec floors unproved → covered in T2).
+- T2 first attempt (2253 / 1835 lines): granted, stopped `lens_context_budget_exceeded`. Owner chose to split; T2 rewritten into `fa8b44b`, `5b3ad96`, `83e127c`, `e553317`, `a47ac1d`, `01154eb` (tree identical to `backup/graphite-t2`).
+- `fa8b44b` (672): declined. `5b3ad96` (704): declined. `83e127c`..`a47ac1d` (905): declined. Reviewed boundary advances to `01154eb`.
+- Owner raised the slicing budget to ~900 lines (2026-10-04). The native reviewer context budget is not configurable.
+
 ## Next step
 T3.
