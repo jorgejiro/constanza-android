@@ -248,3 +248,6 @@ la encuentre más gente.
 ## 📄 Licencia
 
 Distribuido bajo la [licencia MIT](LICENSE).
+
+La tipografía [Geist](https://github.com/vercel/geist-font) incluida se distribuye bajo la
+[SIL Open Font License 1.1](third_party/geist/OFL.txt).

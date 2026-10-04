@@ -17,14 +17,14 @@ import kotlin.test.assertTrue
  * literal, because the habit colour *is* the habit name's text colour (`TodayScreen`,
  * `HabitListScreen`) rather than a swatch beside it.
  *
- * The retoned palette measures ≥6.98:1 against `Background` and ≥5.96:1 against `SurfaceSelected`
- * (`OLIVE` is the worst member on both), but the floor asserted here stays the spec's 4.5:1 rather
- * than the current headroom — a future re-tone should fail this test before it ships, not after.
- * `HabitPaletteTest` separately pins the tighter `[7:1, 11:1]` band that re-tone actually targets.
+ * The floor asserted here stays the spec's 4.5:1 rather than the palette's current headroom — a
+ * future re-tone should fail this test before it ships, not after. `HabitPaletteTest` separately
+ * pins the tighter `[7:1, 11:1]` band that re-tone actually targets.
  *
- * The spec's name still reads "And Accent". There is no chrome accent any more; it was replaced by
- * [ConstanzaColors.ChromeInteractive], asserted below under its own name.
- * `openspec/specs/visual-design-system/spec.md` has not caught up with either change.
+ * Graphite text floors (`odd/tasks/graphite-redesign.md` T1): primary text >= 12:1, secondary text
+ * >= 7:1 and muted labels >= 4.5:1 on [ConstanzaColors.Background], [ConstanzaColors.Surface] and
+ * [ConstanzaColors.SurfaceRaised]. There is no chrome accent; [ConstanzaColors.ChromeInteractive] is
+ * asserted below under its own name.
  */
 class ColorContrastTest {
 
@@ -161,6 +161,36 @@ class ColorContrastTest {
     }
 
     @Test
+    fun `secondary text clears the AA floor on the raised surface container`() {
+        assertRatioAtLeast(
+            ConstanzaColors.OnBackgroundVariant,
+            ConstanzaColors.SurfaceRaised,
+            SECONDARY_TEXT_FLOOR,
+            "OnBackgroundVariant on SurfaceRaised",
+        )
+    }
+
+    @Test
+    fun `muted labels clear the AA body floor on the surface containers`() {
+        listOf("Surface" to ConstanzaColors.Surface, "SurfaceRaised" to ConstanzaColors.SurfaceRaised)
+            .forEach { (name, surface) ->
+                assertRatioAtLeast(ConstanzaColors.OnBackgroundMuted, surface, CONTRAST_FLOOR, "OnBackgroundMuted on $name")
+            }
+    }
+
+    /** The destructive tone carries text (error messages, "Delete"), so it takes the text floor. */
+    @Test
+    fun `the destructive tone clears the AA body floor on every text surface`() {
+        listOf(
+            "Background" to ConstanzaColors.Background,
+            "Surface" to ConstanzaColors.Surface,
+            "SurfaceRaised" to ConstanzaColors.SurfaceRaised,
+        ).forEach { (name, surface) ->
+            assertRatioAtLeast(DarkColors.error, surface, CONTRAST_FLOOR, "error (Destructive) on $name")
+        }
+    }
+
+    @Test
     fun `text on chrome interactive is legible`() {
         assertRatioAtLeast(
             ConstanzaColors.OnChromeInteractive,
@@ -280,7 +310,7 @@ class ColorContrastTest {
      * control's boundary against whatever it sits on.
      *
      * Its unchecked counterpart is deliberately NOT asserted here, and the omission is the reasoned
-     * one rather than the forgotten one: `surfaceContainerHighest` measures 1.17:1 on `Background`
+     * one rather than the forgotten one: `surfaceContainerHighest` measures 1.18:1 on `Background`
      * and cannot be raised to 3:1 without turning every raised container in the app into a light
      * grey slab. An unchecked track does not need to — it is drawn *with a border*, and SC 1.4.11 is
      * satisfied by any boundary that identifies the component. That border reads `outline`, which is
@@ -351,10 +381,10 @@ class ColorContrastTest {
      *
      * Note what this does and does not assert. SC 1.4.11 imposes no ratio *between two states of
      * different components*, and none is achievable here anyway: making the selected fill clear 3:1
-     * against `surfaceContainerHighest` (L=0.0092) would require L>=0.1276, a light grey slab in a
-     * ramp whose lightest surface is L=0.0092. The distinction in this palette is therefore carried
-     * by the content colour, and what is enforceable — and enforced — is that the two (container,
-     * content) pairs cannot both be identical again.
+     * against `surfaceContainerHighest` (L=0.0171) would require L>=0.1512, a light grey slab in a
+     * ramp whose lightest surface is L=0.0235. The distinction in this palette is therefore carried
+     * by the content colour or a one-step fill difference, and what is enforceable — and enforced —
+     * is that the two (container, content) pairs cannot both be identical again.
      */
     @Test
     fun `the selected container is distinguishable from the plain surface container`() {
@@ -397,11 +427,11 @@ class ColorContrastTest {
      *
      * It compares against M3's own unseeded dark baseline rather than against a hex constant, so it
      * keeps meaning "not Material's default" across a material3 upgrade instead of pinning today's
-     * value. The AM/PM selector is a real, reachable screen in a warm-dark app; a violet slab in it
+     * value. The AM/PM selector is a real, reachable screen in a graphite dark app; a violet slab in it
      * is the exact regression this change had to go back and fix.
      */
     @Test
-    fun `the tertiary roles are bound to the warm ramp rather than left at M3's violet default`() {
+    fun `the tertiary roles are bound to the graphite ramp rather than left at M3's violet default`() {
         val m3Default = darkColorScheme()
         listOf(
             Triple("tertiary", DarkColors.tertiary, m3Default.tertiary),
@@ -414,7 +444,7 @@ class ColorContrastTest {
                 actual = bound,
                 message = "$role is still Material 3's stock dark default. The time picker's AM/PM period " +
                     "selector is the app's one consumer of this family, and it would render violet in the " +
-                    "middle of the warm ramp.",
+                    "middle of the graphite ramp.",
             )
         }
     }
@@ -452,7 +482,7 @@ class ColorContrastTest {
 
     /**
      * Which half of the AM/PM toggle is active has to be visible, and in this ramp it cannot be the
-     * fill that says so — `tertiaryContainer` is [ConstanzaColors.SurfaceSelected], 1.17:1 against
+     * fill that says so — `tertiaryContainer` is [ConstanzaColors.SurfaceSelected], 1.29:1 against
      * the background, for the arithmetic reason `Theme.kt` sets out for every selected fill here.
      * The distinction is carried by the label tone instead, exactly as the hour/minute selector
      * already does, so what is enforceable is that the two label tones cannot collapse into one.

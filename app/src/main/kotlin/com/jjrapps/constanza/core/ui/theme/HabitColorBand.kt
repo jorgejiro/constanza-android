@@ -23,6 +23,22 @@ internal const val HABIT_BAND_CEILING = 11.0
  */
 internal const val HABIT_BAND_TOLERANCE = 0.1
 
+private const val HABIT_BAND_GROUND_ARGB = 0xFF110B06.toInt()
+
+/**
+ * The ground every band measurement in this file is taken against: the retired warm-dark background
+ * `#110B06`, frozen here on purpose rather than read from [ConstanzaColors.Background].
+ *
+ * [clampToHabitBand] is not only a UI helper: the v6/v7 database migrations
+ * (`HabitColorRetoneRemap`, `HabitColorRetireRemap`) and backup-import normalisation call it to
+ * rewrite persisted colours. Those outputs are historical facts — a migration must produce the same
+ * bytes whenever it runs — so they cannot follow a re-tone of the live theme. When the graphite
+ * redesign moved [ConstanzaColors.Background] to `#141416`, reading the live value here would have
+ * pushed the GREEN preset out of its own band and silently rewritten it on the next migration.
+ * The habit-palette redesign (graphite T2) owns replacing this band; until then it stays pinned.
+ */
+internal val HabitBandGround = Color(HABIT_BAND_GROUND_ARGB)
+
 private const val MIN_VALUE = 0f
 private const val MAX_VALUE = 1f
 private const val MIN_SATURATION = 0f
@@ -33,7 +49,7 @@ private const val MIN_SATURATION = 0f
 private const val BISECTION_STEPS = 40
 
 /**
- * Pushes [argb] into the legible band `[7:1, 11:1]` against [ConstanzaColors.Background], preserving
+ * Pushes [argb] into the legible band `[7:1, 11:1]` against [HabitBandGround], preserving
  * hue wherever that is possible. Presets never need this — [HabitPalette]'s 22 members are already
  * inside the band by construction — so this exists entirely for the free custom colour wheel
  * (`CustomColorDialog.kt`), which offers the whole sRGB cube.
@@ -65,7 +81,7 @@ private const val BISECTION_STEPS = 40
  * 2. Otherwise the target is [HABIT_BAND_FLOOR] (below the floor) or [HABIT_BAND_CEILING] (above the
  *    ceiling). Decompose to
  *    [Hsv] and bisect **value** in `0f..1f`, holding hue and saturation fixed, for the argb whose
- *    contrast against [ConstanzaColors.Background] equals the target. Value scales every RGB channel
+ *    contrast against [HabitBandGround] equals the target. Value scales every RGB channel
  *    by the same factor at fixed hue/saturation ([Hsv.toArgb]'s `chroma`/`match` are both linear in
  *    `value`), so luminance — and therefore contrast against a fixed dark ground — is monotonic in
  *    value and a plain bisection converges on it.
@@ -87,7 +103,7 @@ private const val BISECTION_STEPS = 40
  * either — to `#FF6A6A` (7.00:1) via the saturation branch, landing on the same colour maroon does.
  */
 fun clampToHabitBand(argb: Int): Int {
-    val ratio = contrastRatio(Color(argb), ConstanzaColors.Background)
+    val ratio = contrastRatio(Color(argb), HabitBandGround)
     val passthroughRange = (HABIT_BAND_FLOOR - HABIT_BAND_TOLERANCE)..(HABIT_BAND_CEILING + HABIT_BAND_TOLERANCE)
     if (ratio in passthroughRange) return argb
 
@@ -97,7 +113,7 @@ fun clampToHabitBand(argb: Int): Int {
 }
 
 /**
- * Solves for the argb at fixed [hue]/[saturation] whose contrast against [ConstanzaColors.Background]
+ * Solves for the argb at fixed [hue]/[saturation] whose contrast against [HabitBandGround]
  * equals [target], choosing the value branch or the saturation branch exactly as
  * [clampToHabitBand]'s KDoc describes (step 3): value first, and saturation only when value alone
  * cannot reach [target] even at `value = 1f`.
@@ -168,19 +184,19 @@ fun habitBandColor(hue: Float, saturation: Float, bandPosition: Float): Int {
  * third slider when it opens on an existing colour, so editing a habit starts the slider where that
  * colour actually measures instead of resetting it to one end.
  *
- * Measures [argb]'s own contrast against [ConstanzaColors.Background] and maps it back onto `0f..1f`
+ * Measures [argb]'s own contrast against [HabitBandGround] and maps it back onto `0f..1f`
  * across `[`[HABIT_BAND_FLOOR]`, `[HABIT_BAND_CEILING]`]`, the exact inverse of [habitBandColor]'s
  * linear map. Coerced so a colour outside the band (a pre-band-fix legacy value, or pure black/white)
  * still yields a valid, clamped slider position rather than a value the slider cannot represent.
  */
 fun habitBandPositionOf(argb: Int): Float {
-    val ratio = contrastRatio(Color(argb), ConstanzaColors.Background)
+    val ratio = contrastRatio(Color(argb), HabitBandGround)
     val position = (ratio - HABIT_BAND_FLOOR) / (HABIT_BAND_CEILING - HABIT_BAND_FLOOR)
     return position.toFloat().coerceIn(MIN_VALUE, MAX_VALUE)
 }
 
 private fun ratioAt(hue: Float, saturation: Float, value: Float): Double =
-    contrastRatio(Color(Hsv(hue, saturation, value).toArgb()), ConstanzaColors.Background)
+    contrastRatio(Color(Hsv(hue, saturation, value).toArgb()), HabitBandGround)
 
 /** Contrast is monotonically increasing in `value` at fixed hue/saturation, so this is a plain
  *  bisection for the `value` whose contrast equals [target]. [Hsv.toArgb] rounds each channel to a

@@ -25,8 +25,8 @@ private val ChipBorderWidth = 1.dp
  * `ButtonDefaults`/`FilterChipDefaults` directly.
  *
  * **Why this object has to exist.** [Theme.kt][DarkColors] binds M3's two stroke roles by job:
- * `outline` is the control stroke ([ConstanzaColors.ControlStroke], 3.81:1 on the background) and
- * `outlineVariant` is the decorative hairline ([ConstanzaColors.Divider], 1.26:1, which WCAG 2.1
+ * `outline` is the control stroke ([ConstanzaColors.ControlStroke], 3.53:1 on the background) and
+ * `outlineVariant` is the decorative hairline ([ConstanzaColors.Divider], 1.22:1, which WCAG 2.1
  * SC 1.4.11 permits for decoration). That split is correct and is what makes the `Switch` thumb
  * visible again. It is not, however, sufficient, because material3 1.4.0 does not honour the same
  * division: verified in the resolved artifact's sources, `outlineVariant` backs `DividerTokens.Color`
@@ -74,22 +74,22 @@ object ConstanzaControlDefaults {
      * The border for a `FilterChip`, correcting two separate things.
      *
      * *Unselected* is the same correction as [outlinedButtonBorder]: the default reads
-     * `outlineVariant`, so an unselected chip was outlined in the 1.26:1 hairline and read as a bare
+     * `outlineVariant`, so an unselected chip was outlined in the 1.22:1 hairline and read as a bare
      * label with no chip around it.
      *
      * *Selected* is a defect the unselected fix would otherwise have introduced. Material draws a
      * selected filter chip with **no border at all** (`selectedBorderColor = Color.Transparent`,
      * `FlatSelectedOutlineWidth = 0.dp`) and lets its `secondaryContainer` fill carry the state. Here
-     * that fill is [ConstanzaColors.SurfaceSelected], 1.17:1 against the background — so the moment
-     * unselected chips gained a visible 3.81:1 stroke, the *selected* chip became the faintest in the
+     * that fill is [ConstanzaColors.SurfaceSelected], 1.29:1 against the background — so the moment
+     * unselected chips gained a visible 3.53:1 stroke, the *selected* chip became the faintest in the
      * row, which is precisely backwards. Raising the fill is not available: 3:1 against the
      * background needs luminance >= 0.111 and would turn the chip into a light slab. So the selected
-     * chip keeps its fill and gains a stroke at 10.44:1 against the background — a selection
+     * chip keeps its fill and gains a stroke at 15.59:1 against the background — a selection
      * indicator being exactly what [ConstanzaColors.ChromeInteractive]'s own KDoc says it draws.
      * This is not an accent stroke: [ConstanzaColors.ChromeInteractive] is achromatic.
      *
      * Both states carry a stroke of the same width, differing only in colour (two achromatic tones,
-     * 2.74:1 apart), so the row keeps a stable geometry and nothing reflows as the selection moves.
+     * 4.42:1 apart), so the row keeps a stable geometry and nothing reflows as the selection moves.
      */
     @Composable
     fun filterChipBorder(selected: Boolean): BorderStroke = FilterChipDefaults.filterChipBorder(

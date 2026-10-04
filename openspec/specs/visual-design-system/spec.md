@@ -2,9 +2,11 @@
 
 ## Purpose
 
-Defines the app's single dark visual scheme, the accessibility contract for every colour it
-renders, and cold-start rendering behaviour. Exact hex/oklch token values, spacing scale, and
-shape scale are implementation detail and belong in `design.md`, not here.
+Defines the app's single dark visual scheme — a neutral "graphite" ramp of near-achromatic greys —
+its bundled typeface, the accessibility contract for every colour it renders, and cold-start
+rendering behaviour. Exact hex token values, the type scale, spacing scale, and shape scale are
+implementation detail and live in `core/ui/theme/` (`ConstanzaColors`, `Type.kt`, `Shape.kt`), not
+here.
 
 ## Requirements
 
@@ -68,11 +70,42 @@ habit palette the whole neighbourhood of its hue.
 - WHEN the user opens the colour picker
 - THEN no colour is withheld from it on the grounds of being reserved for chrome
 
+### Requirement: Chrome Text And Control Contrast Floors
+
+Chrome text and operable-control tones MUST meet these contrast ratios against the background, the
+surface and the raised surface: primary text at least 12:1, secondary text at least 7:1, muted
+labels and the destructive tone at least 4.5:1. The stroke that draws an operable control (switch
+thumbs and track borders, outlined-field borders, unselected chip outlines) MUST meet at least 3:1
+(WCAG 2.1 SC 1.4.11) against every surface such a control can sit on. A purely decorative divider
+is exempt and MUST stay quieter than the control stroke.
+
+#### Scenario: A design tone below its floor is nudged, not shipped
+- GIVEN a tone from the approved design that measures below its floor on any of those surfaces
+- WHEN the theme is built
+- THEN the shipped token is the minimal same-cast lighter step that clears the floor
+
+#### Scenario: Divider and control stroke stay separate
+- GIVEN the app's colour scheme
+- WHEN the control-stroke role and the divider role are inspected
+- THEN they resolve to different tones and the divider measures lower against the background
+
+### Requirement: Bundled Typeface
+
+The app MUST render its text in Geist, bundled in the APK under its SIL Open Font License, and MUST
+NOT depend on a downloadable-font provider or any network fetch to obtain it, because builds without
+Google Play Services must render identically.
+
+#### Scenario: Typeface renders offline without Play Services
+- GIVEN a device with no network and no Google Play Services
+- WHEN the app is launched
+- THEN its text renders in Geist
+
 ### Requirement: Cold-Start Window Background And System Bar Icons
 
-The pre-Compose window background MUST match the app's dark surface colour. System-bar icon
-appearance MUST be pinned to the style appropriate for a dark background, regardless of the
-device's system-wide light/dark setting.
+The pre-Compose window background MUST match the app's dark background colour exactly. System-bar
+icon appearance MUST be pinned to the style appropriate for a dark background, regardless of the
+device's system-wide light/dark setting. The launcher icon's background layer is not bound by this
+requirement and MAY keep its own colour.
 
 #### Scenario: No light flash on cold start
 - GIVEN the app process is not yet running

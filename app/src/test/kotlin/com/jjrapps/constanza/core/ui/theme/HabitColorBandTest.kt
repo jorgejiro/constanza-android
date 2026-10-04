@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 /**
  * [clampToHabitBand]'s own contract: every custom colour a user can mix must land inside
- * `[7.0, 11.0]` against [ConstanzaColors.Background], and every already-legible preset must be
+ * `[7.0, 11.0]` against [HabitBandGround], and every already-legible preset must be
  * returned untouched.
  *
  * Measured cases below are copied verbatim from [clampToHabitBand]'s own KDoc. Channel comparisons
@@ -67,7 +67,7 @@ class HabitColorBandTest {
                 for (b in 0..CHANNEL_MAX step CHANNEL_STEP) {
                     val argb = OPAQUE or (r shl RED_SHIFT) or (g shl GREEN_SHIFT) or b
                     val clamped = clampToHabitBand(argb)
-                    val ratio = contrastRatio(Color(clamped), ConstanzaColors.Background)
+                    val ratio = contrastRatio(Color(clamped), HabitBandGround)
                     if (ratio < worstLow) {
                         worstLow = ratio
                         worstLowArgb = argb
@@ -134,8 +134,8 @@ class HabitColorBandTest {
             val seededPosition = habitBandPositionOf(habitColor.argb)
             val reconstructed = habitBandColor(hsv.hue, hsv.saturation, seededPosition)
 
-            val originalRatio = contrastRatio(Color(habitColor.argb), ConstanzaColors.Background)
-            val reconstructedRatio = contrastRatio(Color(reconstructed), ConstanzaColors.Background)
+            val originalRatio = contrastRatio(Color(habitColor.argb), HabitBandGround)
+            val reconstructedRatio = contrastRatio(Color(reconstructed), HabitBandGround)
 
             assertTrue(
                 kotlin.math.abs(originalRatio - reconstructedRatio) <= ROUND_TRIP_RATIO_TOLERANCE,
@@ -152,8 +152,8 @@ class HabitColorBandTest {
     }
 
     private fun assertBandBoundary(hue: Float, saturation: Float) {
-        val floorRatio = contrastRatio(Color(habitBandColor(hue, saturation, 0f)), ConstanzaColors.Background)
-        val ceilingRatio = contrastRatio(Color(habitBandColor(hue, saturation, 1f)), ConstanzaColors.Background)
+        val floorRatio = contrastRatio(Color(habitBandColor(hue, saturation, 0f)), HabitBandGround)
+        val ceilingRatio = contrastRatio(Color(habitBandColor(hue, saturation, 1f)), HabitBandGround)
 
         assertTrue(
             kotlin.math.abs(floorRatio - HABIT_BAND_FLOOR) <= HABIT_BAND_TOLERANCE,
@@ -173,7 +173,7 @@ class HabitColorBandTest {
         }
         val bandRange = (HABIT_BAND_FLOOR - HABIT_BAND_TOLERANCE)..(HABIT_BAND_CEILING + HABIT_BAND_TOLERANCE)
         results.forEach { argb ->
-            val ratio = contrastRatio(Color(argb), ConstanzaColors.Background)
+            val ratio = contrastRatio(Color(argb), HabitBandGround)
             assertTrue(
                 ratio in bandRange,
                 "hue=$hue sat=$saturation swept to 0x%06X, measuring %.3f:1, outside $bandRange"

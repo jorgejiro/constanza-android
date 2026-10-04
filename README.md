@@ -260,3 +260,6 @@ people find it.
 ## 📄 License
 
 Distributed under the [MIT License](LICENSE).
+
+The bundled [Geist](https://github.com/vercel/geist-font) typeface is licensed under the
+[SIL Open Font License 1.1](third_party/geist/OFL.txt).
