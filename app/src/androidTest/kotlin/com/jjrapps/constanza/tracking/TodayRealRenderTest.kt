@@ -54,16 +54,16 @@ class TodayRealRenderTest {
         val now = today.atTime(14, 42).atZone(zone).toInstant()
 
         val rows = listOf(
-            row(1, "Hacer movilidad al sol en la primera hora tras levantarme", HabitColor.PINK, DayStatus.ALL_COMPLETED, slot(1, 8 * 60, EntryStatus.COMPLETED)),
-            row(2, "Hacer descansos con movilidad", HabitColor.GREEN, DayStatus.ALL_COMPLETED, slot(2, 10 * 60, EntryStatus.COMPLETED)),
-            row(3, "Empezar a preparar la comida antes de las 14h", HabitColor.PEACH, DayStatus.ANY_MISSED, slot(3, 13 * 60 + 20, EntryStatus.MISSED)),
-            row(4, "Comer sanito, lento y pronto todos los días", HabitColor.MINT, DayStatus.ANY_MISSED, slot(4, 14 * 60 + 52, EntryStatus.MISSED)),
+            row(1, "Hacer movilidad al sol en la primera hora tras levantarme", HabitColor.ROSE, DayStatus.ALL_COMPLETED, slot(1, 8 * 60, EntryStatus.COMPLETED)),
+            row(2, "Hacer descansos con movilidad", HabitColor.SAGE, DayStatus.ALL_COMPLETED, slot(2, 10 * 60, EntryStatus.COMPLETED)),
+            row(3, "Empezar a preparar la comida antes de las 14h", HabitColor.SAND, DayStatus.ANY_MISSED, slot(3, 13 * 60 + 20, EntryStatus.MISSED)),
+            row(4, "Comer sanito, lento y pronto todos los días", HabitColor.OLIVE, DayStatus.ANY_MISSED, slot(4, 14 * 60 + 52, EntryStatus.MISSED)),
             row(5, "Estirar la espalda", HabitColor.TEAL, DayStatus.ALL_SKIPPED, slot(5, 12 * 60, EntryStatus.SKIPPED)),
             // Multi-slot: the one case where the scheduled time still earns its place, because it
             // is the only thing telling these two rows apart.
-            row(6, "Beber agua", HabitColor.CYAN, DayStatus.PARTIAL, slot(6, 11 * 60, EntryStatus.COMPLETED), slot(7, 16 * 60, EntryStatus.MISSED)),
-            row(7, "Cenar antes de las 10 de la noche", HabitColor.LILAC, DayStatus.PENDING, slot(8, 21 * 60, EntryStatus.UNKNOWN)),
-            row(8, "Relax a las 23h", HabitColor.BLUE, DayStatus.PENDING, slot(9, 23 * 60, EntryStatus.UNKNOWN)),
+            row(6, "Beber agua", HabitColor.BLUE, DayStatus.PARTIAL, slot(6, 11 * 60, EntryStatus.COMPLETED), slot(7, 16 * 60, EntryStatus.MISSED)),
+            row(7, "Cenar antes de las 10 de la noche", HabitColor.LAVENDER, DayStatus.PENDING, slot(8, 21 * 60, EntryStatus.UNKNOWN)),
+            row(8, "Relax a las 23h", HabitColor.INDIGO, DayStatus.PENDING, slot(9, 23 * 60, EntryStatus.UNKNOWN)),
         )
 
         val state = TodayUiState(

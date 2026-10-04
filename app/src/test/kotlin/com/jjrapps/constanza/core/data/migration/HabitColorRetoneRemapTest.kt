@@ -1,6 +1,5 @@
 package com.jjrapps.constanza.core.data.migration
 
-import com.jjrapps.constanza.core.ui.theme.HabitColor
 import com.jjrapps.constanza.core.ui.theme.HabitPalette
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,13 +11,16 @@ import kotlin.test.assertTrue
  *  KDoc requires for a value one side of a frozen map used to mean. */
 private const val RETIRED_SILVER = 0xFFE0E0E0.toInt()
 
-/** [clampToHabitBand]'s own measured result for [RETIRED_SILVER] and for pure white alike — both are
+/** [clampToLegacyHabitBand]'s own measured result for [RETIRED_SILVER] and for pure white alike — both are
  *  fully desaturated and above the ceiling, so both converge on the same grey. */
 private const val CLAMPED_RETIRED_SILVER = 0xFFC2C2C2.toInt()
 
 /** The value schema version 5 meant by `BLUE_GREY`, literal for the same reason [RETIRED_SILVER] is
  *  — `HabitColor.BLUE_GREY` no longer exists, retired by schema version 6. */
 private const val RETIRED_BLUE_GREY_IN_SCHEMA_V5 = 0xFF849FAC.toInt()
+
+/** Schema version 5's `TEAL` (`#00AE9D`), literal because the graphite palette retired it. */
+private const val SCHEMA_V5_TEAL = 0xFF00AE9D.toInt()
 
 /**
  * The 22-preset legible-band palette exactly as schema version 5 meant it, as literals — the 17
@@ -112,24 +114,24 @@ class HabitColorRetoneRemapTest {
 
     @Test
     fun `the five presets whose value did not change carry no entry`() {
-        listOf(
-            HabitColor.GREEN,
-            HabitColor.LIGHT_BLUE,
-            HabitColor.LIGHT_GREEN,
-            HabitColor.PINK,
-            HabitColor.ORANGE,
-        ).forEach { unchanged ->
+        mapOf(
+            "GREEN" to 0xFF4CAF50.toInt(),
+            "LIGHT_BLUE" to 0xFF03A9F4.toInt(),
+            "LIGHT_GREEN" to 0xFF7CB342.toInt(),
+            "PINK" to 0xFFF48FB1.toInt(),
+            "ORANGE" to 0xFFFF9800.toInt(),
+        ).forEach { (name, unchanged) ->
             assertEquals(
-                unchanged.argb,
-                HabitColorRetoneRemap.normalize(unchanged.argb),
-                "${unchanged.name} did not change value and must pass through unchanged",
+                unchanged,
+                HabitColorRetoneRemap.normalize(unchanged),
+                "$name did not change value and must pass through unchanged",
             )
         }
     }
 
     /**
      * The retired `SILVER` preset gets no explicit entry on purpose (`HabitColorRetoneRemap`'s KDoc):
-     * it falls through to `clampToHabitBand`, which is asserted here rather than merely assumed, so a
+     * it falls through to `clampToLegacyHabitBand`, which is asserted here rather than merely assumed, so a
      * future change to the map cannot silently start treating `SILVER` as an explicit remap target.
      */
     @Test
@@ -138,10 +140,10 @@ class HabitColorRetoneRemapTest {
     }
 
     /** A colour that was never any version of this palette also falls through to the clamp — if it
-     *  is already legible it survives untouched, exactly as [clampToHabitBand] documents. */
+     *  is already legible it survives untouched, exactly as [clampToLegacyHabitBand] documents. */
     @Test
     fun `a custom colour already inside the band passes through unchanged`() {
-        val alreadyLegible = HabitColor.TEAL.argb
+        val alreadyLegible = SCHEMA_V5_TEAL
 
         assertEquals(alreadyLegible, HabitColorRetoneRemap.normalize(alreadyLegible))
     }

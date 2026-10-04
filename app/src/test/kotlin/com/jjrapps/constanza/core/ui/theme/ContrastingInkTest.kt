@@ -33,11 +33,11 @@ class ContrastingInkTest {
     }
 
     /**
-     * Every offered preset takes the black branch, and that is a consequence rather than a
-     * coincidence: clearing the ratified 4.5:1 floor against `ConstanzaColors.SurfaceSelected`
-     * requires relative luminance >= 0.233, while black stops being the better tick below 0.179. So
-     * on this app's ramp, *any* colour legible enough to be offered is also light enough for a black
-     * tick — which is why the white branch above is exercised with custom colours instead.
+     * Every offered preset takes the black branch: the muted graphite presets sit at relative
+     * luminance 0.30 or above (`LAVENDER`, the darkest, measures 6.20:1 on the background), well
+     * clear of the 0.179 crossover below which white becomes the better tick. That is why the white
+     * branch above is exercised with custom colours instead. Whatever branch a future preset takes,
+     * the next test holds its tick to the 4.5:1 text floor.
      */
     @Test
     fun `every offered preset is light enough to take a black tick`() {

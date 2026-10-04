@@ -87,24 +87,15 @@ internal fun hueSpectrum(): List<Color> =
  * the user's own drag the moment the colour's measured contrast did not land exactly back on the
  * position they set it to.
  *
- * **The third axis is the legibility band itself, not raw brightness.** This colour is about to be
- * painted on a habit's name text (see `clampToHabitBand`'s KDoc for why that needs a floor and a
- * ceiling at all), so what reaches [onConfirm] must sit inside `[7:1, 11:1]` against the app
- * background. An earlier version ran the raw HSV mix through `clampToHabitBand` for preview and
- * commit — but that clamp *rebuilds* an out-of-band colour from scratch at exactly the floor or
- * ceiling, ignoring the caller's `value` once a colour was out of band, so most of the brightness
- * slider was dead: measured over its 101 positions, saturated red produced only 12 distinct outputs
- * (50 of them identical to the maximum), saturated blue only 13 (38 identical). Only the very bottom
- * of the slider looked different, because black has no hue to preserve and clamped to a plain grey
- * instead of the same hue-preserving rebuild every other floor-bound position collapsed onto — this
- * is the "only visible at minimum or maximum" defect that was reported.
- *
- * `bandPosition` below fixes this by driving the *target contrast ratio* directly (see
- * `habitBandColor`'s KDoc): `0f` is the darkest legible colour at the current hue/saturation, `1f`
- * the lightest, and every position in between solves for the colour whose contrast equals that
- * position's point on the band. The result is in-band by construction, not by a downstream clamp —
- * `clampToHabitBand` no longer sits in this dialog's path at all; it stays in place for migrations and
- * imports, which still need to pull an arbitrary stored colour into the band.
+ * **The third axis is the contrast band itself, not raw brightness.** A habit's colour is drawn as
+ * an 8dp identity dot, a non-text graphic, so what reaches [onConfirm] must clear WCAG's 3:1 on every
+ * surface the dot sits on and stay as calm as the muted presets: `habitBandColor`'s
+ * `[3.6:1, 9:1]` band against the app background (its KDoc has the measurements). `bandPosition`
+ * drives the *target contrast ratio* directly: `0f` is the darkest allowed colour at the current
+ * hue/saturation, `1f` the lightest, and every position in between solves for the colour whose
+ * contrast equals that point on the band. The result is in-band by construction — there is no
+ * downstream clamp. (An earlier version ran raw HSV `value` through a clamp that rebuilt every
+ * out-of-band colour at the floor or ceiling, which left most of the slider dead.)
  */
 @Composable
 internal fun CustomColorDialog(initialArgb: Int, onConfirm: (Int) -> Unit, onDismiss: () -> Unit) {

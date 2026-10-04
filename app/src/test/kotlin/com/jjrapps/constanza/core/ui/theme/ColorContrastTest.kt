@@ -10,16 +10,13 @@ import kotlin.test.assertTrue
  * Asserts the accessibility contract as JVM unit tests instead of trusting a table in a PR
  * (Engram #47, point 10a; ported from the sibling app's `sleep-noise-android` `ColorContrastTest`).
  *
- * Spec `Habit Colour And Accent Contrast Floor` / `Contrast Floors Asserted By Automated Test`: every
- * offered habit colour MUST clear **4.5:1** against both [ConstanzaColors.Background] and
- * [ConstanzaColors.SurfaceSelected] — one floor, not a lighter graphics-only tier. That reason used to
- * be anticipatory ("a habit colour also has to carry the habit name as adjacent text"); it is now
- * literal, because the habit colour *is* the habit name's text colour (`TodayScreen`,
- * `HabitListScreen`) rather than a swatch beside it.
- *
- * The floor asserted here stays the spec's 4.5:1 rather than the palette's current headroom — a
- * future re-tone should fail this test before it ships, not after. `HabitPaletteTest` separately
- * pins the tighter `[7:1, 11:1]` band that re-tone actually targets.
+ * Spec `Habit Colour Contrast Floor` / `Contrast Floors Asserted By Automated Test` (graphite
+ * redesign T2): a habit's colour is now only an identity dot — a non-text graphic — while its name
+ * renders in the text colour, so every offered habit colour MUST clear WCAG 2.1 SC 1.4.11's **3:1**
+ * against [ConstanzaColors.Background], [ConstanzaColors.Surface] and [ConstanzaColors.SurfaceRaised].
+ * The floor asserted here is the spec's 3:1, not the muted palette's current headroom (5.27:1 at its
+ * lowest) — a future re-tone should fail this test before it ships, not after. Custom colours are
+ * held to the same floor by `HabitColorBandTest`.
  *
  * Graphite text floors (`odd/tasks/graphite-redesign.md` T1): primary text >= 12:1, secondary text
  * >= 7:1 and muted labels >= 4.5:1 on [ConstanzaColors.Background], [ConstanzaColors.Surface] and
@@ -29,25 +26,13 @@ import kotlin.test.assertTrue
 class ColorContrastTest {
 
     @Test
-    fun `every habit colour clears the floor against the background`() {
+    fun `every habit colour clears the non-text floor against the background`() {
         HabitColor.entries.forEach { habitColor ->
             assertRatioAtLeast(
                 foreground = habitColor.composeColor,
                 background = ConstanzaColors.Background,
-                minimum = CONTRAST_FLOOR,
+                minimum = NON_TEXT_FLOOR,
                 label = "${habitColor.name} on Background",
-            )
-        }
-    }
-
-    @Test
-    fun `every habit colour clears the floor against the selected surface`() {
-        HabitColor.entries.forEach { habitColor ->
-            assertRatioAtLeast(
-                foreground = habitColor.composeColor,
-                background = ConstanzaColors.SurfaceSelected,
-                minimum = CONTRAST_FLOOR,
-                label = "${habitColor.name} on SurfaceSelected",
             )
         }
     }
@@ -107,24 +92,24 @@ class ColorContrastTest {
      * and `ExactAlarmBanner`'s explicit `Surface`, both of which carry body text.
      */
     @Test
-    fun `every habit colour clears the floor against the surface container`() {
+    fun `every habit colour clears the non-text floor against the surface container`() {
         HabitColor.entries.forEach { habitColor ->
             assertRatioAtLeast(
                 foreground = habitColor.composeColor,
                 background = ConstanzaColors.Surface,
-                minimum = CONTRAST_FLOOR,
+                minimum = NON_TEXT_FLOOR,
                 label = "${habitColor.name} on Surface",
             )
         }
     }
 
     @Test
-    fun `every habit colour clears the floor against the raised surface container`() {
+    fun `every habit colour clears the non-text floor against the raised surface container`() {
         HabitColor.entries.forEach { habitColor ->
             assertRatioAtLeast(
                 foreground = habitColor.composeColor,
                 background = ConstanzaColors.SurfaceRaised,
-                minimum = CONTRAST_FLOOR,
+                minimum = NON_TEXT_FLOOR,
                 label = "${habitColor.name} on SurfaceRaised",
             )
         }
@@ -218,25 +203,6 @@ class ColorContrastTest {
         surfacesGlyphsSitOn().forEach { (name, surface) ->
             assertRatioAtLeast(ConstanzaColors.StatusMissed, surface, NON_TEXT_FLOOR, "StatusMissed on $name")
         }
-    }
-
-    /**
-     * Both status glyphs must also sit BELOW the habit palette's own `[7:1, 11:1]` band floor
-     * (6.98:1) on [ConstanzaColors.Background] — identity should read a shade louder than state,
-     * the same rule [ColorContrastTest]'s class doc records for both tokens.
-     */
-    @Test
-    fun `both status glyphs read quieter than the habit palette's own contrast floor`() {
-        val paletteFloor = HabitColor.entries.minOf { contrastRatio(it.composeColor, ConstanzaColors.Background) }
-        listOf("StatusCompleted" to ConstanzaColors.StatusCompleted, "StatusMissed" to ConstanzaColors.StatusMissed)
-            .forEach { (name, color) ->
-                val ratio = contrastRatio(color, ConstanzaColors.Background)
-                assertTrue(
-                    actual = ratio < paletteFloor,
-                    message = "$name measured %.2f:1 on Background, not below the habit palette's own %.2f:1 floor"
-                        .format(ratio, paletteFloor),
-                )
-            }
     }
 
     // ------------------------------------------------------------------------------------------
@@ -564,7 +530,7 @@ class ColorContrastTest {
     }
 
     private companion object {
-        /** Spec `Habit Colour And Accent Contrast Floor`: one 4.5:1 floor for both surfaces. */
+        /** WCAG 2.1 SC 1.4.3 AA body-text floor: muted labels, the destructive tone, chrome text. */
         const val CONTRAST_FLOOR = 4.5
 
         /** WCAG 2.1 SC 1.4.11 Non-text Contrast: user-interface components and their states. */
