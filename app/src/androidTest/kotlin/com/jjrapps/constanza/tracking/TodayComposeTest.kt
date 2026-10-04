@@ -66,7 +66,7 @@ class TodayComposeTest {
         viewModel.awaitOneRowWithSlots(2)
 
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
-        composeTestRule.onNodeWithText(text(R.string.today_expand)).performClick()
+        composeTestRule.onNodeWithContentDescription(text(R.string.today_expand)).performClick()
         composeTestRule.onAllNodes(isAnswerYesButton())[0].performClick()
         // today-status-icons: the answered slot's glyph carries the localised label as its
         // `contentDescription` now, not `EntryStatus.COMPLETED.name` — which is what this row used
@@ -127,20 +127,22 @@ class TodayComposeTest {
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
 
         // Collapsed: the expand affordance is on screen, so no slot line is.
-        composeTestRule.onNodeWithText(text(R.string.today_expand)).assertExists()
+        composeTestRule.onNodeWithContentDescription(text(R.string.today_expand)).assertExists()
         composeTestRule.onAllNodes(isAnswerYesButton()).assertCountEquals(0)
 
         // Answer one slot through the expanded view, then collapse again, so the row has a rollup
         // that is neither "all done" nor untouched — PARTIAL is the state a collapsed row is least
         // able to imply from anything else on screen.
-        composeTestRule.onNodeWithText(text(R.string.today_expand)).performClick()
+        composeTestRule.onNodeWithContentDescription(text(R.string.today_expand)).performClick()
         composeTestRule.onAllNodes(isAnswerYesButton())[0].performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.COMPLETED)
-        composeTestRule.onNodeWithText(text(R.string.today_collapse)).performClick()
+        composeTestRule.onNodeWithContentDescription(text(R.string.today_collapse)).performClick()
 
-        composeTestRule.onNodeWithText(text(R.string.today_expand)).assertExists()
+        composeTestRule.onNodeWithContentDescription(text(R.string.today_expand)).assertExists()
         composeTestRule.onAllNodes(isAnswerYesButton()).assertCountEquals(0)
-        composeTestRule.onNodeWithText(text(R.string.today_status_partial), substring = true).assertExists()
+        // Graphite redesign: the rollup word is no longer drawn (the reminder segments replace it) but
+        // still leads the summary's accessible label, which is where it is asserted now.
+        composeTestRule.onNodeWithContentDescription(text(R.string.today_status_partial), substring = true).assertExists()
     }
 
     /**

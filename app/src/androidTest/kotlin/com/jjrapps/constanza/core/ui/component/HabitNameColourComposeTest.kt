@@ -2,12 +2,16 @@ package com.jjrapps.constanza.core.ui.component
 
 import android.content.Context
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.domain.model.Habit
 import com.jjrapps.constanza.domain.model.Schedule
 import com.jjrapps.constanza.habit.HabitListRoute
@@ -17,6 +21,8 @@ import com.jjrapps.constanza.tracking.todayViewModel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -70,17 +76,41 @@ class HabitNameColourComposeTest {
     @After
     fun tearDown() = fixture.close()
 
+    /**
+     * Graphite redesign (`visual-design-system`: the habit colour is shown only as a dot): on Today
+     * the 8dp [HabitDot] carries the habit's colour and the name renders in the text colour.
+     *
+     * The dot is found through its [HabitDotColor] semantics hook in the unmerged tree. The name's
+     * colour is read from the laid-out text itself ([SemanticsActions.GetTextLayoutResult]), which
+     * is where `Text`'s own `color` parameter ends up — the span check alone could not see it.
+     */
     @Test
-    fun theHabitNameRendersInTheHabitsOwnColourOnTheTodayScreen() = runBlocking {
+    fun theDotCarriesTheHabitColourAndTheNameDoesNotOnTheTodayScreen() = runBlocking {
         fixture.habitRepository.create(habitWithColor(HABIT_NAME, HABIT_COLOR_ARGB), Schedule.Daily())
         val viewModel = fixture.todayViewModel()
 
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
         awaitNodeWithText(HABIT_NAME)
 
-        assertNameColour(HABIT_NAME, HABIT_COLOR_ARGB)
+        val dot = composeTestRule.onNode(SemanticsMatcher.keyIsDefined(HabitDotColor), useUnmergedTree = true)
+            .fetchSemanticsNode()
+        assertEquals("the dot must paint the habit's own colour", Color(HABIT_COLOR_ARGB), dot.config[HabitDotColor])
+
+        val nameNode = composeTestRule.onNodeWithText(HABIT_NAME).fetchSemanticsNode()
+        val layouts = mutableListOf<TextLayoutResult>()
+        nameNode.config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+        val nameColour = layouts.first().layoutInput.style.color
+        assertEquals("the name must render in the text colour", ConstanzaColors.OnBackground, nameColour)
+        assertNotEquals("the name must not render in the habit colour", Color(HABIT_COLOR_ARGB), nameColour)
+        val annotated = nameNode.config[SemanticsProperties.Text].first { it.text.contains(HABIT_NAME) }
+        assertTrue(
+            "no span of the name may carry the habit colour",
+            annotated.spanStyles.none { it.item.color == Color(HABIT_COLOR_ARGB) },
+        )
     }
 
+    /** Habit list half — still the pre-graphite assertion (name painted in the habit colour);
+     *  the habit-list redesign (T4 of graphite-redesign) moves it onto the dot like Today. */
     @Test
     fun theHabitNameRendersInEachHabitsOwnColourOnTheHabitListScreenAndDistinguishesTwoHabits() = runBlocking {
         fixture.habitRepository.create(habitWithColor("Read", HABIT_COLOR_ARGB), Schedule.Daily())
