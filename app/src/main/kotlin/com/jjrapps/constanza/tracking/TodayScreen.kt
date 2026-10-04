@@ -1,5 +1,3 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-
 package com.jjrapps.constanza.tracking
 
 import androidx.compose.foundation.clickable
@@ -16,15 +14,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -135,9 +128,10 @@ fun TodayScreen(
             },
         )
     }
-    val dateNavActions = remember(onPreviousDay, onNextDay, onToday) {
-        DateNavActions(onPreviousDay, onNextDay, onToday)
+    val headerActions = remember(onManageHabits, onOpenSettings, onPreviousDay, onNextDay, onToday) {
+        TodayHeaderActions(onManageHabits, onOpenSettings, onPreviousDay, onNextDay, onToday)
     }
+    val progress = remember(state.rows) { todayProgress(state.rows) }
     changeDialogTarget?.let { target ->
         ChangeAnswerDialog(
             habitName = target.habitName,
@@ -157,27 +151,9 @@ fun TodayScreen(
         )
     }
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.today_title)) },
-                actions = {
-                    TextButton(onClick = onManageHabits) {
-                        Text(stringResource(R.string.today_manage_habits))
-                    }
-                    // today-status-icons: a gear is the single most universally recognised icon in
-                    // mobile UI, and the top bar is exactly where horizontal space is scarcest — a
-                    // clear win for an icon over the word here. `Icons.Filled.Settings` is part of
-                    // `material-icons-core` (app/build.gradle.kts), the only icon artifact this
-                    // project depends on.
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = stringResource(R.string.today_settings),
-                        )
-                    }
-                },
-            )
-        },
+        // Graphite redesign: the header replaces the `TopAppBar` and the date bar that sat under
+        // it. As the top bar it stays fixed above both of [TodayContent]'s layouts.
+        topBar = { TodayHeader(state.date, state.isPastDay, progress, headerActions) },
         // today-add-habit-is-not-a-fab: the same slot, the same icon and the same corner
         // `HabitListScreen` uses, so the two screens agree on what creating a habit looks like.
         //
@@ -190,7 +166,7 @@ fun TodayScreen(
         floatingActionButton = { if (!state.isPastDay) TodayAddHabitFab(onAddHabit) },
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
-            TodayContent(state, onToggleExpanded, actions, onNotificationPermissionRequested, dateNavActions)
+            TodayContent(state, onToggleExpanded, actions, onNotificationPermissionRequested)
         }
     }
 }
@@ -243,17 +219,6 @@ private data class SlotActions(
  *  frame the dialog opened). */
 private data class ChangeDialogTarget(val habitId: Long, val habitName: String, val slot: TodaySlot)
 
-/** today-past-day-correction, design.md decision 4: [TodayContent] already carries 5 parameters;
- *  three more loose callbacks would push it to 8, past detekt's unconfigured `LongParameterList`
- *  default of 6 — and the `@Suppress("LongParameterList")` on `fun TodayScreen` above covers only
- *  that declaration, never this private sibling. Built the same way [SlotActions] is: one holder
- *  instead of three separate parameters. */
-private data class DateNavActions(
-    val onPreviousDay: () -> Unit,
-    val onNextDay: () -> Unit,
-    val onToday: () -> Unit,
-)
-
 /** today-add-habit-is-not-a-fab: `TodayContentActions` used to bundle `onAddHabit` with
  *  `onNotificationPermissionRequested`, because with [DateNavActions] alongside them
  *  [TodayContent] would have carried six loose parameters and detekt's unconfigured
@@ -266,7 +231,6 @@ private fun TodayContent(
     onToggleExpanded: (Long) -> Unit,
     actions: SlotActions,
     onNotificationPermissionRequested: () -> Unit,
-    dateNavActions: DateNavActions,
 ) {
     // Two layouts, chosen by whether there is a list at all, rather than one LazyColumn with an
     // empty branch inside it. A `fillParentMaxSize` item is sized against the whole viewport and
@@ -280,13 +244,6 @@ private fun TodayContent(
     // presence is the "you are not on today" signal, and a signal that scrolls away is not one.
     if (state.rows.isEmpty()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            TodayDateBar(
-                state.date,
-                state.isPastDay,
-                dateNavActions.onPreviousDay,
-                dateNavActions.onNextDay,
-                dateNavActions.onToday,
-            )
             TodayPermissionBanners(state, onNotificationPermissionRequested)
             if (state.isPastDay) {
                 TodayPastDayEmptyState(modifier = Modifier.weight(1f))
@@ -297,13 +254,6 @@ private fun TodayContent(
         return
     }
     Column(modifier = Modifier.fillMaxSize()) {
-        TodayDateBar(
-            state.date,
-            state.isPastDay,
-            dateNavActions.onPreviousDay,
-            dateNavActions.onNextDay,
-            dateNavActions.onToday,
-        )
         // today-add-habit-is-not-a-fab: the trailing add-habit item that used to close this list is
         // gone, and with it the vertical padding it happened to leave at the end. The FAB floats
         // over the list rather than scrolling with it, so without this the last habit's answer
@@ -323,7 +273,6 @@ private fun TodayContent(
             state.sections.forEach { section ->
                 val muted = section.kind == TodaySectionKind.DONE
                 item(key = "section-header-${section.kind}") { TodaySectionHeader(section.kind) }
-                item(key = "section-divider-${section.kind}") { TodaySectionDivider() }
                 items(section.rows, key = { it.habitId }) { row ->
                     val expanded = row.habitId in state.expandedHabitIds
                     HabitRollupRow(row, expanded, state.zone, onToggleExpanded, actions, muted)

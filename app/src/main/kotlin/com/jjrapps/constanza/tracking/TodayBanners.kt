@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -21,9 +22,13 @@ import androidx.compose.ui.unit.dp
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.core.ui.theme.ConstanzaShapes
+import com.jjrapps.constanza.core.ui.theme.Spacing
 import com.jjrapps.constanza.reminding.NotificationPermissionDecision
 
 /**
+ * Graphite redesign: both banners sit on the neutral [ConstanzaColors.Surface] card tone, inset
+ * to the screen margin, with secondary-tone body text — a notice, not an alarm, and no warm tint.
+ *
  * The Today screen's two permission banners, kept together and out of [TodayScreen] so the file
  * that owns the habit list is not also the file that owns every permission affordance. They are
  * deliberately the same shape — the same tonal [Surface], the same load-bearing `weight(1f)` — so
@@ -91,7 +96,7 @@ internal fun NotificationPermissionBanner(
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { onPermissionRequested() }
-    Surface(color = ConstanzaColors.SurfaceRaised, shape = ConstanzaShapes.medium) {
+    BannerSurface {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -101,6 +106,8 @@ internal fun NotificationPermissionBanner(
             Text(
                 stringResource(R.string.today_notification_permission_banner),
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = ConstanzaColors.OnBackgroundVariant,
             )
             TextButton(onClick = {
                 if (blocked) {
@@ -135,7 +142,7 @@ internal fun NotificationPermissionBanner(
 @Composable
 internal fun ExactAlarmBanner() {
     val context = LocalContext.current
-    Surface(color = ConstanzaColors.SurfaceRaised, shape = ConstanzaShapes.medium) {
+    BannerSurface {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -149,6 +156,8 @@ internal fun ExactAlarmBanner() {
             Text(
                 stringResource(R.string.today_exact_alarm_banner),
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = ConstanzaColors.OnBackgroundVariant,
             )
             TextButton(onClick = {
                 val uri = Uri.parse("package:${context.packageName}")
@@ -158,4 +167,16 @@ internal fun ExactAlarmBanner() {
             }
         }
     }
+}
+
+/** The one container both banners share, so they read as one family: the neutral card tone, the
+ *  16dp card corner, inset to the screen margin with a little air above and below. */
+@Composable
+private fun BannerSurface(content: @Composable () -> Unit) {
+    Surface(
+        color = ConstanzaColors.Surface,
+        shape = ConstanzaShapes.medium,
+        modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.xs),
+        content = content,
+    )
 }

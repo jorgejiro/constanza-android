@@ -430,8 +430,8 @@ class CoreFlowE2ETest {
      * reminder.
      */
     private fun addHabitThroughTheUi(name: String) {
-        awaitText(string(R.string.today_manage_habits))
-        compose.onNodeWithText(string(R.string.today_manage_habits)).performClick()
+        awaitContentDescription(string(R.string.today_manage_habits))
+        compose.onNodeWithContentDescription(string(R.string.today_manage_habits)).performClick()
 
         awaitContentDescription(string(R.string.habit_list_add_habit))
         compose.onNodeWithContentDescription(string(R.string.habit_list_add_habit)).performClick()

@@ -56,6 +56,9 @@ object Spacing {
  * below the 48dp minimum touch target on its short 28dp side, so [AnswerPillTouchTarget] is the
  * square hit box the pill is centred inside rather than a size the pill itself ever draws at.
  *
+ * [CompactIconButton] is the graphite 44dp icon button (Today's header actions and day chevrons);
+ * [ProgressBar] is the Today progress line's thickness.
+ *
  * [MinTouchTarget] (today-one-line-row, vertical-rhythm correction) is the standard 48dp Android
  * accessible minimum, same value as [SwatchTouchTarget]/[AnswerPillTouchTarget] but named
  * generically because it is applied to a whole Today ROW now, not one small control inside it: an
@@ -78,5 +81,7 @@ object Dimens {
     val AnswerPillWidth = 46.dp
     val AnswerPillHeight = 28.dp
     val AnswerPillTouchTarget = 48.dp
+    val CompactIconButton = 44.dp
+    val ProgressBar = 4.dp
     val MinTouchTarget = 48.dp
 }

@@ -7,14 +7,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.core.ui.theme.Spacing
 
 /**
@@ -53,7 +57,7 @@ internal fun TodayEmptyState(modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(stringResource(R.string.today_empty))
+        Text(stringResource(R.string.today_empty), color = ConstanzaColors.OnBackgroundVariant)
     }
 }
 
@@ -79,12 +83,21 @@ internal fun TodayEmptyState(modifier: Modifier = Modifier) {
  * `today-past-day-correction` design decision 5: a habit's schedule starts when it is created, so
  * dating one three weeks back means nothing, and that change's own convention is that unavailable
  * navigation is structurally absent rather than greyed out.
+ *
+ * Graphite redesign: light-filled (`primary`, the interactive chrome tone, with its dark ink) on
+ * the 18dp `shapes.large` corner, and flat — M3's default container is the dark selected tone,
+ * which disappeared into the graphite ground. No elevation shadow: on a near-black background a
+ * shadow only muddies the edge the light fill already draws.
  */
 @Composable
 internal fun TodayAddHabitFab(onAddHabit: () -> Unit) {
     FloatingActionButton(
         onClick = onAddHabit,
         modifier = Modifier.testTag(TODAY_ADD_HABIT_FAB_TEST_TAG),
+        shape = MaterialTheme.shapes.large,
+        containerColor = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+        elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp),
     ) {
         Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.today_add_habit))
     }
