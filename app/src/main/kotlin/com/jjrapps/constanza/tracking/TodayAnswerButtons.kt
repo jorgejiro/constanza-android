@@ -20,9 +20,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.icons.ConstanzaIcons
@@ -100,31 +98,5 @@ private fun AnswerButton(
         ) {
             Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(ANSWER_ICON_SIZE))
         }
-    }
-}
-
-/**
- * today-one-line-row, vertical-rhythm fix: reports [paintedHeight] upward to whatever measures
- * this element — typically a `Row` sizing itself against its tallest child — instead of this
- * element's own true measured height, and centres the real content around that smaller reported
- * box. Nothing about the element's REAL size, position or hit-test area changes: Compose's
- * semantics tree reads the actual placed child and its true coordinates, never what a `layout {}`
- * modifier merely reports to its own parent, so a test's `fetchSemanticsNode().boundsInRoot` on
- * whatever this wraps stays exactly what it was measured at. Only the space the immediate PARENT
- * reserves for this child shrinks — the true content overlaps into whatever padding or whitespace
- * already surrounds it, rather than pushing that parent to grow.
- *
- * This is the general mechanism behind [Dimens.AnswerPillTouchTarget] sitting inside a pending
- * row without inflating it — [Dimens.Swatch] sits inside [Dimens.SwatchTouchTarget] for free
- * because `HabitColorPicker`'s grid already allocates a 48dp cell per swatch; a Today row has no
- * such fixed cell, so the overlap has to be built by hand here instead. `internal`, not `private`
- * — `TodayScreen.kt`'s multi-slot header applies this identical fix to its own expand/collapse
- * control, whose own touch-target padding was the second half of the same class of defect.
- */
-internal fun Modifier.reportPaintedHeight(paintedHeight: Dp) = layout { measurable, constraints ->
-    val placeable = measurable.measure(constraints)
-    val reportedHeight = paintedHeight.roundToPx()
-    layout(placeable.width, reportedHeight) {
-        placeable.place(0, (reportedHeight - placeable.height) / 2)
     }
 }

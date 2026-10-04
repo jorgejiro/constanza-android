@@ -6,17 +6,20 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.service.notification.StatusBarNotification
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.app.NotificationManagerCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.jjrapps.constanza.core.di.ReminderSettingsDataStoreEntryPoint
 import com.jjrapps.constanza.core.ui.MainActivity
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.core.ui.theme.HabitColor
 import com.jjrapps.constanza.localization.AppLocaleController
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -104,37 +107,27 @@ class NotificationPosterInstrumentedTest {
     }
 
     /**
-     * Task 6.5's accent claim (`ui-design-system` spec: a habit's colour is its identity wherever
-     * the habit appears, including outside the app). Guards exactly one link:
-     * `NotificationPoster.setColor` carries the `colorArgb` it is handed through to the system
-     * notification unchanged, so the accent a user sees in the shade is the habit's stored colour
-     * and not a framework default.
-     *
-     * That is one half of the chain. The other half — that colours already persisted before the
-     * warm-dark palette landed were actually rewritten to a current-palette value — is proven by
-     * `AppDatabaseMigrationTest`, which asserts the post-migration row VALUES rather than merely
-     * that `MIGRATION_1_2` completed. Together the two close the claim end to end: the migration
-     * proves the stored int is on-palette, and this test proves the stored int is what gets posted.
-     *
-     * The input is [HabitColor.TEAL] rather than a hex literal, so the test also documents the
-     * live palette and fails if a re-tone ever changes it out from under this assertion instead of
-     * asserting against a colour the app can no longer produce.
+     * Graphite redesign: the notification accent is the app's neutral interactive tone
+     * ([ConstanzaColors.ChromeInteractive], #ECECEE) for every habit, no longer the habit's own
+     * colour. Posted with a palette colour that differs from that tone, so the assertion fails if
+     * `NotificationPoster` ever goes back to painting the colour it is handed.
      */
     @Test
-    fun postedNotificationCarriesTheHabitColourAsItsAccent() = runBlocking {
-        val expectedColor = HabitColor.TEAL.argb
+    fun postedNotificationCarriesTheNeutralAccentWhateverTheHabitColour(): Unit = runBlocking {
+        val habitColor = HabitColor.TEAL.argb
         assertTrue(
             "postReminder must report a real post when notifications are enabled",
-            poster.postReminder(ACCENT_OCCURRENCE_ID, "Stretch", expectedColor),
+            poster.postReminder(ACCENT_OCCURRENCE_ID, "Stretch", habitColor),
         )
 
         val posted = awaitPosted(ACCENT_OCCURRENCE_ID)
         assertEquals(
-            "Notification.color must be the habit's stored colourArgb byte-for-byte — this is the " +
-                "only place NotificationPoster.setColor's effect is observable.",
-            expectedColor,
+            "Notification.color must be the neutral accent #ECECEE, not the habit colour — this is " +
+                "the only place NotificationPoster.setColor's effect is observable.",
+            ConstanzaColors.ChromeInteractive.toArgb(),
             posted.notification.color,
         )
+        assertNotEquals(habitColor, posted.notification.color)
     }
 
     /**

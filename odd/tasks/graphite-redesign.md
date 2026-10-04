@@ -32,7 +32,7 @@ Strategy: ask-on-risk resolved by owner policy (no process prompts) → work-uni
 ## Tasks
 - [x] T1 Theme foundation: graphite tokens, M3 mapping, Geist typography, window background, contrast tests, visual-design-system spec. Route: delegated (writer trigger, 2+ non-trivial files).
 - [x] T2 Muted 12-colour palette: enum, colour band for a non-text dot, picker + custom dialog, DB v8 remap + backup schema 5 normalisation, tests, seeds, habit-management/data-portability specs. Route: delegated.
-- [ ] T3 Today screen: dot + neutral names, round answer buttons, answered glyphs, section headers, progress bar, reminder segments, FAB, notification accent; migrate tests. Route: delegated.
+- [x] T3 Today screen: dot + neutral names, round answer buttons, answered glyphs, section headers, progress bar, reminder segments, FAB, notification accent; migrate tests. Route: delegated.
 - [ ] T4 Habit list: dot, schedule subtitle (new data flow), menu, archived switch; rewrite HabitNameColourComposeTest. Route: delegated.
 - [ ] T5 Editor, Progress, Settings, Onboarding restyle. Route: delegated.
 - [ ] T6 Full verification: `./gradlew check`, `assembleDebug`, `:app:emulatorMatrixGroupDebugAndroidTest`, rendered review on emulator. Route: delegated verifier.
@@ -80,6 +80,39 @@ Hand-off notes:
 - **T5:** `CustomColorDialog` sliders unchanged in UX; editing an old custom colour lighter than 9:1 seeds the slider at 1f and re-solves on confirm.
 - Native review: not run by the writer (parent owns RDD assessment).
 
+### T3 — done, commits `9340811`, `81d8e56`, `dd63fa7`, `ae3b7fb`
+Route: delegated writer (writer trigger). Commits (additions+deletions):
+- `9340811` feat(today): graphite header with day progress line — 15 files, +494/-189 (683).
+- `81d8e56` feat(today): round neutral answer buttons and glyphs — 14 files, +250/-255 (505).
+- `dd63fa7` feat(today): dot-led rows with reminder segments — 14 files, +529/-538 (1067; over the ~900 budget because the old row code leaves `TodayScreen.kt` and the new rows land in `TodayHabitRows.kt` in the same unit — they cannot compile apart).
+- `ae3b7fb` feat(reminding): neutral notification accent — 3 files, +35/-28 (63).
+Each commit compiled and kept unit tests green (`:app:testDebugUnitTest :app:detektMain :app:lintDebug :app:compileDebugAndroidTestKotlin` run per commit).
+
+Test-first: `TodayProgressTest` written first against stub `todayProgress`/`reminderProgress` → RED (3 of 5 failed), then implemented → GREEN.
+
+Verification (JAVA_HOME = Android Studio JBR), on `ae3b7fb`:
+- `:domain:test` → 57 tests, 0 failures (XML).
+- `:app:testDebugUnitTest` → 361 tests, 0 failures/errors (XML; 357 − 2 retired status-glyph contrast tests + 1 neutral-glyph contrast test + 5 progress tests).
+- `:app:detektMain` → pass. `:app:compileDebugAndroidTestKotlin` → pass.
+- `:app:lintDebug` → 0 errors (the `LocalDate.EPOCH` NewApi is fixed via `LocalDate.ofEpochDay(0)`); 9 pre-existing warnings.
+- `:app:emulatorMatrixGroupDebugAndroidTest` (full suite, same tree) → api31: 207 tests, 0 failures, 3 skipped; api37: 207 tests, 0 failures, 6 skipped (API-level assumption skips, pre-existing). Includes all Today/tracking classes, CoreFlowE2ETest, TodayAddHabitE2ETest, NotificationPosterInstrumentedTest, HabitNameColourComposeTest.
+- Render: `TodayRealRenderTest` on api37 (board data, 360dp @2.625), PNG recovered from the pulled logcat → `/private/tmp/claude-501/-Users-jorge-dev-constanza-android/393ec5f2-5fc2-4458-93b1-0cc69a55357b/scratchpad/t3-today.png` (English; `ProvideAppLocale` only bites below API 33).
+
+What changed: header (title, list/sliders icon buttons from new `core/ui/icons/ConstanzaIcons`, long date + 44dp chevrons trailing it, "Today" jump in the title row on a past day, "N of M" + 4dp bar, omitted when nothing is due); section headers labelMedium in OnBackgroundMuted, no divider (shared `SectionHeader`, so Settings headings change too); rows with `core/ui/component/HabitDot` (50% alpha in Answered), neutral names, time/snooze subtitle; round ✕/✓ 44dp buttons in 48dp targets (✓ filled in Now); neutral glyphs; multi-reminder segments (unanswered = SurfaceSelected) + "x of N · next HH:MM" with the day rollup in the accessible label; 44dp chevron expander; light-filled flat FAB; banners on Surface; notification accent #ECECEE. StatusCompleted/StatusMissed and AnswerPill* dims retired.
+
+Deviations:
+- "x of N" strings are plain strings, not plurals: neither EN nor ES inflects "N of M".
+- Pending single-slot rows show the reminder time again as subtitle (board), reversing today-status-icons point 3; `TodaySlotRowComposeTest.theSlotTimeIsAbsentOnASingleSlotHabit` became `theSlotTimeIsTheSubtitleOfAPendingSingleSlotHabit`.
+- `NotificationPoster.postReminder` keeps its now-unused `colorArgb` (suppressed) because `scheduling/ReminderFireWorker.kt` is outside the T3 surface.
+- `TodayRealRenderTest` now logs the PNG as base64 chunks (GMD uninstalls `filesDir`).
+- `dd63fa7` exceeds ~900 lines (see above).
+
+Hand-off notes:
+- **T4:** reuse `HabitDot` (exposes `HabitDotColor` semantics for tests) and `ConstanzaIcons`; the habit-list half of `HabitNameColourComposeTest` still asserts the habit colour on the name span and must flip to the dot. `HabitListScreen.kt:269` comment still cites the removed `TodayScreen.demotedSuffix`.
+- **T5:** `SectionHeader` is already in the graphite label style (affects Settings sections). `SectionDivider` still exists for Settings.
+- Out of surface, stale: `res/drawable/ic_launcher_foreground.xml` comment cites `ConstanzaColors.StatusCompleted` (token retired; colour value unchanged in the drawable); `ReminderFireWorker` still passes `habit.colorArgb`.
+- Native review: not run by the writer (parent owns RDD assessment).
+
 ### Native review log
 - T1 `131117e`..`7f55a2a` (775 lines): granted → approved, acknowledged (lineage review-fca3c9fb01a9e39f). 2 WARNING + 1 SUGGESTION informational (migration test ground → fixed in T2; ReminderTimeField selected contrast → T5; spec floors unproved → covered in T2).
 - T2 first attempt (2253 / 1835 lines): granted, stopped `lens_context_budget_exceeded`. Owner chose to split; T2 rewritten into `fa8b44b`, `5b3ad96`, `83e127c`, `e553317`, `a47ac1d`, `01154eb` (tree identical to `backup/graphite-t2`).
@@ -87,4 +120,4 @@ Hand-off notes:
 - Owner raised the slicing budget to ~900 lines (2026-10-04). The native reviewer context budget is not configurable.
 
 ## Next step
-T3.
+T4.

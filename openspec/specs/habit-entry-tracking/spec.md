@@ -138,14 +138,18 @@ An occurrence with a live snooze that is never answered MUST still resolve to `M
 
 The `:domain` module MUST expose a pure function that collapses all of a habit's `Entry` rows for a single date into one day-level status, independent of any UI. Separately, the today screen MUST display each due occurrence's state per slot rather than only the collapsed day-level status.
 
-A pending slot (`UNKNOWN`) MUST display its three answer actions (Yes, No, Skip). An answered slot (`COMPLETED`, `MISSED`, or `SKIPPED`) MUST instead display text naming its specific answer (Done, Missed, or Skipped — never a generic "answered" label) plus exactly one control to change it, never relying on colour or position alone. That control MUST be reachable and operable without a gesture, with an accessible label distinguishing its slot from every other slot on screen. This applies identically to the single-slot row and an expanded multi-slot row; the day-level rollup row is unaffected and out of scope.
+A pending slot (`UNKNOWN`) MUST display exactly two answer controls: a round "No" control drawn as a cross (✕) followed by a round "Yes" control drawn as a tick (✓), each with a touch target of at least 48dp and an accessible label naming its answer and its habit. Neither control is coloured green or red; in the "Now" section the "Yes" control is the one filled control, elsewhere both are outlined. Skip is not offered on the pending row; it is reached through the answered slot's change route. An answered slot (`COMPLETED`, `MISSED`, or `SKIPPED`) MUST instead display a neutral glyph — a tick, a cross or a dash — whose accessible text names its specific answer (Done, Missed, or Skipped — never a generic "answered" label), plus exactly one control to change it, never relying on colour or position alone. That control MUST be reachable and operable without a gesture, with an accessible label distinguishing its slot from every other slot on screen. This applies identically to the single-slot row and an expanded multi-slot row.
+
+A multi-slot habit's own row MUST summarise its slots without being expanded: one segment per slot, answered segments lit, followed by "x of N" answered and, while a slot is still unanswered, the next unanswered reminder time ("1 of 3 · next 13:00"). The day-level rollup status MUST remain available to assistive technology as part of that summary's accessible label, even though it is not drawn as a word.
+
+The today screen header MUST show the displayed date and a progress line reading "N of M", where M is the number of habits shown for that date and N the number of those whose slots are all answered (any answer), with a bar filled to N/M. With no habit shown, the progress line and bar are omitted.
 
 While displaying the **live-today view** — meaning the user has not deliberately navigated to a past date — the today screen MUST track the current local date rather than the date at construction. Crossing local midnight MUST re-query and re-render the per-slot display and rollup against the new date, with no user interaction. If backgrounded across midnight, resuming MUST re-read the current local date and correct the display by that resume. This obligation covers midnight rollover while displayed and resume after backgrounding; it excludes a timezone change while continuously foregrounded, a named, accepted scoping boundary. Once the user has deliberately navigated to a past date, neither a midnight rollover nor a resume MUST move the displayed date away from that deliberately-viewed date; the screen resumes tracking the current local date only once the user returns to the live-today view.
 
 **Date navigation:** from the live-today view, the user MAY navigate backward to any past date with no lower bound; a past date with nothing scheduled MUST render empty rather than an error. Forward navigation MUST NOT reach any date later than the current local date — the live-today view is the forward boundary. While viewing a past date, the add-habit affordance MUST be absent — absent rather than disabled — and a past date with nothing scheduled MUST present past-day empty-state text. These are two independent obligations, not one: the affordance's absence is not conditional on the empty state, and the text does not occupy the affordance's position. Any per-slot UI-only state, such as which slot is expanded or reopened, MUST NOT carry over from one displayed date to another.
 
 **Rollup precedence (ratified 2026-09-01, task 6b.10):** the collapsed status MUST lead with progress, not failure. A day with at least one `COMPLETED` slot and at least one `MISSED` slot MUST report a partially-completed status, never a missed-day status. A missed-day status MUST be reported only when a day has no `COMPLETED` slot at all and at least one `MISSED` slot. The full precedence, most to least specific: all slots `UNKNOWN` reports pending; all slots `COMPLETED` reports fully-completed; all slots `SKIPPED` reports fully-skipped; no `COMPLETED` slot and at least one `MISSED` slot reports missed; every other mix (including any `COMPLETED` slot alongside any `MISSED` slot) reports partial completion.
-(Previously: the local-date-tracking obligation was unconditional and covered only midnight rollover and resume, with no concept of a deliberately navigated-away date and no navigation surface at all. The past-day clause also read as one coupled obligation — the affordance absent and past-day text "in its place", "where the affordance would otherwise be" — which was literal while the add-habit button lived inside the empty state; once it became a floating action button in the corner, nothing stood in its place, so it is now stated as two independent obligations.)
+(Previously: a pending slot displayed three text actions (Yes, No, Skip), an answered slot displayed its answer as visible text, and the collapsed multi-slot row named its rollup as a visible word; the graphite redesign draws round ✕/✓ controls, neutral glyphs and per-slot segments, keeping every answer and status as accessible text. Previously, too, the local-date-tracking obligation was unconditional and covered only midnight rollover and resume, with no concept of a deliberately navigated-away date and no navigation surface at all. The past-day clause also read as one coupled obligation — the affordance absent and past-day text "in its place", "where the affordance would otherwise be" — which was literal while the add-habit button lived inside the empty state; once it became a floating action button in the corner, nothing stood in its place, so it is now stated as two independent obligations.)
 
 #### Scenario: Day rollup reports partial completion
 - GIVEN a 3-slot day with 2 `COMPLETED` and 1 `UNKNOWN`
@@ -168,10 +172,25 @@ While displaying the **live-today view** — meaning the user has not deliberate
 - WHEN the today screen renders that habit
 - THEN it shows three independently answerable rows, not one collapsed row
 
+#### Scenario: A pending slot offers a round No and a round Yes, without colour
+- GIVEN a pending single-slot habit
+- WHEN the today screen renders it
+- THEN it shows a ✕ control followed by a ✓ control, each at least 48dp to touch and labelled "Answer no for <habit>" / "Answer yes for <habit>", neither green nor red, and no third control
+
 #### Scenario: An answered slot names its specific answer and offers one route, without colour
 - GIVEN three slots recorded `COMPLETED`, `MISSED`, and `SKIPPED` respectively
 - WHEN the today screen renders each, with no colour perception assumed (e.g. via TalkBack)
-- THEN each shows its own distinct text — "Done", "Missed", or "Skipped", never a shared generic label — plus exactly one route to change it, with no Yes/No/Skip actions remaining
+- THEN each shows its own neutral glyph whose accessible text is distinct — "Done", "Missed", or "Skipped", never a shared generic label — plus exactly one route to change it, with no answer controls remaining
+
+#### Scenario: A collapsed multi-slot habit summarises its reminders
+- GIVEN a three-slot habit with its 09:00 slot answered and its 13:00 and 18:00 slots pending
+- WHEN the today screen renders it collapsed
+- THEN it shows three segments with the first lit, and "1 of 3 · next 13:00", and its accessible label leads with the day's rollup status
+
+#### Scenario: The header counts fully answered habits
+- GIVEN five habits shown for the day, two with every slot answered and three with at least one slot pending
+- WHEN the today screen renders its header
+- THEN it reads "2 of 5" beside the date, with the progress bar two-fifths full
 
 #### Scenario: The change route is reachable without a gesture and names its own slot
 - GIVEN a two-slot habit where both slots are answered

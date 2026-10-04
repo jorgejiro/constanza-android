@@ -87,7 +87,7 @@ class TodayAnsweredSlotComposeTest {
 
     private fun expandRow() {
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
-        composeTestRule.onNodeWithText(text(R.string.today_expand)).performClick()
+        composeTestRule.onNodeWithContentDescription(text(R.string.today_expand)).performClick()
     }
 
     /**

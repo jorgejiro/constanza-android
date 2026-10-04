@@ -1,6 +1,8 @@
 package com.jjrapps.constanza.tracking
 
 import android.graphics.Bitmap
+import android.util.Base64
+import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
@@ -22,6 +24,7 @@ import com.jjrapps.constanza.domain.model.DayStatus
 import com.jjrapps.constanza.domain.model.EntryStatus
 import org.junit.Rule
 import org.junit.Test
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.time.LocalDate
 import java.time.ZoneId
@@ -38,9 +41,9 @@ import java.time.ZoneId
  * identical whatever emulator runs it. Capture targets the tagged fixed-size [Box] and never
  * `onRoot()`, which would grab the whole test-activity window at the emulator's own size.
  *
- * The PNG lands in app-private `filesDir`. Retrieving it needs `adb shell am instrument` rather
- * than Gradle's `connectedDebugAndroidTest`, because that task uninstalls the app when it finishes
- * and takes the file with it.
+ * The PNG lands in app-private `filesDir` (reachable through `adb shell am instrument`) and is also
+ * logged as base64 chunks under the `TodayRealRender` tag, so a Gradle managed-device run — which
+ * uninstalls the app, `filesDir` included — still leaves it in the test's pulled logcat.
  */
 class TodayRealRenderTest {
 
@@ -50,26 +53,26 @@ class TodayRealRenderTest {
     @Test
     fun renderTodayScreenAtRealSize() {
         val zone = ZoneId.of("Europe/Madrid")
-        val today = LocalDate.of(2026, 9, 7)
-        val now = today.atTime(14, 42).atZone(zone).toInstant()
+        // The approved graphite board's own day ("Domingo, 28 de septiembre"), so the render can be
+        // laid beside it: one habit due now, two later (one of them a three-reminder habit with its
+        // first reminder answered), and two answered — one done, one missed.
+        val today = LocalDate.of(2025, 9, 28)
+        val now = today.atTime(10, 0).atZone(zone).toInstant()
 
         val rows = listOf(
-            row(1, "Hacer movilidad al sol en la primera hora tras levantarme", HabitColor.ROSE, DayStatus.ALL_COMPLETED, slot(1, 8 * 60, EntryStatus.COMPLETED)),
-            row(2, "Hacer descansos con movilidad", HabitColor.SAGE, DayStatus.ALL_COMPLETED, slot(2, 10 * 60, EntryStatus.COMPLETED)),
-            row(3, "Empezar a preparar la comida antes de las 14h", HabitColor.SAND, DayStatus.ANY_MISSED, slot(3, 13 * 60 + 20, EntryStatus.MISSED)),
-            row(4, "Comer sanito, lento y pronto todos los días", HabitColor.OLIVE, DayStatus.ANY_MISSED, slot(4, 14 * 60 + 52, EntryStatus.MISSED)),
-            row(5, "Estirar la espalda", HabitColor.TEAL, DayStatus.ALL_SKIPPED, slot(5, 12 * 60, EntryStatus.SKIPPED)),
-            // Multi-slot: the one case where the scheduled time still earns its place, because it
-            // is the only thing telling these two rows apart.
-            row(6, "Beber agua", HabitColor.BLUE, DayStatus.PARTIAL, slot(6, 11 * 60, EntryStatus.COMPLETED), slot(7, 16 * 60, EntryStatus.MISSED)),
-            row(7, "Cenar antes de las 10 de la noche", HabitColor.LAVENDER, DayStatus.PENDING, slot(8, 21 * 60, EntryStatus.UNKNOWN)),
-            row(8, "Relax a las 23h", HabitColor.INDIGO, DayStatus.PENDING, slot(9, 23 * 60, EntryStatus.UNKNOWN)),
+            row(1, "Caminar", HabitColor.SAGE, DayStatus.PENDING, slot(1, 9 * 60 + 30, EntryStatus.UNKNOWN)),
+            row(
+                2, "Beber agua", HabitColor.BLUE, DayStatus.PARTIAL,
+                slot(2, 9 * 60, EntryStatus.COMPLETED), slot(3, 13 * 60, EntryStatus.UNKNOWN), slot(4, 18 * 60, EntryStatus.UNKNOWN),
+            ),
+            row(3, "Estirar", HabitColor.SAND, DayStatus.PENDING, slot(5, 19 * 60, EntryStatus.UNKNOWN)),
+            row(4, "Leer 20 minutos", HabitColor.TAN, DayStatus.ALL_COMPLETED, slot(6, 8 * 60, EntryStatus.COMPLETED)),
+            row(5, "Meditar", HabitColor.LAVENDER, DayStatus.ANY_MISSED, slot(7, 8 * 60 + 30, EntryStatus.MISSED)),
         )
 
         val state = TodayUiState(
             rows = rows,
             sections = groupTodayRows(rows, today, zone, now),
-            expandedHabitIds = setOf(6L),
             zone = zone,
             date = today,
         )
@@ -103,6 +106,15 @@ class TodayRealRenderTest {
         File(target.filesDir, RENDER_FILE_NAME).outputStream().use {
             bitmap.compress(Bitmap.CompressFormat.PNG, PNG_QUALITY, it)
         }
+        // Gradle managed devices uninstall the app (and `filesDir` with it) when the run ends, but
+        // they do keep each test's logcat under `build/outputs/androidTest-results/`. The PNG is
+        // logged there as numbered base64 chunks, which a script joins back into the file.
+        val encoded = ByteArrayOutputStream().use { bytes ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, PNG_QUALITY, bytes)
+            Base64.encodeToString(bytes.toByteArray(), Base64.NO_WRAP)
+        }
+        val chunks = encoded.chunked(LOG_CHUNK_SIZE)
+        chunks.forEachIndexed { index, chunk -> Log.i(LOG_TAG, "${index + 1}/${chunks.size}:$chunk") }
     }
 
     private fun row(
@@ -130,9 +142,10 @@ class TodayRealRenderTest {
         /** The repo's stated phone width, so the output is measurable against every other render. */
         const val RENDER_WIDTH_DP = 360
 
-        /** Taller than a real screen on purpose: this is a contact sheet, and a scrolled-off row is
-         *  a row nobody reviews. */
-        const val RENDER_HEIGHT_DP = 1000
+        /** A real phone's height, so the FAB lands where it does on a device. */
+        const val RENDER_HEIGHT_DP = 800
+        const val LOG_TAG = "TodayRealRender"
+        const val LOG_CHUNK_SIZE = 3_000
         const val PNG_QUALITY = 100
     }
 }

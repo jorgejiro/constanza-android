@@ -6,6 +6,7 @@ import androidx.compose.ui.test.WindowSize
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.DpSize
@@ -82,7 +83,7 @@ class TodayAdaptiveComposeTest {
                 TodayRoute(onManageHabits = {}, viewModel = viewModel)
             }
         }
-        composeTestRule.onNodeWithText(text(R.string.today_expand)).performClick()
+        composeTestRule.onNodeWithContentDescription(text(R.string.today_expand)).performClick()
 
         // Both notations are spelled out rather than derived, and the device's setting picks one:
         // the emulators this matrix provisions run en-US, so this is the 12-hour branch in practice

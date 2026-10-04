@@ -158,9 +158,12 @@
     <string name="today_expand">Show times</string>
     <string name="today_collapse">Hide times</string>
     <!-- graphite redesign: the header's progress line — habits whose every slot is answered, out
-         of the habits shown for the day. Not plurals: "N of M" has no singular/plural form in
-         English or Spanish. -->
+         of the habits shown for the day — and a multi-reminder habit's own line under its name,
+         answered reminders out of its reminders and, while one is left, the next one's time.
+         Not plurals: "N of M" has no singular/plural form in English or Spanish. -->
     <string name="today_progress">%1$d of %2$d</string>
+    <string name="today_reminders_progress">%1$d of %2$d</string>
+    <string name="today_reminders_progress_next">%1$d of %2$d · next %3$s</string>
 
     <!-- reminder-response: pending/snoozed rendering by reading reminder_occurrences (task 6b.3, design D3). -->
     <string name="today_slot_pending">Pending</string>

@@ -118,15 +118,14 @@ class TodaySlotRowComposeTest {
     }
 
     /**
-     * today-status-icons, point 3: on a single-slot habit [TodaySlot.minuteOfDay] renders nothing
-     * at all any more — not even demoted — because the row's name and (once answered) its status
-     * glyph already say everything it has to say. today-one-line-row extends this: a PENDING
-     * single-slot row shows only its two answer pills, no status word at all — "Pendiente" is gone
-     * from the row entirely — so this now asserts the pills are what proves the row is pending,
-     * rather than a status word that no longer renders.
+     * Graphite redesign, reversing today-status-icons point 3: a pending single-slot habit shows its
+     * reminder time again, as the quiet subtitle under its name ("Caminar / 09:30" on the board) —
+     * the line that used to carry the time beside the buttons is gone, so the subtitle is the one
+     * place left to say WHEN the reminder is. It follows the device's hour cycle like every other
+     * time on screen.
      */
     @Test
-    fun theSlotTimeIsAbsentOnASingleSlotHabit(): Unit = runBlocking {
+    fun theSlotTimeIsTheSubtitleOfAPendingSingleSlotHabit(): Unit = runBlocking {
         fixture.seedHabitWithEnabledSlot(name = LONG_HABIT_NAME, minuteOfDay = MORNING_MINUTE)
         viewModel.awaitRows(1)
 
@@ -134,7 +133,10 @@ class TodaySlotRowComposeTest {
 
         composeTestRule.onNode(isAnswerYesButton()).assertIsDisplayed()
         composeTestRule
-            .onNodeWithText(expectedTimeOnDevice(inTwentyFourHour = "08:00", inTwelveHour = "8:00 AM"), substring = true)
+            .onNodeWithText(expectedTimeOnDevice(inTwentyFourHour = "08:00", inTwelveHour = "8:00 AM"))
+            .assertIsDisplayed()
+        composeTestRule
+            .onNodeWithText(unexpectedTimeOnDevice(inTwentyFourHour = "08:00", inTwelveHour = "8:00 AM"), substring = true)
             .assertDoesNotExist()
     }
 
@@ -160,7 +162,7 @@ class TodaySlotRowComposeTest {
         viewModel.awaitOneRowWithSlots(2)
 
         setPhoneSizedContent()
-        composeTestRule.onNodeWithText(text(R.string.today_expand)).performClick()
+        composeTestRule.onNodeWithContentDescription(text(R.string.today_expand)).performClick()
         val shown = expectedTimeOnDevice(inTwentyFourHour = "08:00", inTwelveHour = "8:00 AM")
 
         composeTestRule.onNodeWithText(shown).assertIsDisplayed()
