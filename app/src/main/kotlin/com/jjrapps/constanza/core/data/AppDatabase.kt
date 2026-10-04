@@ -42,16 +42,16 @@ import com.jjrapps.constanza.core.data.entity.ScheduleEntity
  * `version = 2`'s. No column, table, or index changed, so `5.json`'s `identityHash` is unchanged
  * from `4.json`'s. `AppMigrations.migration4To5` rewrites every habit's `colorArgb` from the
  * 23-preset warm-dark palette into `HabitColor`'s 22-preset legible-band palette (or, for the
- * retired `SILVER` preset and any custom colour, through `clampToHabitBand`'s `[7:1, 11:1]` fallback)
+ * retired `SILVER` preset and any custom colour, through `clampToLegacyHabitBand`'s `[7:1, 11:1]` fallback)
  * — registered in `DatabaseModule`, same as every migration before it.
  *
  * `version = 6` (colour overhaul slice C): a third data-only habit-colour repaint, same shape as
  * `version = 2`'s and `version = 5`'s. No column, table, or index changed, so `6.json`'s
  * `identityHash` is unchanged from `5.json`'s. `AppMigrations.migration5To6` rewrites every `habits`
- * row still holding the retired `BLUE_GREY` preset onto `HabitColor.CYAN` — the one explicit entry
- * `HabitColorRetireRemap` carries, since `BLUE_GREY`'s `#849FAC` measures inside the `[7:1, 11:1]`
- * band and so would otherwise pass `clampToHabitBand` unchanged — registered in `DatabaseModule`,
- * same as every migration before it.
+ * row still holding the retired `BLUE_GREY` preset onto the then-current `CYAN` preset — the one
+ * explicit entry `HabitColorRetireRemap` carries, since `BLUE_GREY`'s `#849FAC` measures inside the
+ * `[7:1, 11:1]` band and so would otherwise pass `clampToLegacyHabitBand` unchanged — registered in
+ * `DatabaseModule`, same as every migration before it.
  *
  * `version = 7` (remove-dead-sort-order): drops `HabitEntity.sortOrder` — nothing in the app ever
  * wrote it to anything but `0`, since there is no reorder gesture, so the column advertised a

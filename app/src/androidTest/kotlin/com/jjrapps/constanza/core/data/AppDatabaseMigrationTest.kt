@@ -12,11 +12,10 @@ import com.jjrapps.constanza.core.data.migration.HabitColorRemap
 import com.jjrapps.constanza.core.data.migration.HabitColorRetireRemap
 import com.jjrapps.constanza.core.data.migration.HabitColorRetoneRemap
 import com.jjrapps.constanza.core.data.migration.PreMigrationSnapshotWriter
-import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
-import com.jjrapps.constanza.core.ui.theme.HABIT_BAND_CEILING
-import com.jjrapps.constanza.core.ui.theme.HABIT_BAND_FLOOR
-import com.jjrapps.constanza.core.ui.theme.HABIT_BAND_TOLERANCE
-import com.jjrapps.constanza.core.ui.theme.HabitColor
+import com.jjrapps.constanza.core.ui.theme.HabitBandGround
+import com.jjrapps.constanza.core.ui.theme.LEGACY_HABIT_BAND_CEILING
+import com.jjrapps.constanza.core.ui.theme.LEGACY_HABIT_BAND_FLOOR
+import com.jjrapps.constanza.core.ui.theme.LEGACY_HABIT_BAND_TOLERANCE
 import com.jjrapps.constanza.core.ui.theme.contrastRatio
 import com.jjrapps.constanza.domain.model.Schedule
 import java.io.File
@@ -42,13 +41,17 @@ private const val RETIRED_SILVER_ARGB = 0xFFE0E0E0.toInt()
 private const val CLAMPED_SILVER_ARGB = 0xFFC2C2C2.toInt()
 
 /** An arbitrary custom colour no version of this palette ever offered — navy, well outside the
- *  legible band (1.48:1 against `ConstanzaColors.Background`), the same case `HabitColorBandTest`
+ *  legible band (1.48:1 against the frozen `#110B06` ground), the same case `LegacyHabitColorBandTest`
  *  pins on the JVM side. */
 private const val OUT_OF_BAND_CUSTOM_ARGB = 0xFF1A237E.toInt()
 
 /** The retired `BLUE_GREY` preset (Blue Grey 400) — literal rather than `HabitColor.BLUE_GREY`,
  *  which no longer exists, for the same reason [HabitColorRetireRemap]'s own KDoc gives. */
 private const val RETIRED_BLUE_GREY_ARGB = 0xFF849FAC.toInt()
+
+/** The 21-preset palette's `CYAN`, literal because the graphite palette (schema version 8) retired
+ *  it; the v5 -> v6 test pins what schema version 6 meant. */
+private const val SCHEMA_V6_CYAN_ARGB = 0xFF00ABBD.toInt()
 
 /**
  * Task 3.7 (base harness), **extended** by task 2.11 and task 3.5 — never recreated (correction
@@ -341,7 +344,9 @@ class AppDatabaseMigrationTest {
      * [HabitColorRetoneRemap.LEGACY_TO_CURRENT] — comes out `#C2C2C2` via the contrast clamp
      * fall-through; and an arbitrary out-of-band custom colour (never any version of this palette)
      * comes out somewhere inside the legible band rather than at an exact pinned hex, since the clamp's
-     * own contract ([clampToHabitBand]'s KDoc) is "inside the band", not "this exact byte".
+     * own contract (`clampToLegacyHabitBand`'s KDoc) is "inside the band", not "this exact byte". The
+     * band is measured against the frozen [HabitBandGround] (`#110B06`) the migration itself uses,
+     * not the live graphite background.
      */
     @Test
     fun migration4To5RetonesEveryLegacyPresetAndClampsTheRest() {
@@ -376,10 +381,12 @@ class AppDatabaseMigrationTest {
 
             assertTrue("expected the out-of-band custom colour row", cursor.moveToNext())
             assertEquals(outOfBandId, cursor.getLong(0))
-            val clampedRatio = contrastRatio(Color(cursor.getInt(1)), ConstanzaColors.Background)
+            val clampedRatio = contrastRatio(Color(cursor.getInt(1)), HabitBandGround)
+            val low = LEGACY_HABIT_BAND_FLOOR - LEGACY_HABIT_BAND_TOLERANCE
+            val high = LEGACY_HABIT_BAND_CEILING + LEGACY_HABIT_BAND_TOLERANCE
             assertTrue(
                 "an out-of-band custom colour must land inside the legible band, measured %.2f:1".format(clampedRatio),
-                clampedRatio in (HABIT_BAND_FLOOR - HABIT_BAND_TOLERANCE)..(HABIT_BAND_CEILING + HABIT_BAND_TOLERANCE),
+                clampedRatio in low..high,
             )
         }
 
@@ -404,9 +411,9 @@ class AppDatabaseMigrationTest {
      * trusting `runMigrationsAndValidate` returned without throwing.
      *
      * Two cases: a habit stored on the retired `BLUE_GREY` preset (`#849FAC`) comes out on
-     * [HabitColor.CYAN] (`#00ABBD`) — the one entry [HabitColorRetireRemap.LEGACY_TO_CURRENT]
-     * carries — and a habit already stored on a current preset that did not move
-     * ([HabitColor.CYAN] itself) survives byte-identical, proving the migration does not touch rows
+     * the then-current `CYAN` (`#00ABBD`) — the one entry [HabitColorRetireRemap.LEGACY_TO_CURRENT]
+     * carries — and a habit already stored on a then-current preset that did not move (`CYAN`
+     * itself) survives byte-identical, proving the migration does not touch rows
      * it has no reason to.
      */
     @Test
@@ -417,7 +424,7 @@ class AppDatabaseMigrationTest {
 
         migrationTestHelper.createDatabase(TEST_DB_NAME, version = 5).use { db ->
             seedHabitV4(db, id = blueGreyHabitId, colorArgb = RETIRED_BLUE_GREY_ARGB)
-            seedHabitV4(db, id = cyanHabitId, colorArgb = HabitColor.CYAN.argb)
+            seedHabitV4(db, id = cyanHabitId, colorArgb = SCHEMA_V6_CYAN_ARGB)
         }
 
         val migratedDb = migrationTestHelper.runMigrationsAndValidate(TEST_DB_NAME, 6, true, migration5To6())
@@ -431,7 +438,7 @@ class AppDatabaseMigrationTest {
             assertEquals(cyanHabitId, cursor.getLong(0))
             assertEquals(
                 "a current preset that did not move must survive byte-identical",
-                HabitColor.CYAN.argb,
+                SCHEMA_V6_CYAN_ARGB,
                 cursor.getInt(1),
             )
         }

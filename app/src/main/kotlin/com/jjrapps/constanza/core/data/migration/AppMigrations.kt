@@ -199,7 +199,7 @@ internal object AppMigrations {
      * their "22-preset legible-band palette" counterparts (`HabitColor`'s KDoc — the `[7:1, 11:1]`
      * contrast band), and anything left over — the retired `SILVER` preset and any genuinely custom
      * colour a habit already holds — is pulled into that same band exactly as a fresh custom pick
-     * would be (`HabitColorBand.kt`'s `clampToHabitBand`). No column, table, or index changes, so
+     * would be (`LegacyHabitColorBand.kt`'s `clampToLegacyHabitBand`). No column, table, or index changes, so
      * `5.json`'s `identityHash` is unchanged from `4.json`'s — the same shape [migration1To2]'s KDoc
      * documents for its own data-only change.
      *
@@ -212,7 +212,7 @@ internal object AppMigrations {
      * actually moved but leave `SILVER` and every custom colour untouched — precisely the defect this
      * migration exists to fix. So this migration reads back every **distinct** `colorArgb` actually
      * present in the table, runs each through [HabitColorRetoneRemap.normalize] here in Kotlin (map
-     * lookup, then [com.jjrapps.constanza.core.ui.theme.clampToHabitBand] fallthrough), and writes
+     * lookup, then [com.jjrapps.constanza.core.ui.theme.clampToLegacyHabitBand] fallthrough), and writes
      * only the ones whose value actually changed — still via bound `Int` arguments in the `UPDATE`
      * itself, for the exact sign-trap reason [migration1To2]'s KDoc gives: the *comparison* against
      * `colorArgb` must never be built from inlined hex text either.
@@ -249,15 +249,15 @@ internal object AppMigrations {
      * column, table, or index changes, so `6.json`'s `identityHash` is unchanged from `5.json`'s —
      * the same shape [migration1To2]'s KDoc documents for its own data-only change.
      *
-     * **Why [com.jjrapps.constanza.core.ui.theme.clampToHabitBand] alone cannot handle this one,
+     * **Why [com.jjrapps.constanza.core.ui.theme.clampToLegacyHabitBand] alone cannot handle this one,
      * unlike a retirement whose colour was already out of band.** `#849FAC` measures 7.01:1, inside
      * the `[7:1, 11:1]` band, so the clamp would return it unchanged and a `BLUE_GREY` habit would
      * silently become a *custom* grey — exactly the near-neutral identity this retirement removes.
      * So, exactly as [migration4To5] does for its wider re-tone, this migration reads back every
      * **distinct** `colorArgb` actually present in the table, runs each through
      * [HabitColorRetireRemap.normalize] here in Kotlin (map lookup — one entry, `#849FAC` ->
-     * [com.jjrapps.constanza.core.ui.theme.HabitColor.CYAN]'s `#00ABBD` — then
-     * [com.jjrapps.constanza.core.ui.theme.clampToHabitBand] fallthrough for everything else), and
+     * `CYAN`'s `#00ABBD` — then
+     * [com.jjrapps.constanza.core.ui.theme.clampToLegacyHabitBand] fallthrough for everything else), and
      * writes only the ones whose value actually changed — still via bound `Int` arguments in the
      * `UPDATE` itself, for the exact sign-trap reason [migration1To2]'s KDoc gives.
      *

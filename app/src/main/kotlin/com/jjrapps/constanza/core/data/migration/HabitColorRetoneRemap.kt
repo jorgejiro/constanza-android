@@ -1,6 +1,6 @@
 package com.jjrapps.constanza.core.data.migration
 
-import com.jjrapps.constanza.core.ui.theme.clampToHabitBand
+import com.jjrapps.constanza.core.ui.theme.clampToLegacyHabitBand
 
 /**
  * The frozen "23-preset warm-dark palette" -> "22-preset legible-band palette" habit-colour
@@ -9,18 +9,18 @@ import com.jjrapps.constanza.core.ui.theme.clampToHabitBand
  * and what the *current* one means at the moment this re-tone was written, and both sides must stay
  * literal ints so a future re-tone cannot silently change what this map has always said.
  *
- * **Why every already-persisted habit needs this at all.** [HabitPalette.contains] answers `false`
+ * **Why every already-persisted habit needs this at all.** `HabitPalette.contains` answers `false`
  * for any int not among the 22 current presets, and every habit created before this re-tone holds
  * one of the *previous* palette's argb ints — none of which survive unchanged, because every preset
  * that changed value changed precisely because it needed to (into the `[7:1, 11:1]` band `HabitColor`'s
- * KDoc measures). Left alone, [HabitPalette.contains] would misread every existing habit as a custom
+ * KDoc measures). Left alone, `HabitPalette.contains` would misread every existing habit as a custom
  * colour instead of the preset it was assigned from.
  *
  * **Remap, then clamp — not remap alone.** [LEGACY_TO_CURRENT] only ever held 17 entries: the five
  * presets whose value did not change ([HabitColorRemap]'s own six-pastel scope is unrelated and long
  * migrated) need no entry, and the retired `SILVER` (`#E0E0E0`) gets none either — it was never a
  * "this preset moved" case, it was retired outright. Both of those, plus any genuinely custom colour
- * a habit already held, fall through [normalize]'s `?:` to [clampToHabitBand], which is exactly what
+ * a habit already held, fall through [normalize]'s `?:` to [clampToLegacyHabitBand], which is exactly what
  * that function is for: a stored colour that is not a recognised preset is either already inside the
  * legible band (and passes through unchanged) or gets pulled into it exactly as a fresh custom pick
  * would.
@@ -56,13 +56,13 @@ internal object HabitColorRetoneRemap {
     /**
      * A total function: an explicitly remapped legacy preset takes its mapped current value; the
      * retired `SILVER` (`#E0E0E0`), any legacy preset that did not move, and any genuine custom colour
-     * all fall through to [clampToHabitBand] instead of being coerced onto some arbitrary palette
+     * all fall through to [clampToLegacyHabitBand] instead of being coerced onto some arbitrary palette
      * member. `SILVER` in particular is asserted by [HabitColorRetoneRemapTest] rather than merely
      * assumed to fall through correctly: `#E0E0E0` measures `14.81:1` against
      * `ConstanzaColors.Background`, above the `11.0` ceiling, so it clamps to the same `#C2C2C2` pure
-     * white clamps to — both are fully desaturated, and [clampToHabitBand]'s value bisection for a
+     * white clamps to — both are fully desaturated, and [clampToLegacyHabitBand]'s value bisection for a
      * fixed hue/saturation converges on the same grey regardless of where above the ceiling it
      * started.
      */
-    fun normalize(argb: Int): Int = LEGACY_TO_CURRENT[argb] ?: clampToHabitBand(argb)
+    fun normalize(argb: Int): Int = LEGACY_TO_CURRENT[argb] ?: clampToLegacyHabitBand(argb)
 }
