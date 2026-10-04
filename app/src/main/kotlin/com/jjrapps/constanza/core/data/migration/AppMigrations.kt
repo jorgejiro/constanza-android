@@ -15,7 +15,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * [HabitColorRemap.LEGACY_TO_CURRENT] (a bijection, so the inverse is exact) if a colour rollback
  * is ever needed. Unmapped ints were never written by this migration (see the `WHERE colorArgb IN
  * (...)` guard below), so they need no inverse. Never revert
- * [com.jjrapps.constanza.core.data.AppDatabase]'s `version` back to 1, 2, 3, 4, 5, or 6 — Room refuses
+ * [com.jjrapps.constanza.core.data.AppDatabase]'s `version` back to 1, 2, 3, 4, 5, 6, or 7 — Room refuses
  * to open an already-upgraded file at a lower version, making the user's data unreachable.
  * (`Migration(2, 3)`, the slot this note used to reserve, was consumed by [migration2To3] — the
  * removal of `HabitEntity.question`. `Migration(3, 4)`, the slot that note then reserved, was
@@ -24,8 +24,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * [migration4To5] — the colour re-tone into `HabitColor`'s `[7:1, 11:1]` band. `Migration(5, 6)`,
  * the slot that note reserved next, is now consumed by [migration5To6] — the retirement of
  * `BLUE_GREY`. `Migration(6, 7)`, the slot that note reserved next, is now consumed by
- * [migration6To7] — the removal of the dead `HabitEntity.sortOrder` column — so any future
- * rollback recipe starts from version 8 onward. Unlike
+ * [migration6To7] — the removal of the dead `HabitEntity.sortOrder` column. `Migration(7, 8)` is
+ * now consumed by [migration7To8] — the graphite redesign's muted 12-colour palette — so any future
+ * rollback recipe starts from version 9 onward. Unlike
  * [migration1To2]'s bijection, neither [HabitColorRetoneRemap.LEGACY_TO_CURRENT] nor
  * [HabitColorRetireRemap.LEGACY_TO_CURRENT] has an exact inverse to offer a rollback: both sit on a
  * clamp fallthrough ([HabitColorRetoneRemap.normalize], [HabitColorRetireRemap.normalize]) that is
@@ -69,6 +70,9 @@ internal object AppMigrations {
 
     /** Same `MagicNumber` reasoning as [SCHEMA_VERSION_3] — `7` needs a named constant too. */
     private const val SCHEMA_VERSION_7 = 7
+
+    /** Same `MagicNumber` reasoning as [SCHEMA_VERSION_3] — `8` needs a named constant too. */
+    private const val SCHEMA_VERSION_8 = 8
 
     /**
      * **The sign trap.** `0xFF8E24AA.toInt()` is a *negative* `Int` once stored in the `colorArgb`
@@ -324,6 +328,39 @@ internal object AppMigrations {
                 db.execSQL("ALTER TABLE `_new_habits` RENAME TO `habits`")
                 val after = childRowCounts(db)
                 check(before == after) { "migration6To7 lost child rows: before=$before after=$after" }
+            }
+        }
+
+    /**
+     * Graphite redesign T2. Data-only colour repaint: every `habits` row still holding one of the 21
+     * retired legible-band presets is rewritten onto its muted counterpart from
+     * [HabitColorMutedRemap.LEGACY_TO_CURRENT]. No column, table, or index changes, so `8.json`'s
+     * `identityHash` is unchanged from `7.json`'s — the same shape [migration1To2]'s KDoc documents.
+     *
+     * **A fixed `CASE WHEN`, like [migration1To2], not a distinct-colour read like [migration4To5].**
+     * [HabitColorMutedRemap.normalize] has no clamp fallthrough — custom colours are left untouched —
+     * so the full set of rows this migration may change is exactly the map's 21 keys, known at
+     * compile time. The `WHERE colorArgb IN (...)` guard keeps every other row byte-identical. Every
+     * value is a bound `Int` argument, for the sign-trap reason [migration1To2]'s KDoc gives.
+     *
+     * [writer]`.write(db)` runs first, exactly as every earlier migration's does, for the same
+     * reason: a recoverable snapshot failure must never fail the migration itself.
+     */
+    fun migration7To8(writer: PreMigrationSnapshotWriter): Migration =
+        object : Migration(SCHEMA_VERSION_7, SCHEMA_VERSION_8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                writer.write(db)
+
+                val entries = HabitColorMutedRemap.LEGACY_TO_CURRENT.entries.toList()
+                val caseWhenSql = "WHEN ? THEN ? ".repeat(entries.size)
+                val inPlaceholders = entries.joinToString(separator = ",") { "?" }
+                val caseArgs = entries.flatMap { (legacy, current) -> listOf(legacy, current) }
+                val inArgs = entries.map { it.key }
+                db.execSQL(
+                    "UPDATE habits SET colorArgb = CASE colorArgb $caseWhenSql END " +
+                        "WHERE colorArgb IN ($inPlaceholders)",
+                    (caseArgs + inArgs).toTypedArray(),
+                )
             }
         }
 

@@ -2,6 +2,7 @@ package com.jjrapps.constanza.portability
 
 import androidx.room.withTransaction
 import com.jjrapps.constanza.core.data.AppDatabase
+import com.jjrapps.constanza.core.data.migration.HabitColorMutedRemap
 import com.jjrapps.constanza.core.data.migration.HabitColorRemap
 import com.jjrapps.constanza.core.data.migration.HabitColorRetireRemap
 import com.jjrapps.constanza.core.data.migration.HabitColorRetoneRemap
@@ -90,6 +91,16 @@ class UnsupportedBackupVersionException(val fileVersion: Int) :
 private const val PASTEL_REMAP_SCHEMA_VERSION = 2
 
 /**
+ * `LEGIBLE_BAND_SCHEMA_VERSION` (`4`): the value [CURRENT_SCHEMA_VERSION] held before the graphite
+ * redesign's muted palette. A file older than *this* still needs the legible-band hops
+ * ([HabitColorRetoneRemap], [HabitColorRetireRemap]) before the muted one; a file *at* it already
+ * sits on the 21-preset legible-band palette and needs only [HabitColorMutedRemap]. Gating the older
+ * hops here (rather than applying them to every pre-current file as before) keeps a schema-4 file's
+ * custom colours away from the frozen legacy clamp, which a schema-4 file was never subject to.
+ */
+private const val LEGIBLE_BAND_SCHEMA_VERSION = 4
+
+/**
  * Task 2.8 (data-portability: Backup Schema Version Read On Import, Legacy Habit Colour Normalized
  * On Import), extended by the colour overhaul's second habit-colour repaint. A pure, top-level
  * function — not a [BackupImporter] method — so `BackupImporterNormalizationTest` can assert its
@@ -103,7 +114,10 @@ private const val PASTEL_REMAP_SCHEMA_VERSION = 2
  * [HabitColorRetoneRemap.normalize] always — the 23-preset -> 22-preset legible-band hop
  * `AppMigrations.migration4To5` applies on-device — then [HabitColorRetireRemap.normalize] always —
  * the 22-preset -> 21-preset `BLUE_GREY` retirement hop `AppMigrations.migration5To6` applies
- * on-device. `schemaVersion == CURRENT_SCHEMA_VERSION` returns [habits] unchanged: colours are
+ * on-device; those two only for a file older than [LEGIBLE_BAND_SCHEMA_VERSION] — then
+ * [HabitColorMutedRemap.normalize] always, the 21-preset -> 12-preset muted hop
+ * `AppMigrations.migration7To8` applies on-device. `schemaVersion == CURRENT_SCHEMA_VERSION`
+ * returns [habits] unchanged: colours are
  * imported byte-identical (data-portability: Round-Trip Fidelity, "Current-version round trip
  * preserves colour exactly").
  */
@@ -120,8 +134,12 @@ private fun normalizeColor(colorArgb: Int, schemaVersion: Int): Int {
     } else {
         colorArgb
     }
-    val retoned = HabitColorRetoneRemap.normalize(pastelNormalized)
-    return HabitColorRetireRemap.normalize(retoned)
+    val legibleBand = if (schemaVersion < LEGIBLE_BAND_SCHEMA_VERSION) {
+        HabitColorRetireRemap.normalize(HabitColorRetoneRemap.normalize(pastelNormalized))
+    } else {
+        pastelNormalized
+    }
+    return HabitColorMutedRemap.normalize(legibleBand)
 }
 
 /**

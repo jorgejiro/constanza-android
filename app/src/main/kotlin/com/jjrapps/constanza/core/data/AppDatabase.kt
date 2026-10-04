@@ -61,6 +61,12 @@ import com.jjrapps.constanza.core.data.entity.ScheduleEntity
  * INSERT / DROP / RENAME, the same shape `migration2To3` used to drop `question` (design.md D1),
  * with the same runtime child-row count guard (design.md D2) across `schedules`, `reminder_slots`,
  * `entries`, and `reminder_occurrences`.
+ *
+ * `version = 8` (graphite redesign T2): a fourth data-only habit-colour repaint, same shape as
+ * `version = 2`'s. No column, table, or index changed, so `8.json`'s `identityHash` is unchanged
+ * from `7.json`'s. `AppMigrations.migration7To8` rewrites every `habits` row holding one of the 21
+ * retired legible-band presets onto its muted graphite counterpart (`HabitColorMutedRemap`); custom
+ * colours are left untouched — registered in `DatabaseModule`, same as every migration before it.
  */
 @Database(
     entities = [
@@ -70,7 +76,7 @@ import com.jjrapps.constanza.core.data.entity.ScheduleEntity
         EntryEntity::class,
         ReminderOccurrenceEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

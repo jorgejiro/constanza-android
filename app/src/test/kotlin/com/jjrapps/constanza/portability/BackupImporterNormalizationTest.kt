@@ -1,5 +1,6 @@
 package com.jjrapps.constanza.portability
 
+import com.jjrapps.constanza.core.data.migration.HabitColorMutedRemap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -15,13 +16,18 @@ import kotlin.test.assertEquals
  * the 23-preset warm-dark palette), then [HabitColorRetoneRemap] (that palette -> the 22-preset
  * legible-band one), then [HabitColorRetireRemap] (that palette -> the current 21-preset one, minus
  * `BLUE_GREY`) — and their expected values are unchanged from before the second and third epochs
- * existed: both pastels these seeds remap to already sit inside [clampToHabitBand]'s tolerance, so
+ * existed: both pastels these seeds remap to already sit inside [clampToLegacyHabitBand]'s tolerance, so
  * neither later hop moves them. The `schemaVersion 2` cases are unchanged from before the third
  * epoch existed for the same reason: a file at that version already skipped [HabitColorRemap] but
  * still needs [HabitColorRetoneRemap]'s hop, and neither seed there is `BLUE_GREY`, so
  * [HabitColorRetireRemap] leaves them untouched. The `schemaVersion 3` case is new: a file at that
  * version already skipped both earlier epochs (it was already past them) but still needs
  * [HabitColorRetireRemap]'s hop, which did not exist when `3` was [CURRENT_SCHEMA_VERSION].
+ *
+ * The graphite redesign added a fourth epoch, [HabitColorMutedRemap] (the 21 legible-band presets
+ * -> the 12 muted ones), applied to every file below schema version 5. The `schemaVersion 1` seeds
+ * remap to pastels that were never one of the 21, so the muted hop leaves them alone; `schemaVersion
+ * 2` and `3` seeds that land on a retired legible-band preset continue onto its muted counterpart.
  *
  * Right-hand values are deliberately spelled as literals rather than as `HabitColor` members: this
  * function's contract is about what each schema version *meant* at the time, not about what the
@@ -52,22 +58,8 @@ class BackupImporterNormalizationTest {
         assertEquals(schemaV2Pink, normalized.single().colorArgb)
     }
 
-    /** New coverage for the colour overhaul: a `schemaVersion 2` file already skipped
-     *  [HabitColorRemap] (that epoch is behind it) but still holds a 23-preset warm-dark colour that
-     *  needs [HabitColorRetoneRemap]'s hop, which did not exist the last time `2` meant "current". */
-    @Test
-    fun `schemaVersion 2 normalizes an old-preset colour to its retoned counterpart`() {
-        val oldRed = 0xFFF44336.toInt()
-        val newRed = 0xFFFF6D48.toInt()
-        val habits = listOf(habitWithColor(oldRed))
-
-        val normalized = normalizeHabitColors(habits, schemaVersion = 2)
-
-        assertEquals(newRed, normalized.single().colorArgb)
-    }
-
     /** The retired `SILVER` preset gets no explicit `HabitColorRetoneRemap` entry — it falls through
-     *  to `clampToHabitBand`, exactly as `HabitColorRetoneRemapTest` pins for the on-device migration.
+     *  to `clampToLegacyHabitBand`, exactly as `HabitColorRetoneRemapTest` pins for the on-device migration.
      *  A `schemaVersion 2` backup holding it must retone the same way on import. */
     @Test
     fun `schemaVersion 2 normalizes the retired silver preset through the contrast clamp`() {
@@ -85,14 +77,51 @@ class BackupImporterNormalizationTest {
      *  still holds the retired `BLUE_GREY` preset, which needs [HabitColorRetireRemap]'s hop that
      *  did not exist the last time `3` meant "current". */
     @Test
-    fun `schemaVersion 3 normalizes the retired blue grey preset to cyan`() {
+    fun `schemaVersion 3 normalizes the retired blue grey preset through cyan to teal`() {
         val retiredBlueGrey = 0xFF849FAC.toInt()
-        val cyan = 0xFF00ABBD.toInt()
+        val mutedTeal = 0xFF6FA6A6.toInt()
         val habits = listOf(habitWithColor(retiredBlueGrey))
 
         val normalized = normalizeHabitColors(habits, schemaVersion = 3)
 
-        assertEquals(cyan, normalized.single().colorArgb)
+        assertEquals(mutedTeal, normalized.single().colorArgb)
+    }
+
+    /** New coverage for the graphite redesign's fourth repaint: a `schemaVersion 4` file already
+     *  sits on the 21-preset legible-band palette, so it skips every older hop and takes only
+     *  [HabitColorMutedRemap]'s, the same table `AppMigrations.migration7To8` applies on-device. */
+    @Test
+    fun `schemaVersion 4 maps every retired legible-band preset through the muted table`() {
+        HabitColorMutedRemap.LEGACY_TO_CURRENT.forEach { (legacy, muted) ->
+            val normalized = normalizeHabitColors(listOf(habitWithColor(legacy)), schemaVersion = 4)
+
+            assertEquals(muted, normalized.single().colorArgb, "0x%08X".format(legacy))
+        }
+    }
+
+    /** A `schemaVersion 4` file's custom colours were never subject to the frozen legacy clamp and
+     *  must not start being now: a colour far outside the old `[7:1, 11:1]` band (which the clamp
+     *  would rebuild) survives a schema-4 import byte-identical. */
+    @Test
+    fun `schemaVersion 4 leaves a custom colour untouched`() {
+        val darkCustom = 0xFF3D2B1F.toInt()
+
+        val normalized = normalizeHabitColors(listOf(habitWithColor(darkCustom)), schemaVersion = 4)
+
+        assertEquals(darkCustom, normalized.single().colorArgb)
+    }
+
+    /** A `schemaVersion 2` file already skipped [HabitColorRemap] but still holds a 23-preset
+     *  warm-dark colour, so it chains the retone hop *and* the muted one: the warm-dark red becomes
+     *  the legible-band red, which the graphite palette then retires onto `CLAY`. */
+    @Test
+    fun `schemaVersion 2 retoned red ends on clay`() {
+        val oldRed = 0xFFF44336.toInt()
+        val mutedClay = 0xFFC48A7D.toInt()
+
+        val normalized = normalizeHabitColors(listOf(habitWithColor(oldRed)), schemaVersion = 2)
+
+        assertEquals(mutedClay, normalized.single().colorArgb)
     }
 
     @Test
