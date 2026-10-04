@@ -1,0 +1,9 @@
+Constanza 1.1.0: a new design.
+
+• A calm graphite look with the Geist typeface and better contrast.
+• Each habit carries a small colour dot; names read in a single tone.
+• Answering is clearer: round ✕ and ✓ buttons and a bar with your progress for the day.
+• The habit list shows each habit's schedule and time.
+• A palette of 12 softer colours; your habits move to the closest new colour on their own.
+
+No accounts, no cloud, no ads, no tracking.

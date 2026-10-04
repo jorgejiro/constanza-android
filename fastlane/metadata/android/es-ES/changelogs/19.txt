@@ -1,0 +1,9 @@
+Constanza 1.1.0: nuevo diseño.
+
+• Aspecto sobrio en grafito, con tipografía Geist y mejor contraste.
+• Cada hábito lleva un punto de color discreto; los nombres se leen en un solo tono.
+• Responder es más claro: botones redondos ✕ y ✓, y una barra con tu progreso del día.
+• La lista de hábitos muestra la frecuencia y la hora de cada uno.
+• Paleta de 12 colores más suaves; tus hábitos pasan solos al color nuevo más parecido.
+
+Sin cuentas, sin nube, sin anuncios, sin seguimiento.
