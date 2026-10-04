@@ -35,7 +35,7 @@ import java.time.Instant
 private const val WAIT_TIMEOUT_MS = 5_000L
 private const val HABIT_NAME = "Stretch"
 private const val HABIT_COLOR_ARGB = 0xFF2196F3.toInt() // HabitColor.BLUE, arbitrary for this test
-private const val OTHER_HABIT_COLOR_ARGB = 0xFF4CAF50.toInt() // HabitColor.GREEN, arbitrary for this test
+private const val OTHER_HABIT_COLOR_ARGB = 0xFF4CAF50.toInt() // a retired green preset, arbitrary for this test
 
 /**
  * `habit-management`: "Habit Colour Visible Where Habits Are Listed", in its graphite form

@@ -82,10 +82,7 @@ class NotificationPoster @Inject constructor(
      * own content, and is deliberately NOT resolved through [localizedContext] or any string
      * resource (reminder-response: the notification body is never localized).
      */
-    // `colorArgb` is no longer painted (see the class KDoc) but stays in the signature: removing it
-    // touches the scheduling worker that calls this, which belongs to a separate change.
-    @Suppress("UnusedParameter", "UNUSED_PARAMETER")
-    suspend fun postReminder(occurrenceId: Long, habitName: String, colorArgb: Int): Boolean {
+    suspend fun postReminder(occurrenceId: Long, habitName: String): Boolean {
         val localizedContext = appLocaleController.localizedApplicationContext()
         if (!canPost(localizedContext)) return false
         postToSystem(occurrenceId, buildNotification(localizedContext, occurrenceId, habitName))

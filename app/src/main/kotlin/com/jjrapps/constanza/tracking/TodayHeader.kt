@@ -1,14 +1,11 @@
 package com.jjrapps.constanza.tracking
 
 import android.text.format.DateFormat
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
@@ -16,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,14 +26,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.ProgressBarRangeInfo
-import androidx.compose.ui.semantics.progressBarRangeInfo
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.component.ProgressLine
 import com.jjrapps.constanza.core.ui.icons.ConstanzaIcons
 import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.core.ui.theme.Dimens
@@ -180,27 +174,6 @@ private fun DayChevron(icon: ImageVector, description: String, onClick: () -> Un
             contentDescription = description,
             tint = ConstanzaColors.OnBackgroundVariant,
             modifier = Modifier.size(CHEVRON_ICON_SIZE),
-        )
-    }
-}
-
-/** A 4dp rounded line: the day's answered share in the text colour over a dark track. Exposes its
- *  value as progress-bar semantics, so TalkBack reads it as progress rather than skipping a box. */
-@Composable
-private fun ProgressLine(fraction: Float, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(Dimens.ProgressBar / 2)
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(Dimens.ProgressBar)
-            .semantics { progressBarRangeInfo = ProgressBarRangeInfo(fraction, 0f..1f) }
-            .background(ConstanzaColors.SurfaceSelected, shape),
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth(fraction)
-                .fillMaxHeight()
-                .background(ConstanzaColors.OnBackground, shape),
         )
     }
 }

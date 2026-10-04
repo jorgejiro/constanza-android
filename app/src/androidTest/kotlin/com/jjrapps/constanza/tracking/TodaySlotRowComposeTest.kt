@@ -53,8 +53,8 @@ private const val LONG_HABIT_NAME = "Hacer ejercicios de movilidad en la primera
  *
  * Defect 1 was originally reported as "Skip" wrapping mid-word to "Ski / p", compared against
  * "Yes"'s reference height. today-one-line-row deletes the "Skip" pending control (and the
- * text-driven `TextButton`s it wrapped) outright, replacing it with two fixed-size pills that
- * cannot wrap at all — see `theAnswerPillsStayOnScreenNextToALongHabitNameOnAPhone` for what
+ * text-driven `TextButton`s it wrapped) outright, replacing it with two fixed-size controls that
+ * cannot wrap at all — see `theAnswerButtonsStayOnScreenNextToALongHabitNameOnAPhone` for what
  * survives of that defect.
  *
  * today-status-icons folds in the slice that replaced the answered-slot status WORD with a glyph:
@@ -92,16 +92,16 @@ class TodaySlotRowComposeTest {
      * today-one-line-row: the original defect here was "Skip" wrapping mid-word next to a long
      * habit name, comparing button heights — that premise is gone along with the "Skip" pending
      * control itself (deleted from the row) and the text-driven `TextButton`s it wrapped inside.
-     * [TodayAnswerPills] paints a fixed 46x28dp box (`Dimens.AnswerPillWidth`/`AnswerPillHeight`),
-     * so neither pill can ever wrap — there is no longer a label long enough to test that with.
+     * [TodayAnswerButtons] paints fixed 44dp round icon buttons (`Dimens.AnswerButton`), so neither
+     * can ever wrap — there is no longer a label long enough to test that with.
      *
      * What survives from the original defect is its other half: answer controls must not run past
      * the screen's right edge next to a long name. The habit name carries `weight(1f)` precisely so
-     * IT wraps under length pressure rather than squeezing the pills — this proves that still holds
+     * IT wraps under length pressure rather than squeezing the buttons — this proves that still holds
      * for the reported name.
      */
     @Test
-    fun theAnswerPillsStayOnScreenNextToALongHabitNameOnAPhone(): Unit = runBlocking {
+    fun theAnswerButtonsStayOnScreenNextToALongHabitNameOnAPhone(): Unit = runBlocking {
         fixture.seedHabitWithEnabledSlot(name = LONG_HABIT_NAME, minuteOfDay = MORNING_MINUTE)
         viewModel.awaitRows(1)
 
@@ -112,7 +112,7 @@ class TodaySlotRowComposeTest {
 
         val no = composeTestRule.onNode(isAnswerNoButton()).fetchSemanticsNode().boundsInRoot
         assertTrue(
-            "the answer pills ran past the right edge of a ${PHONE_WIDTH_DP}dp screen",
+            "the answer buttons ran past the right edge of a ${PHONE_WIDTH_DP}dp screen",
             no.right <= composeTestRule.onRoot().fetchSemanticsNode().boundsInRoot.right,
         )
     }
@@ -147,8 +147,8 @@ class TodaySlotRowComposeTest {
      * still render, per today-status-icons point 3, and it still has to respect the device's own
      * hour-cycle setting.
      *
-     * today-one-line-row: the time is now its own bare `Text` node (`TodaySlotTrailing`), rendered
-     * ahead of the answer pills rather than joined into one status sentence with a demoted status
+     * today-one-line-row: the time is now its own bare `Text` node (`SlotTrailing` in
+     * `TodayHabitRows.kt`), rendered ahead of the answer buttons rather than joined into one status sentence with a demoted status
      * word — there is no longer a status word to join it to on a pending row. Asserted as an exact
      * node rather than a joined string.
      */

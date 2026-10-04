@@ -87,13 +87,13 @@ class ReminderFireWorkerTest {
 
     @Test
     fun postsTheNotificationAndRecordsFiredState() = runBlocking {
-        coEvery { notificationPoster.postReminder(any(), any(), any()) } returns true
+        coEvery { notificationPoster.postReminder(any(), any()) } returns true
         val habitId = insertHabit(kind = "DAILY")
         val now = Instant.parse("2026-09-01T08:00:00Z")
         val occId = insertArmedOccurrence(habitId, "2026-09-01", now)
         buildWorker(occId, now).doWork()
 
-        coVerify { notificationPoster.postReminder(occId, "Exercise", 0) }
+        coVerify { notificationPoster.postReminder(occId, "Exercise") }
         val stored = database.reminderOccurrenceDao().findById(occId)
         assertEquals("FIRED", stored?.state)
         assertEquals(now.toEpochMilli(), stored?.notifiedAtEpochMs)
@@ -109,7 +109,7 @@ class ReminderFireWorkerTest {
      */
     @Test
     fun aGatedPostRecordsNoNotifiedAtAndStillLandsOnFired() = runBlocking {
-        coEvery { notificationPoster.postReminder(any(), any(), any()) } returns false
+        coEvery { notificationPoster.postReminder(any(), any()) } returns false
         val habitId = insertHabit(kind = "DAILY")
         val now = Instant.parse("2026-09-01T08:00:00Z")
         val occId = insertArmedOccurrence(habitId, "2026-09-01", now)
@@ -131,7 +131,7 @@ class ReminderFireWorkerTest {
         val occId = insertArmedOccurrence(habitId, "2026-09-02", now)
         buildWorker(occId, now).doWork()
 
-        coVerify(exactly = 0) { notificationPoster.postReminder(any(), any(), any()) }
+        coVerify(exactly = 0) { notificationPoster.postReminder(any(), any()) }
         assertEquals("SUPPRESSED", database.reminderOccurrenceDao().findById(occId)?.state)
     }
 
@@ -155,7 +155,7 @@ class ReminderFireWorkerTest {
         val occId = insertArmedOccurrence(habitId, "2026-09-01", now)
         buildWorker(occId, now).doWork()
 
-        coVerify(exactly = 0) { notificationPoster.postReminder(any(), any(), any()) }
+        coVerify(exactly = 0) { notificationPoster.postReminder(any(), any()) }
         assertEquals("SUPPRESSED", database.reminderOccurrenceDao().findById(occId)?.state)
         assertTrue(
             "a suppressed-by-answer occurrence must be invisible to the midnight sweep",
@@ -173,7 +173,7 @@ class ReminderFireWorkerTest {
         val occId = insertArmedOccurrence(habitId, "2026-09-01", now)
         buildWorker(occId, now).doWork()
 
-        coVerify(exactly = 0) { notificationPoster.postReminder(any(), any(), any()) }
+        coVerify(exactly = 0) { notificationPoster.postReminder(any(), any()) }
         assertEquals("SUPPRESSED", database.reminderOccurrenceDao().findById(occId)?.state)
     }
 
@@ -182,14 +182,14 @@ class ReminderFireWorkerTest {
      *  provisional verdict awaiting an answer, so it must still fire. */
     @Test
     fun aMissedEntryStillFires() = runBlocking {
-        coEvery { notificationPoster.postReminder(any(), any(), any()) } returns true
+        coEvery { notificationPoster.postReminder(any(), any()) } returns true
         val habitId = insertHabit(kind = "DAILY")
         database.entryDao().insert(completedEntry(habitId, "2026-09-01").copy(status = "MISSED"))
         val now = Instant.parse("2026-09-01T08:00:00Z")
         val occId = insertArmedOccurrence(habitId, "2026-09-01", now)
         buildWorker(occId, now).doWork()
 
-        coVerify { notificationPoster.postReminder(occId, "Exercise", 0) }
+        coVerify { notificationPoster.postReminder(occId, "Exercise") }
         assertEquals("FIRED", database.reminderOccurrenceDao().findById(occId)?.state)
     }
 
@@ -203,7 +203,7 @@ class ReminderFireWorkerTest {
         val occId = insertArmedOccurrence(habitId, "2026-09-01", now, slotId = 42)
         buildWorker(occId, now).doWork()
 
-        coVerify(exactly = 0) { notificationPoster.postReminder(any(), any(), any()) }
+        coVerify(exactly = 0) { notificationPoster.postReminder(any(), any()) }
         assertEquals("SUPPRESSED", database.reminderOccurrenceDao().findById(occId)?.state)
     }
 

@@ -17,8 +17,8 @@ import com.jjrapps.constanza.core.ui.theme.Dimens
 /**
  * Graphite redesign: a 4dp rounded line, [fraction] of it in the text colour over a dark track
  * ([ConstanzaColors.SurfaceSelected]). Exposes its value as progress-bar semantics, so TalkBack reads
- * it as progress rather than skipping a box. Same look as Today's own day-progress line
- * (`tracking.TodayHeader`), shared here for the Progress screen's compliance bar.
+ * it as progress rather than skipping a box. Shared by Today's day-progress line
+ * (`tracking.TodayHeader`) and the Progress screen's compliance bar.
  */
 @Composable
 fun ProgressLine(fraction: Float, modifier: Modifier = Modifier) {

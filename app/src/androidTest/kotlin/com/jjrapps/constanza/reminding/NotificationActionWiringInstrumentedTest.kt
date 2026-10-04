@@ -26,7 +26,6 @@ import java.util.concurrent.TimeUnit
 
 private const val YES_OCCURRENCE_ID = 9101L
 private const val SNOOZE_OCCURRENCE_ID = 9102L
-private const val HABIT_COLOR_ARGB = -14575885
 private const val SEND_TIMEOUT_SECONDS = 5L
 private const val POLL_TIMEOUT_MS = 5_000L
 private const val POLL_INTERVAL_MS = 50L
@@ -106,7 +105,7 @@ class NotificationActionWiringInstrumentedTest {
     }
 
     private fun postAndFindAction(occurrenceId: Long, labelRes: Int): Notification.Action {
-        runBlocking { poster.postReminder(occurrenceId, "Meditate", HABIT_COLOR_ARGB) }
+        runBlocking { poster.postReminder(occurrenceId, "Meditate") }
         val posted = awaitPosted(occurrenceId)
         val label = context.getString(labelRes)
         return posted.notification.actions.first { it.title == label }

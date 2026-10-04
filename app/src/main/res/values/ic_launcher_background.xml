@@ -5,8 +5,9 @@
         than a drawable: <adaptive-icon>'s <background> accepts a colour directly, and a
         one-colour vector or shape drawable would only be another file to keep in sync.
 
-        Must match ConstanzaColors.BACKGROUND_ARGB (#110B06), the same warm-dark ground as
-        colors.xml's window_background.
+        #110B06 is the original warm-dark ground the icon was designed on. The graphite redesign
+        moved the in-app background to #141416 but left the launcher icon unchanged on purpose;
+        nothing binds this colour to the app theme.
     -->
     <color name="ic_launcher_background">#110B06</color>
 </resources>

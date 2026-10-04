@@ -20,9 +20,10 @@
     every neighbouring icon in the app drawer. The 2dp at risk is the arrowhead's tip, and only on
     a mask tighter than 70dp.
 
-    The tick is ConstanzaColors.StatusCompleted (#5FA867), the exact tone the Today screen draws a
-    completed habit in, so the icon shows the app's own "done" glyph rather than a colour chosen to
-    look nice. The ring is white rather than a brand colour on purpose: by the ratified
+    The tick is #5FA867, the tone the Today screen used to draw a completed habit in when the icon
+    was designed, so the icon shows the app's own "done" glyph rather than a colour chosen to look
+    nice. The graphite redesign made the in-app glyphs neutral but left the launcher icon unchanged
+    on purpose. The ring is white rather than a brand colour on purpose: by the ratified
     `Habit Colour Is The Only Chroma`, chroma belongs to habits, and the launcher is the one place
     this app is allowed an identity of its own without competing with anything.
 

@@ -25,10 +25,9 @@ import com.jjrapps.constanza.domain.model.EntryStatus
  * Shaped like [com.jjrapps.constanza.habit.HabitListScreen]'s `DeleteHabitDialog` and
  * [com.jjrapps.constanza.portability.DataPortabilityScreen]'s `ImportConfirmDialog` — a plain
  * [AlertDialog] titled with the subject at stake, dismissible by its own Cancel button — and its
- * option list follows [com.jjrapps.constanza.reminding.SnoozeSettingsScreen]'s
- * `SnoozeDurationRow` precedent: one `Role.RadioButton`-selectable row per choice, the current
- * answer pre-selected. Unlike that settings screen, choosing a row here both answers AND closes
- * the dialog immediately — there is nothing left to confirm once an option is picked, so
+ * option list is a single-choice list: one `Role.RadioButton`-selectable row per choice, the
+ * current answer pre-selected (the same semantics Settings' snooze chips keep). Choosing a row
+ * here both answers AND closes the dialog immediately — there is nothing left to confirm once an option is picked, so
  * [confirmButton] is empty rather than a second, redundant action.
  *
  * Exactly three rows, in the order the brief specifies: Sí, No, Omitido — reusing
