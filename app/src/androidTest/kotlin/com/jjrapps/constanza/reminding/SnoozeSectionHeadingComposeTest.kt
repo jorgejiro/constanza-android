@@ -23,7 +23,7 @@ import org.junit.runner.RunWith
  * `androidTest` can satisfy that call today. Rather than stand up that infrastructure for one
  * heading assertion, this test renders the exact two production composables the screen's snooze
  * section is built from — [SectionHeader] with the real `settings_snooze_section_title` resource,
- * and [SnoozeDurationRow] (widened to `internal` for exactly this) — side by side, the same way
+ * and [SnoozeDurationChip] (widened to `internal` for exactly this) — side by side, the same way
  * `SnoozeSettingsScreen` places them.
  */
 @RunWith(AndroidJUnit4::class)
@@ -39,7 +39,7 @@ class SnoozeSectionHeadingComposeTest {
         composeTestRule.setContent {
             Column {
                 SectionHeader(stringResource(R.string.settings_snooze_section_title))
-                SnoozeDurationRow(SnoozeDuration.TEN_MINUTES, selected = false, onSelect = {})
+                SnoozeDurationChip(SnoozeDuration.TEN_MINUTES, selected = false, onSelect = {})
             }
         }
 

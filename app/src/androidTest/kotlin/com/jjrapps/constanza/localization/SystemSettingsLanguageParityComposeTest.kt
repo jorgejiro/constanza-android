@@ -7,9 +7,13 @@ import android.os.LocaleList
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jjrapps.constanza.R
@@ -115,10 +119,13 @@ class SystemSettingsLanguageParityComposeTest {
             composeTestRule.onAllNodesWithText(spanishLabel).fetchSemanticsNodes().isNotEmpty() &&
                 viewModel.selected.value == AppLanguage.Spanish
         }
-        composeTestRule.onNodeWithText(spanishLabel).assertIsSelected()
+        // Graphite layout: the section row names the current choice (asserted by the wait above);
+        // the radio options live in its dialog, where the selection is checked.
+        composeTestRule.onNodeWithText(spanishLabel).performClick()
+        composeTestRule.onNode(hasText(spanishLabel) and hasAnyAncestor(isDialog())).assertIsSelected()
         // The view model is seeded with SystemDefault, so this is what the picker would still show
         // if the ON_START re-read had never happened.
-        composeTestRule.onNodeWithText(systemDefaultLabel).assertIsNotSelected()
+        composeTestRule.onNode(hasText(systemDefaultLabel) and hasAnyAncestor(isDialog())).assertIsNotSelected()
     }
 
     companion object {

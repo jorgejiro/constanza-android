@@ -1,25 +1,20 @@
 package com.jjrapps.constanza.localization
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleStartEffect
 import com.jjrapps.constanza.R
-import com.jjrapps.constanza.core.ui.component.SectionDivider
 import com.jjrapps.constanza.core.ui.component.SectionHeader
+import com.jjrapps.constanza.core.ui.component.SettingsNavigationRow
+import com.jjrapps.constanza.core.ui.component.SettingsRowDivider
+import com.jjrapps.constanza.core.ui.component.SingleChoiceDialog
 
 /**
  * app-localization: Three-State Language Override — the picker, as a third section on the existing
@@ -48,38 +43,31 @@ fun LanguageSection(viewModel: LanguageSettingsViewModel = hiltViewModel()) {
 
 /**
  * Presentational half, following this codebase's container/presentational split: it takes the
- * selection and the callback and owns no state, so a Compose test can drive it with
- * `createComposeRule()` and no Hilt-enabled Activity.
+ * selection and the callback and owns no state beyond whether its dialog is open, so a Compose test
+ * can drive it with `createComposeRule()` and no Hilt-enabled Activity.
+ *
+ * Graphite redesign: one row naming the current choice, opening a small dialog with the three
+ * options as radio rows.
  */
 @Composable
 fun LanguageSectionContent(selected: AppLanguage, onSelect: (AppLanguage) -> Unit) {
-    Column(modifier = Modifier.padding(16.dp)) {
-        // settings-section-headings: the Column above already supplies the 16dp screen inset every
-        // row here shares, so the header's own horizontal inset is zeroed out — otherwise it would
-        // sit indented past the radio rows it introduces.
-        SectionHeader(stringResource(R.string.settings_language_section_title), startInset = 0.dp, endInset = 0.dp)
-        SectionDivider(startInset = 0.dp, endInset = 0.dp)
-        AppLanguage.entries.forEach { language ->
-            LanguageRow(
-                language = language,
-                selected = language == selected,
-                onSelect = onSelect,
-            )
-        }
+    var showDialog by rememberSaveable { mutableStateOf(false) }
+    Column {
+        SectionHeader(stringResource(R.string.settings_language_section_title))
+        SettingsNavigationRow(title = languageLabel(selected), onClick = { showDialog = true })
+        SettingsRowDivider()
     }
-}
-
-@Composable
-private fun LanguageRow(language: AppLanguage, selected: Boolean, onSelect: (AppLanguage) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .selectable(selected = selected, onClick = { onSelect(language) }, role = Role.RadioButton)
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(selected = selected, onClick = null)
-        Text(languageLabel(language), modifier = Modifier.padding(start = 16.dp))
+    if (showDialog) {
+        SingleChoiceDialog(
+            title = stringResource(R.string.settings_language_section_title),
+            options = AppLanguage.entries.map { it to languageLabel(it) },
+            selected = selected,
+            onSelect = {
+                onSelect(it)
+                showDialog = false
+            },
+            onDismiss = { showDialog = false },
+        )
     }
 }
 

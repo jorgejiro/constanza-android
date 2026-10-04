@@ -8,9 +8,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.habit.HabitEditorUiState
@@ -120,8 +124,11 @@ class LanguageOverrideComposeTest {
             }
         }
 
-        composeTestRule.onNodeWithText(ENGLISH_LANGUAGE_NAME).assertIsDisplayed()
-        composeTestRule.onNodeWithText(SPANISH_LANGUAGE_NAME).assertIsDisplayed()
+        // Graphite layout: the section row names the current choice; the picker is its dialog.
+        composeTestRule.onNodeWithText(SPANISH_LANGUAGE_NAME).performClick()
+
+        composeTestRule.onNode(hasText(ENGLISH_LANGUAGE_NAME) and hasAnyAncestor(isDialog())).assertIsDisplayed()
+        composeTestRule.onNode(hasText(SPANISH_LANGUAGE_NAME) and hasAnyAncestor(isDialog())).assertIsDisplayed()
     }
 
     /**

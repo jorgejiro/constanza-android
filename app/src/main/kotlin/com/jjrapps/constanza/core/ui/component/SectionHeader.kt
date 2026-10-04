@@ -2,13 +2,11 @@ package com.jjrapps.constanza.core.ui.component
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.core.ui.theme.Spacing
 
@@ -51,24 +49,5 @@ fun SectionHeader(
             .padding(start = startInset, end = endInset, top = Spacing.xl, bottom = Spacing.xs),
         style = MaterialTheme.typography.labelMedium,
         color = ConstanzaColors.OnBackgroundMuted,
-    )
-}
-
-/**
- * today-grouped-sections: a 1dp hairline directly under a [SectionHeader] — NEVER full-bleed, or
- * it would compete with the one left edge every other line on Today shares. Coloured with the
- * app's own real divider role (`ConstanzaColors.Divider`, bound to `colorScheme.outlineVariant`),
- * never an invented low-alpha overlay.
- */
-@Composable
-fun SectionDivider(
-    modifier: Modifier = Modifier,
-    startInset: Dp = Spacing.lg,
-    endInset: Dp = Spacing.lg,
-) {
-    HorizontalDivider(
-        modifier = modifier.fillMaxWidth().padding(start = startInset, end = endInset),
-        thickness = 1.dp,
-        color = MaterialTheme.colorScheme.outlineVariant,
     )
 }
