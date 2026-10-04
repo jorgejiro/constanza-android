@@ -427,14 +427,14 @@ private fun HabitRollupHeader(
  *
  *  today-one-line-row, point 2: an ANSWERED slot's whole line is now the tap target that opens
  *  [ChangeAnswerDialog] — "Cambiar" is gone, so the row itself has to say it is tappable. A pending
- *  slot's line carries no click of its own; only its two [TodayAnswerPills] do.
+ *  slot's line carries no click of its own; only its two [TodayAnswerButtons] do.
  *
  *  today-one-line-row, vertical-rhythm correction: [Dimens.MinTouchTarget] is a real MINIMUM
  *  height on this whole row now, not merely on a child inside it. The first cut of this redesign
  *  read "fix it downward, not upward" as absolute and kept this row at text height even once
  *  answered — correct while the row was passive, wrong the moment it became the ONLY route to
  *  [ChangeAnswerDialog]: a muted (Contestados) answered row measured 28.6dp tall on a real render,
- *  a control a finger can miss. [reportPaintedHeight] (on the pills, `TodayAnswerPills.kt`, and on
+ *  a control a finger can miss. [reportPaintedHeight] (on the pills, `TodayAnswerButtons.kt`, and on
  *  the multi-slot expander, [HabitRollupHeader]) still does real work here — it stops THEIR OWN
  *  48dp touch targets from becoming a SECOND, independent reason this row grows past the floor —
  *  but the floor itself now belongs to the row, applied unconditionally to both pending and
@@ -520,7 +520,7 @@ private fun answeredRowDescription(habitName: String, slot: TodaySlot, time: Str
  * name line for a single-slot habit ([SingleSlotRow]), or one [SlotRow] line per slot once a
  * multi-slot habit is expanded. Lifted straight from `TodayOneLineRowPrototype`'s own `Trailing`:
  * the scheduled time (only when [timeIsIdentity], today-status-icons point 3) leads, then either
- * two [TodayAnswerPills] or the answered glyph — never a status WORD, which is the whole point:
+ * two [TodayAnswerButtons] or the answered glyph — never a status WORD, which is the whole point:
  * a row offering Sí/No is pending by definition, so "Pendiente" said nothing "Sí"/"No" did not
  * already say louder.
  *
@@ -551,7 +551,7 @@ private fun TodaySlotTrailing(
                 Text(snoozeSentence(epochMs, zone), style = MaterialTheme.typography.bodyMedium, color = demotedColor)
                 Spacer(Modifier.width(Spacing.sm))
             }
-            TodayAnswerPills(row.habitName) { status -> actions.onAnswer(row.habitId, slot, status) }
+            TodayAnswerButtons(row.habitName, filled = false) { status -> actions.onAnswer(row.habitId, slot, status) }
         } else {
             AnsweredStatusRow(status = slot.status)
         }

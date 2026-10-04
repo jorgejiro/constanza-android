@@ -70,8 +70,8 @@ class TodayOneLineRowComposeTest {
         viewModel.awaitRows(1)
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
 
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).assertCountEquals(1)
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_no)).assertCountEquals(1)
+        composeTestRule.onAllNodes(isAnswerYesButton()).assertCountEquals(1)
+        composeTestRule.onAllNodes(isAnswerNoButton()).assertCountEquals(1)
         composeTestRule.onNodeWithText("Omitir").assertDoesNotExist()
         composeTestRule.onNodeWithText("Skip").assertDoesNotExist()
     }
@@ -84,7 +84,7 @@ class TodayOneLineRowComposeTest {
         viewModel.awaitRows(1)
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
 
-        composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).performClick()
+        composeTestRule.onNode(isAnswerYesButton()).performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.COMPLETED)
 
         composeTestRule.onNodeWithContentDescription(
@@ -92,8 +92,8 @@ class TodayOneLineRowComposeTest {
         ).performClick()
 
         // The row itself still carries "Journal" behind the dialog (its own name text), so the
-        // dialog's presence is asserted through its three options instead — none of which the row,
-        // now answered and showing only a glyph, renders on its own.
+        // dialog's presence is asserted through its three text options instead — the row's own
+        // answer buttons are icons with no text, so these can only be the dialog's.
         composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).assertExists()
         composeTestRule.onNodeWithText(text(R.string.today_answer_no)).assertExists()
         composeTestRule.onNodeWithText(text(R.string.today_slot_skipped)).assertExists()
@@ -108,7 +108,7 @@ class TodayOneLineRowComposeTest {
         viewModel.awaitRows(1)
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
 
-        composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).performClick()
+        composeTestRule.onNode(isAnswerYesButton()).performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.COMPLETED)
 
         composeTestRule.onNodeWithContentDescription(
@@ -126,11 +126,9 @@ class TodayOneLineRowComposeTest {
     }
 
     /**
-     * "A tap target below 48dp anywhere in this row is a defect." Both answer pills are queried by
-     * their own visible text: `Modifier.clickable`'s `shouldMergeDescendantSemantics` merges a
-     * clickable node's descendants into itself for semantics purposes, so the node `onNodeWithText`
-     * resolves here IS the pill's outer touch-target `Box` — sized [Dimens.AnswerPillTouchTarget]
-     * — not the smaller label `Text` alone. The answered row's own click target is checked the same
+     * "A tap target below 48dp anywhere in this row is a defect." Both answer buttons are queried by
+     * their accessible label, which sits on the clickable outer touch-target `Box` itself — sized
+     * [Dimens.AnswerButtonTouchTarget] — not on the 44dp circle painted inside it. The answered row's own click target is checked the same
      * way, by its change-dialog `contentDescription`.
      */
     @Test
@@ -139,10 +137,10 @@ class TodayOneLineRowComposeTest {
         viewModel.awaitRows(1)
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
 
-        val minimumPx = with(composeTestRule.density) { Dimens.AnswerPillTouchTarget.toPx() }
-        val yesBounds = composeTestRule.onNodeWithText(text(R.string.today_answer_yes))
+        val minimumPx = with(composeTestRule.density) { Dimens.AnswerButtonTouchTarget.toPx() }
+        val yesBounds = composeTestRule.onNode(isAnswerYesButton())
             .fetchSemanticsNode().boundsInRoot
-        val noBounds = composeTestRule.onNodeWithText(text(R.string.today_answer_no))
+        val noBounds = composeTestRule.onNode(isAnswerNoButton())
             .fetchSemanticsNode().boundsInRoot
         assertTrue(
             "the Sí pill's hit box is ${yesBounds.width}x${yesBounds.height}px, below ${minimumPx}px",
@@ -153,7 +151,7 @@ class TodayOneLineRowComposeTest {
             noBounds.width >= minimumPx && noBounds.height >= minimumPx,
         )
 
-        composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).performClick()
+        composeTestRule.onNode(isAnswerYesButton()).performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.COMPLETED)
 
         val rowBounds = composeTestRule.onNodeWithContentDescription(

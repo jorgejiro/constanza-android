@@ -110,27 +110,27 @@ class TodayAnsweredSlotComposeTest {
         expandRow()
 
         // All three pending: three full sets of answer pills on screen.
-        assertEquals(3, composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).fetchSemanticsNodes().size)
+        assertEquals(3, composeTestRule.onAllNodes(isAnswerYesButton()).fetchSemanticsNodes().size)
 
         // Slot 0 -> Yes (Done). Answered slots always sit first among the remaining pending ones,
         // since an answered slot drops its own pending pills — deterministic without needing a
         // node index that survives the collapse.
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes))[0].performClick()
+        composeTestRule.onAllNodes(isAnswerYesButton())[0].performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.COMPLETED)
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_completed)).assertExists()
-        assertEquals(2, composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).fetchSemanticsNodes().size)
+        assertEquals(2, composeTestRule.onAllNodes(isAnswerYesButton()).fetchSemanticsNodes().size)
 
         // Slot 1 -> No (Missed). Slot 0's Done glyph is untouched by this.
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_no))[0].performClick()
+        composeTestRule.onAllNodes(isAnswerNoButton())[0].performClick()
         viewModel.awaitSlotStatus(slotIndex = 1, status = EntryStatus.MISSED)
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_missed)).assertExists()
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_completed)).assertExists()
 
         // Slot 2 -> Yes (Done). No pending pills remain anywhere on the row.
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes))[0].performClick()
+        composeTestRule.onAllNodes(isAnswerYesButton())[0].performClick()
         viewModel.awaitSlotStatus(slotIndex = 2, status = EntryStatus.COMPLETED)
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).assertCountEquals(0)
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_no)).assertCountEquals(0)
+        composeTestRule.onAllNodes(isAnswerYesButton()).assertCountEquals(0)
+        composeTestRule.onAllNodes(isAnswerNoButton()).assertCountEquals(0)
         assertEquals(2, composeTestRule.onAllNodesWithContentDescription(text(R.string.today_slot_completed)).fetchSemanticsNodes().size)
 
         // Reopen slot 0 only, by its own distinct row description (time-led, since this is a
@@ -151,8 +151,8 @@ class TodayAnsweredSlotComposeTest {
         // assertion below is what actually proves the reopen worked: two Missed glyphs now, not one.
         assertEquals(2, composeTestRule.onAllNodesWithContentDescription(text(R.string.today_slot_missed)).fetchSemanticsNodes().size)
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_completed)).assertExists()
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).assertCountEquals(0)
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_no)).assertCountEquals(0)
+        composeTestRule.onAllNodes(isAnswerYesButton()).assertCountEquals(0)
+        composeTestRule.onAllNodes(isAnswerNoButton()).assertCountEquals(0)
     }
 
     /**
@@ -172,11 +172,11 @@ class TodayAnsweredSlotComposeTest {
         seedThreeSlotHabit("Stretch")
         expandRow()
 
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes))[0].performClick()
+        composeTestRule.onAllNodes(isAnswerYesButton())[0].performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.COMPLETED)
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_no))[0].performClick()
+        composeTestRule.onAllNodes(isAnswerNoButton())[0].performClick()
         viewModel.awaitSlotStatus(slotIndex = 1, status = EntryStatus.MISSED)
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes))[0].performClick()
+        composeTestRule.onAllNodes(isAnswerYesButton())[0].performClick()
         viewModel.awaitSlotStatus(slotIndex = 2, status = EntryStatus.COMPLETED)
 
         val morning = expectedTimeOnDevice(inTwentyFourHour = "08:00", inTwelveHour = "8:00 AM")
@@ -215,10 +215,10 @@ class TodayAnsweredSlotComposeTest {
         viewModel.awaitOneRowWithSlots(1)
 
         composeTestRule.setContent { TodayRoute(onManageHabits = {}, viewModel = viewModel) }
-        composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).performClick()
+        composeTestRule.onNode(isAnswerYesButton()).performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.COMPLETED)
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_completed)).assertExists()
-        composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).assertCountEquals(0)
+        composeTestRule.onAllNodes(isAnswerYesButton()).assertCountEquals(0)
 
         composeTestRule.onNodeWithContentDescription(
             changeDescription("Read", text(R.string.today_slot_completed)),
@@ -229,6 +229,7 @@ class TodayAnsweredSlotComposeTest {
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.MISSED)
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_missed)).assertExists()
         composeTestRule.onAllNodesWithText(text(R.string.today_answer_no)).assertCountEquals(0)
+        composeTestRule.onAllNodes(isAnswerNoButton()).assertCountEquals(0)
         // Recollapsed with its OWN new change route, proving the row offers one again.
         composeTestRule.onNodeWithContentDescription(
             changeDescription("Read", text(R.string.today_slot_missed)),
@@ -287,6 +288,6 @@ class TodayAnsweredSlotComposeTest {
         ).assertExists()
         val snoozedPrefix = text(R.string.today_slot_pending_snoozed_until).substringBefore("%")
         composeTestRule.onNodeWithText(snoozedPrefix, substring = true).assertDoesNotExist()
-        assertFalse(composeTestRule.onAllNodesWithText(text(R.string.today_answer_yes)).fetchSemanticsNodes().isNotEmpty())
+        assertFalse(composeTestRule.onAllNodes(isAnswerYesButton()).fetchSemanticsNodes().isNotEmpty())
     }
 }

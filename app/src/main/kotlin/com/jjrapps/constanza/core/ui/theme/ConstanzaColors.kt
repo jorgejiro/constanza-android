@@ -28,8 +28,6 @@ internal object ConstanzaColors {
     private const val ON_BACKGROUND_VARIANT_ARGB = 0xFFADADB5.toInt()
     private const val ON_BACKGROUND_MUTED_ARGB = 0xFF8C8C95.toInt()
     private const val DESTRUCTIVE_ARGB = 0xFFE3A39A.toInt()
-    private const val STATUS_COMPLETED_ARGB = 0xFF5FA867.toInt()
-    private const val STATUS_MISSED_ARGB = 0xFFE07B74.toInt()
 
     /** Every screen sits on this. */
     val Background = Color(BACKGROUND_ARGB)
@@ -100,18 +98,4 @@ internal object ConstanzaColors {
      * [SurfaceRaised].
      */
     val Destructive = Color(DESTRUCTIVE_ARGB)
-
-    /**
-     * The tick glyph on an answered [com.jjrapps.constanza.domain.model.EntryStatus.COMPLETED]
-     * Today slot (today-status-icons). Kept from the warm palette until the Today restyle replaces
-     * coloured answer glyphs with neutral ones. Clears SC 1.4.11's 3:1 non-text floor on all four
-     * surface tones; [ColorContrastTest] asserts it.
-     */
-    val StatusCompleted = Color(STATUS_COMPLETED_ARGB)
-
-    /**
-     * The cross glyph on an answered [com.jjrapps.constanza.domain.model.EntryStatus.MISSED] Today
-     * slot (today-status-icons). Same status and guard as [StatusCompleted].
-     */
-    val StatusMissed = Color(STATUS_MISSED_ARGB)
 }

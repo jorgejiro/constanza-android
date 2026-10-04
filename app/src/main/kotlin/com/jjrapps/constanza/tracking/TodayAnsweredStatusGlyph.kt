@@ -3,12 +3,10 @@ package com.jjrapps.constanza.tracking
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -16,18 +14,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import com.jjrapps.constanza.core.ui.icons.ConstanzaIcons
 import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.core.ui.theme.Dimens
 import com.jjrapps.constanza.domain.model.EntryStatus
 
 /**
  * today-status-icons: what an answered Today slot renders instead of the status WORD it used to
- * draw for it — "Hecho"/"No hecho"/"Omitido" become a glyph, because a green tick or a red cross
- * carries the same information at a glance and a repeated row of answered habits used to read as a
- * wall of near-identical sentences.
+ * draw for it — "Hecho"/"No hecho"/"Omitido" become a glyph, because a tick or a cross carries the
+ * same information at a glance and a repeated row of answered habits used to read as a wall of
+ * near-identical sentences.
+ *
+ * Graphite redesign: the glyphs are neutral, never green or red. The tick is
+ * [ConstanzaColors.OnBackgroundVariant]; the cross and the skipped dash recede one step further to
+ * [ConstanzaColors.OnBackgroundMuted], so a day of answers reads as quiet text, not a scoreboard.
  *
  * `SlotRow`/`SingleSlotRow` only reach this for a slot that is actually answered
- * (`COMPLETED`/`MISSED`/`SKIPPED`) — a pending or snoozed slot shows [TodayAnswerPills] instead,
+ * (`COMPLETED`/`MISSED`/`SKIPPED`) — a pending or snoozed slot shows [TodayAnswerButtons] instead,
  * which is why [EntryStatus.UNKNOWN] has no branch below.
  *
  * today-one-line-row: this used to also draw the habit's scheduled slot time beside the glyph, and
@@ -49,16 +53,17 @@ internal fun AnsweredStatusRow(status: EntryStatus, modifier: Modifier = Modifie
 private fun StatusGlyph(status: EntryStatus, modifier: Modifier = Modifier) {
     when (status) {
         EntryStatus.COMPLETED -> Icon(
-            imageVector = Icons.Filled.Check,
+            imageVector = ConstanzaIcons.Check,
             contentDescription = null,
-            tint = ConstanzaColors.StatusCompleted,
+            tint = ConstanzaColors.OnBackgroundVariant,
             modifier = modifier.size(Dimens.StatusGlyph),
         )
         EntryStatus.MISSED -> Icon(
-            imageVector = Icons.Filled.Close,
+            imageVector = ConstanzaIcons.Close,
             contentDescription = null,
-            tint = ConstanzaColors.StatusMissed,
-            modifier = modifier.size(Dimens.StatusGlyph),
+            tint = ConstanzaColors.OnBackgroundMuted,
+            // The board draws the cross a size below the tick (16 vs 18): a miss is noted, not shouted.
+            modifier = modifier.size(Dimens.StatusGlyph).padding(1.dp),
         )
         EntryStatus.SKIPPED -> SkippedDash(modifier)
         // Unreachable: AnsweredStatusRow is only called for a slot SlotRow has already established
@@ -70,20 +75,10 @@ private fun StatusGlyph(status: EntryStatus, modifier: Modifier = Modifier) {
 }
 
 /**
- * `material-icons-core` 1.7.8 — the only icon artifact this project depends on
- * (`app/build.gradle.kts`, no `material-icons-extended`) — has no minus/dash glyph: `Icons.Filled`
- * ships `Check`, `Clear`, `Close`, `Create`, `Delete`, `Done`, `Edit`, `Settings` and roughly forty
- * more, but nothing shaped like a horizontal dash. Adding `material-icons-extended` for one
- * rectangle is not a trade worth making, so `SKIPPED` draws its own: a small rounded bar centred in
- * the same [Dimens.StatusGlyph] square [Icons.Filled.Check]/[Icons.Filled.Close] occupy, so all
- * three glyphs share one optical baseline. [Dimens.StatusGlyphDashWidth]/[Dimens.StatusGlyphDashHeight]
- * approximate the visual width those two vectors actually draw inside that square (a Material glyph
- * does not fill its own viewport) rather than spanning the whole box, which would read as a much
- * heavier mark than a tick or a cross.
- *
- * Tinted [ConstanzaColors.OnBackgroundMuted] rather than either of [ConstanzaColors.StatusCompleted]/
- * [ConstanzaColors.StatusMissed] — `SKIPPED` is neither a pass nor a fail, so it borrows the app's
- * existing "quiet, no verdict" tone instead of a new one measured for this shape alone.
+ * `SKIPPED` is neither a pass nor a fail, so it draws a short rounded dash rather than a tick or a
+ * cross, centred in the same [Dimens.StatusGlyph] square so all three glyphs share one optical
+ * baseline. [Dimens.StatusGlyphDashWidth]/[Dimens.StatusGlyphDashHeight] approximate the visual
+ * width the tick and cross draw inside that square rather than spanning the whole box.
  */
 @Composable
 private fun SkippedDash(modifier: Modifier = Modifier) {

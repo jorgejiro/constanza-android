@@ -107,10 +107,10 @@ class TodaySlotRowComposeTest {
 
         setPhoneSizedContent()
 
-        composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).assertIsDisplayed()
-        composeTestRule.onNodeWithText(text(R.string.today_answer_no)).assertIsDisplayed()
+        composeTestRule.onNode(isAnswerYesButton()).assertIsDisplayed()
+        composeTestRule.onNode(isAnswerNoButton()).assertIsDisplayed()
 
-        val no = composeTestRule.onNodeWithText(text(R.string.today_answer_no)).fetchSemanticsNode().boundsInRoot
+        val no = composeTestRule.onNode(isAnswerNoButton()).fetchSemanticsNode().boundsInRoot
         assertTrue(
             "the answer pills ran past the right edge of a ${PHONE_WIDTH_DP}dp screen",
             no.right <= composeTestRule.onRoot().fetchSemanticsNode().boundsInRoot.right,
@@ -132,7 +132,7 @@ class TodaySlotRowComposeTest {
 
         setPhoneSizedContent()
 
-        composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).assertIsDisplayed()
+        composeTestRule.onNode(isAnswerYesButton()).assertIsDisplayed()
         composeTestRule
             .onNodeWithText(expectedTimeOnDevice(inTwentyFourHour = "08:00", inTwelveHour = "8:00 AM"), substring = true)
             .assertDoesNotExist()
@@ -181,7 +181,7 @@ class TodaySlotRowComposeTest {
         viewModel.awaitRows(1)
 
         setPhoneSizedContent()
-        composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).performClick()
+        composeTestRule.onNode(isAnswerYesButton()).performClick()
 
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.COMPLETED)
         composeTestRule.onNodeWithContentDescription(text(R.string.today_slot_completed)).assertExists()
@@ -204,7 +204,7 @@ class TodaySlotRowComposeTest {
         viewModel.awaitRows(1)
         setPhoneSizedContent()
 
-        composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).performClick()
+        composeTestRule.onNode(isAnswerYesButton()).performClick()
         viewModel.awaitSlotStatus(slotIndex = 0, status = EntryStatus.COMPLETED)
         val completedLabel = text(R.string.today_slot_completed)
         assertTrue(completedLabel.isNotBlank())
@@ -257,7 +257,7 @@ class TodaySlotRowComposeTest {
         setPhoneSizedContent()
         val snoozedPrefix = text(R.string.today_slot_pending_snoozed_until).substringBefore("%")
         composeTestRule.onNodeWithText(snoozedPrefix, substring = true).assertIsDisplayed()
-        composeTestRule.onNodeWithText(text(R.string.today_answer_yes)).assertIsDisplayed()
+        composeTestRule.onNode(isAnswerYesButton()).assertIsDisplayed()
 
         // No answered glyph exists anywhere on this single-row screen: a pending/snoozed slot never
         // reaches AnsweredStatusRow, whichever of the three status words its contentDescription
