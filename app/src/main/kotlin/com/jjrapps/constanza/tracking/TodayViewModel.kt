@@ -317,6 +317,9 @@ class TodayViewModel @Inject constructor(
     }
 }
 
+/** The Unix epoch, spelled out: `LocalDate.EPOCH` is API 34 and minSdk is 31 (lint `NewApi`). */
+private val PLACEHOLDER_DATE: LocalDate = LocalDate.ofEpochDay(0)
+
 data class TodayUiState(
     val rows: List<TodayHabitRow> = emptyList(),
     /** today-grouped-sections, design.md: [rows] grouped into "Ahora"/"Más tarde"/"Hecho" and
@@ -331,7 +334,7 @@ data class TodayUiState(
      *  [TodayViewModel] always constructs a real value from [CurrentDateSource]; the placeholder
      *  default here exists only so previews/tests that do not care about the date compile without
      *  naming one, the same reason [zone] defaults to a fixed value instead of an ambient read. */
-    val date: LocalDate = LocalDate.EPOCH,
+    val date: LocalDate = PLACEHOLDER_DATE,
     /** today-past-day-correction, design.md decision 1/5: `true` exactly when the user has
      *  deliberately navigated away from the live edge. Defaults to `false` — the value that
      *  reproduces existing behaviour — the same discipline [notificationPermission] already

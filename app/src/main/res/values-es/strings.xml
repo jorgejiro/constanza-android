@@ -140,6 +140,7 @@
     <string name="today_section_done">Contestados</string>
     <string name="today_expand">Mostrar horas</string>
     <string name="today_collapse">Ocultar horas</string>
+    <string name="today_progress">%1$d de %2$d</string>
 
     <!-- reminder-response: pending/snoozed rendering by reading reminder_occurrences (task 6b.3, design D3). -->
     <string name="today_slot_pending">Pendiente</string>

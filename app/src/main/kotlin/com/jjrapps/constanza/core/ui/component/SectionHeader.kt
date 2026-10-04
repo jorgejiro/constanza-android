@@ -7,10 +7,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.core.ui.theme.Spacing
 
 /**
@@ -23,10 +22,10 @@ import com.jjrapps.constanza.core.ui.theme.Spacing
  * them had ANY heading style before this — each was a bare [Text] with no `style` argument at
  * all, inheriting `bodyLarge`, identical to the option labels sitting beside it.
  *
- * Built off [MaterialTheme.typography.labelMedium] (its 12sp size is a real token, not a guessed
- * literal) with only weight and letter-spacing added.
+ * Graphite redesign: exactly [MaterialTheme.typography.labelMedium] — 12sp / 500 with 0.08em
+ * tracking, already tuned there — in [ConstanzaColors.OnBackgroundMuted], the label tone. Weight
+ * and tracking are no longer overridden here, so the type scale is the one place they are set.
  */
-private val SECTION_HEADER_LETTER_SPACING = 1.5.sp
 
 /**
  * [title] is a plain [String] rather than a `@StringRes` id or an enum, so this component stays
@@ -50,11 +49,8 @@ fun SectionHeader(
         modifier = modifier
             .fillMaxWidth()
             .padding(start = startInset, end = endInset, top = Spacing.xl, bottom = Spacing.xs),
-        style = MaterialTheme.typography.labelMedium.copy(
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = SECTION_HEADER_LETTER_SPACING,
-        ),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.labelMedium,
+        color = ConstanzaColors.OnBackgroundMuted,
     )
 }
 
