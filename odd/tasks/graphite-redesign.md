@@ -31,7 +31,7 @@ Strategy: ask-on-risk resolved by owner policy (no process prompts) → work-uni
 
 ## Tasks
 - [x] T1 Theme foundation: graphite tokens, M3 mapping, Geist typography, window background, contrast tests, visual-design-system spec. Route: delegated (writer trigger, 2+ non-trivial files).
-- [ ] T2 Muted 12-colour palette: enum, colour band for a non-text dot, picker + custom dialog, DB v8 remap + backup schema 5 normalisation, tests, seeds, habit-management/data-portability specs. Route: delegated.
+- [x] T2 Muted 12-colour palette: enum, colour band for a non-text dot, picker + custom dialog, DB v8 remap + backup schema 5 normalisation, tests, seeds, habit-management/data-portability specs. Route: delegated.
 - [ ] T3 Today screen: dot + neutral names, round answer buttons, answered glyphs, section headers, progress bar, reminder segments, FAB, notification accent; migrate tests. Route: delegated.
 - [ ] T4 Habit list: dot, schedule subtitle (new data flow), menu, archived switch; rewrite HabitNameColourComposeTest. Route: delegated.
 - [ ] T5 Editor, Progress, Settings, Onboarding restyle. Route: delegated.
@@ -60,5 +60,25 @@ Hand-off notes:
 - Launcher `ic_launcher_background.xml` keeps #110B06 (out of scope); its comment still says it must match `ConstanzaColors.BACKGROUND_ARGB` — stale, outside T1 surface. No test binds them; spec now states the launcher is not bound.
 - Native review: not run by the writer (parent owns RDD assessment).
 
+### T2 — done, commit `5349520` (`feat(palette): muted 12-colour habit palette with v8 remap`)
+Route: delegated writer (writer trigger). Verification (JAVA_HOME = Android Studio JBR):
+- `:domain:test` → 57 tests, 0 failures (test-results XML).
+- `:app:testDebugUnitTest` → 357 tests, 0 failures, 0 errors (test-results XML).
+- `:app:detektMain` → pass. `:app:compileDebugAndroidTestKotlin` → pass.
+- `:app:lintDebug` → only the 2 known `NewApi` errors at `tracking/TodayViewModel.kt:334` (`LocalDate.EPOCH`); no other errors.
+- androidTest (incl. new `migration7To8RepaintsEveryRetiredPresetAndLeavesCustomColoursUntouched`) compiled, **not run** (emulator matrix is T6).
+
+Palette: SAGE, BLUE, SAND, CLAY, LAVENDER (VISIBLE), TEAL, OLIVE, ROSE, INDIGO, LIME, TAN, GREY; DEFAULT = BLUE. 6.20–8.37:1 on Background, ≥5.27:1 on SurfaceRaised. CIE76 ΔE: global min 10.8 (SAND/TAN, floor 10), grid neighbours 17.5 (TEAL/GREY, floor 15), visible row 21.1 (floor 20).
+Band decision: custom band against live `ConstanzaColors.Background` = [3.6:1, 9:1]. 3.6 because 3.0 on Background is only 2.55:1 on SurfaceRaised; 3.6 gives 3.06:1 there. Ceiling 9 sits just above the lightest preset (LIME 8.37). Saturation **not** capped (non-trivial: changes slider semantics/seeding); the ceiling removes the loudest picks. Old `[7,11]` clamp frozen as `clampToLegacyHabitBand` on `HabitBandGround` #110B06 (`LegacyHabitColorBand.kt`), used only by v5/v6 remaps and backup schema < 4.
+Remap (`HabitColorMutedRemap`, Room 7→8 and backup schema < 5): nearest CIE76 ΔE, with 5 hue-family overrides (GREEN→SAGE, AMBER→SAND, MINT→TEAL, BLUE→BLUE, LILAC→LAVENDER). Others: VIOLET/PURPLE/LILAC→LAVENDER, RED→CLAY, LIGHT_BLUE/BLUE→BLUE, PINK/MAGENTA→ROSE, INDIGO→INDIGO, YELLOW/OLIVE→OLIVE, LIME/LIGHT_GREEN→LIME, TEAL/CYAN/MINT→TEAL, ORANGE/PEACH/AMBER→SAND, BROWN→TAN. Custom colours untouched (no clamp fallthrough). `8.json` identical to `7.json` except `version`. Backup `CURRENT_SCHEMA_VERSION` = 5; retone+retire hops now gated to schema < 4, muted hop to < 5.
+Specs: visual-design-system (3:1 non-text floor for the dot, custom band, name in text colour, neutral chrome with destructive exception, all floors asserted by test), habit-management (12 muted, row of 5, design-system-repaint exception), data-portability (schema 5 scenarios, per-epoch gating).
+
+Hand-off notes:
+- **Deviation:** `core/di/DatabaseModule.kt` (outside the allowed surface) got one line to register `migration7To8`; without it Room cannot open v7 installs.
+- **Deviation:** `ColorContrastTest`'s "status glyphs quieter than the habit palette floor" test was removed — the muted floor (6.20) is now below StatusCompleted (6.38) / StatusMissed (6.36) and the spec no longer reserves those tones. T3 retires the tokens.
+- **T3/T4:** the spec now says names render in the text colour and answer controls/glyphs are neutral; code still paints names in the habit colour (`TodayScreen`, `HabitListScreen`) and uses StatusCompleted/StatusMissed. `HabitNameColourComposeTest` still uses the retired hex literals as arbitrary colours (T4 rewrites it).
+- **T5:** `CustomColorDialog` sliders unchanged in UX; editing an old custom colour lighter than 9:1 seeds the slider at 1f and re-solves on confirm.
+- Native review: not run by the writer (parent owns RDD assessment).
+
 ## Next step
-T2.
+T3.
