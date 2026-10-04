@@ -112,7 +112,7 @@ class TodayAddHabitE2ETest {
         // the reason CoreFlowE2ETest documents: the row is not toggleable as a whole, so a tap on
         // the label passes straight through and saves a habit with no enabled slot.
         compose.onNode(isToggleable()).performScrollTo().performClick()
-        compose.onNodeWithText(string(R.string.habit_editor_save)).performScrollTo().performClick()
+        compose.onNodeWithText(string(R.string.habit_editor_save)).performClick()
 
         awaitText(string(R.string.today_title))
         // See theAddHabitFabOpensTheEditorAndBackingOutReturnsToToday's own comment for why this

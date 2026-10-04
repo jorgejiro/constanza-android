@@ -75,6 +75,7 @@
     <string name="habit_editor_name_label">Name</string>
     <string name="habit_editor_name_error">A name is required</string>
     <string name="habit_editor_notes_label">Notes (optional)</string>
+    <string name="habit_editor_notes_placeholder">For example, after lunch</string>
     <string name="habit_editor_color_label">Colour</string>
 
     <!-- habit-management: the colour picker's standard palette. Every swatch carries its colour's

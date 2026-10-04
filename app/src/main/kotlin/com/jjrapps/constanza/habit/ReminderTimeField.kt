@@ -2,16 +2,11 @@
 
 package com.jjrapps.constanza.habit
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimeInput
@@ -28,17 +23,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.TimeOfDayFormat
 import com.jjrapps.constanza.core.ui.rememberTimeOfDayFormat
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.core.ui.theme.Dimens
-import com.jjrapps.constanza.core.ui.theme.Spacing
 
 private const val MINUTES_PER_HOUR = 60
 
@@ -52,30 +47,24 @@ const val REMINDER_TIME_MODE_TOGGLE_TEST_TAG = "reminder_time_mode_toggle"
 
 /**
  * **The habit editor's one time-of-day control**, shared by `ScheduleEditors`'s
- * `ReminderTimeEditor` (the single optional reminder) and by every row of the `TIMES_PER_DAY`
- * slot list (`ReminderSlotRow`). Those two used to hold a byte-identical copy of the same pair
- * of bare hour/minute `OutlinedTextField`s
- * — the duplication was half the defect, so one composable serving both call sites is part of the
- * fix, not a tidy-up alongside it.
+ * `ReminderTimeEditor` (the single optional reminder), by every row of the `TIMES_PER_DAY` slot
+ * list (`ReminderSlotRow`) and by Settings' day-review time. One composable serving every call site
+ * is deliberate: the editor once held two byte-identical copies of a time control, and that
+ * duplication was half of a defect.
  *
- * **Why a bordered, tappable row rather than a `readOnly` `OutlinedTextField`.** Visually the two
- * are the same thing: [Dimens.FieldBorder] and `shapes.extraSmall` are exactly what M3 draws around
- * an unfocused outlined field, so this lines up with the name/notes fields and with
- * `ScheduleKindPicker` directly above it. Structurally they are not. A `readOnly` text field still
- * consumes the tap to place a caret, so making one open a dialog needs either an invisible overlay
- * (two nodes, one of them unlabelled, for one control) or `enabled = false` (which leaks a
- * `Disabled` semantics property into the merged node, so TalkBack announces a live control as
- * disabled). One [Role.Button] node wrapping both texts is correct to a screen reader and is
- * directly addressable from a test — see the comment on where that click is declared. It is
- * also what the row already *is*: a value you pick, not a value you type.
- * [Icons.Filled.ArrowDropDown] is the same
- * trailing glyph `ExposedDropdownMenuDefaults.TrailingIcon` puts on the frequency picker, so the two
- * pick-a-value rows in this form read as one affordance — and it ships in `material-icons-core`,
- * the only icon artifact this project depends on, so no clock glyph is worth a new dependency.
+ * **Graphite redesign: a list row, not a bordered field.** The label sits on the left in the text
+ * colour and the time on the right with tabular figures, at the graphite row height; the caller
+ * draws the hairlines between rows. It is still a value you pick, not one you type, so it is still
+ * not a `readOnly` text field (which would consume the tap to place a caret).
+ *
+ * **One button node.** The click, its [Role.Button] and both texts are declared on the same `Row`,
+ * so they merge into one node that announces as a button carrying the label and the time, and is
+ * directly addressable from a test. The click must not move onto a wrapper with its own `onClick`
+ * overload: `Surface(onClick = ...)` sets no role, and a role handed to it lands on a different node
+ * and is dropped from the exported accessibility tree (checked with `uiautomator dump`).
  *
  * [label] is `null` in the slot list on purpose: `ReminderSlotEditor` already renders one
- * "Reminder times" header above the whole list, and repeating a per-row label there would push a
- * row that also carries a checkbox and a remove button past a phone's width for no information.
+ * "Reminder times" header above the whole list, so each slot row shows only its time.
  */
 @Composable
 internal fun ReminderTimeField(
@@ -88,42 +77,24 @@ internal fun ReminderTimeField(
     // One read of the device's 12/24-hour setting, shared by the row and by the dialog's
     // TimePickerState. Reading it twice would let the row and the picker it opens disagree.
     val timeFormat = rememberTimeOfDayFormat()
-    Surface(
-        modifier = modifier,
-        shape = MaterialTheme.shapes.extraSmall,
-        color = Color.Transparent,
-        border = BorderStroke(Dimens.FieldBorder, MaterialTheme.colorScheme.outline),
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = Dimens.SettingsRow)
+            .clickable(role = Role.Button, onClick = { showPicker = true }),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            // The click lives here, on the Row, rather than on Surface's own `onClick` overload,
-            // and that is not a style preference. `Surface(onClick = ...)` sets no `role`, and its
-            // `minimumInteractiveComponentSize` puts a layout node between the caller's modifier
-            // and the internal `clickable` — so a `semantics { role = Role.Button }` handed to it
-            // lands on a DIFFERENT node from the click action and is dropped from the exported
-            // accessibility tree (checked with `uiautomator dump`, not assumed). Declared together
-            // here, the role, the click and both texts merge into one node that announces as a
-            // button, and the ripple is still clipped to the Surface's rounded shape.
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(role = Role.Button, onClick = { showPicker = true })
-                .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val time = timeFormat.format(minuteOfDay)
-            if (label == null) {
-                Text(time, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            } else {
-                Text(
-                    label,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(time, style = MaterialTheme.typography.titleMedium)
-            }
-            // Null on purpose: the whole Surface is one merged button node already carrying the
-            // label and the time, so a description here would only add a third thing to read.
-            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+        val time = timeFormat.format(minuteOfDay)
+        val rowText = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal)
+        if (label != null) {
+            Text(label, style = rowText, color = ConstanzaColors.OnBackground, modifier = Modifier.weight(1f))
         }
+        Text(
+            time,
+            style = rowText.copy(fontFeatureSettings = TABULAR_FIGURES),
+            color = ConstanzaColors.OnBackground,
+            modifier = if (label == null) Modifier.weight(1f) else Modifier,
+        )
     }
     if (showPicker) {
         ReminderTimePickerDialog(
@@ -137,6 +108,29 @@ internal fun ReminderTimeField(
         )
     }
 }
+
+/**
+ * The time picker's hour/minute (and AM/PM) selector tones, named so a unit test can measure them
+ * (`ReminderTimeSelectorContrastTest`).
+ *
+ * The T1 review found the selected half of the selector distinguishable only by its fill,
+ * `SurfaceSelected` against `SurfaceRaised` — about 1.1:1, so nothing on screen said which half
+ * you were about to edit. The selected half is now light-filled with dark ink (the same pair as
+ * every graphite primary action) and the unselected half a dark fill with light ink, which puts
+ * the two states more than 3:1 apart (WCAG 2.1 SC 1.4.11) and each numeral well above 4.5:1 on its
+ * own container.
+ */
+internal object ReminderTimeSelectorTones {
+    val SelectedContainer = ConstanzaColors.ChromeInteractive
+    val SelectedContent = ConstanzaColors.OnChromeInteractive
+    val UnselectedContainer = ConstanzaColors.SurfaceSelected
+    val UnselectedContent = ConstanzaColors.OnBackground
+
+    /** The surface the selector sits on: the dialog's `surfaceContainerHigh`. */
+    val DialogSurface = ConstanzaColors.SurfaceRaised
+}
+
+private const val TABULAR_FIGURES = "tnum"
 
 /**
  * Material 3's clock dial, with keyboard entry one tap away.
@@ -212,18 +206,19 @@ private fun ReminderTimePickerDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     ) {
-        // Everything except the selected time selector's text is left at the theme-derived
-        // default. Verified on the emulator, not assumed: `core/ui/theme/Theme.kt` binds BOTH
-        // `primaryContainer` and `surfaceContainerHighest` to ConstanzaColors.SurfaceSelected, and
-        // their content roles (`onPrimaryContainer`, `onSurface`) both to OnBackground — so the
-        // hour box and the minute box render pixel-identical and nothing on screen says which half
-        // you are about to edit. Repointing the selected half's text at `primary` restores that
-        // distinction with the app's own achromatic control tone rather than a new colour value,
-        // and a selection indicator is exactly what ConstanzaColors.ChromeInteractive's KDoc says
-        // it draws. The container tones are deliberately left alone: two filled boxes would shout
-        // where one numeral is enough.
+        // See ReminderTimeSelectorTones: the selected half is light-filled with dark ink so it is
+        // unmistakable against the dark unselected half, for both the hour/minute selector and the
+        // 12-hour period selector.
         val colors = TimePickerDefaults.colors(
-            timeSelectorSelectedContentColor = MaterialTheme.colorScheme.primary,
+            clockDialColor = ReminderTimeSelectorTones.UnselectedContainer,
+            timeSelectorSelectedContainerColor = ReminderTimeSelectorTones.SelectedContainer,
+            timeSelectorSelectedContentColor = ReminderTimeSelectorTones.SelectedContent,
+            timeSelectorUnselectedContainerColor = ReminderTimeSelectorTones.UnselectedContainer,
+            timeSelectorUnselectedContentColor = ReminderTimeSelectorTones.UnselectedContent,
+            periodSelectorSelectedContainerColor = ReminderTimeSelectorTones.SelectedContainer,
+            periodSelectorSelectedContentColor = ReminderTimeSelectorTones.SelectedContent,
+            periodSelectorUnselectedContainerColor = ReminderTimeSelectorTones.UnselectedContainer,
+            periodSelectorUnselectedContentColor = ReminderTimeSelectorTones.UnselectedContent,
         )
         if (showDial) TimePicker(state = state, colors = colors) else TimeInput(state = state, colors = colors)
     }
