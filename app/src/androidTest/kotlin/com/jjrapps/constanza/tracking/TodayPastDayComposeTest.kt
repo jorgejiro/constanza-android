@@ -68,8 +68,7 @@ class TodayPastDayComposeTest {
 
     /** The same enum-to-copy mapping `slotStatusLabel` uses in `app/src/main`, restated here rather
      *  than called: `internal` visibility from `app/src/main` is not reliably exposed to
-     *  `app/src/androidTest` in this project's AGP setup (see `TodayOneLineRowPrototype`'s own
-     *  KDoc for the identical reason it duplicates colour literals instead of importing them). */
+     *  `app/src/androidTest` in this project's AGP setup. */
     private fun statusLabelText(status: EntryStatus): String = when (status) {
         EntryStatus.COMPLETED -> text(R.string.today_slot_completed)
         EntryStatus.MISSED -> text(R.string.today_slot_missed)

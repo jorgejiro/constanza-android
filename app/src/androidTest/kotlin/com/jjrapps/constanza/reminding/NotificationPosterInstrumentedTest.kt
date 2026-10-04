@@ -14,12 +14,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.jjrapps.constanza.core.di.ReminderSettingsDataStoreEntryPoint
 import com.jjrapps.constanza.core.ui.MainActivity
 import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
-import com.jjrapps.constanza.core.ui.theme.HabitColor
 import com.jjrapps.constanza.localization.AppLocaleController
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -31,7 +29,6 @@ private const val OCCURRENCE_ID = 9001L
  *  whichever notification a previously-run test in this class left in the drawer. */
 private const val ACCENT_OCCURRENCE_ID = 9002L
 private const val EXPECTED_ACTION_COUNT = 3
-private const val HABIT_COLOR_ARGB = -14575885
 private const val GRANT_TIMEOUT_MS = 5_000L
 private const val GRANT_POLL_INTERVAL_MS = 50L
 
@@ -92,7 +89,7 @@ class NotificationPosterInstrumentedTest {
         // mockable-jar unit test — so `true` is asserted on the same call whose visibility is awaited.
         assertTrue(
             "postReminder must report a real post when notifications are enabled",
-            poster.postReminder(OCCURRENCE_ID, "Meditate", HABIT_COLOR_ARGB),
+            poster.postReminder(OCCURRENCE_ID, "Meditate"),
         )
 
         val posted = awaitPosted(OCCURRENCE_ID)
@@ -109,25 +106,22 @@ class NotificationPosterInstrumentedTest {
     /**
      * Graphite redesign: the notification accent is the app's neutral interactive tone
      * ([ConstanzaColors.ChromeInteractive], #ECECEE) for every habit, no longer the habit's own
-     * colour. Posted with a palette colour that differs from that tone, so the assertion fails if
-     * `NotificationPoster` ever goes back to painting the colour it is handed.
+     * colour — `postReminder` no longer even receives the habit colour.
      */
     @Test
-    fun postedNotificationCarriesTheNeutralAccentWhateverTheHabitColour(): Unit = runBlocking {
-        val habitColor = HabitColor.TEAL.argb
+    fun postedNotificationCarriesTheNeutralAccent(): Unit = runBlocking {
         assertTrue(
             "postReminder must report a real post when notifications are enabled",
-            poster.postReminder(ACCENT_OCCURRENCE_ID, "Stretch", habitColor),
+            poster.postReminder(ACCENT_OCCURRENCE_ID, "Stretch"),
         )
 
         val posted = awaitPosted(ACCENT_OCCURRENCE_ID)
         assertEquals(
-            "Notification.color must be the neutral accent #ECECEE, not the habit colour — this is " +
+            "Notification.color must be the neutral accent #ECECEE — this is " +
                 "the only place NotificationPoster.setColor's effect is observable.",
             ConstanzaColors.ChromeInteractive.toArgb(),
             posted.notification.color,
         )
-        assertNotEquals(habitColor, posted.notification.color)
     }
 
     /**

@@ -34,8 +34,8 @@ Strategy: ask-on-risk resolved by owner policy (no process prompts) → work-uni
 - [x] T2 Muted 12-colour palette: enum, colour band for a non-text dot, picker + custom dialog, DB v8 remap + backup schema 5 normalisation, tests, seeds, habit-management/data-portability specs. Route: delegated.
 - [x] T3 Today screen: dot + neutral names, round answer buttons, answered glyphs, section headers, progress bar, reminder segments, FAB, notification accent; migrate tests. Route: delegated.
 - [x] T4 Habit list: dot, schedule subtitle (new data flow), menu, archived switch; rewrite HabitNameColourComposeTest. Route: delegated.
-- [ ] T5 Editor, Progress, Settings, Onboarding restyle. Route: delegated.
-- [ ] T6 Full verification: `./gradlew check`, `assembleDebug`, `:app:emulatorMatrixGroupDebugAndroidTest`, rendered review on emulator. Route: delegated verifier.
+- [x] T5 Editor, Progress, Settings, Onboarding restyle. Route: delegated.
+- [x] T6 Full verification: `./gradlew check`, `assembleDebug`, `:app:emulatorMatrixGroupDebugAndroidTest`, rendered review on emulator. Route: delegated verifier.
 
 ## Checks per task
 `./gradlew :domain:test :app:testDebugUnitTest :app:detektMain :app:compileDebugAndroidTestKotlin` (JAVA_HOME = Android Studio JBR).
@@ -140,6 +140,84 @@ Hand-off notes:
 - **T5:** `ConstanzaControlDefaults.switchColors()` exists for the Settings switches. `HabitEditorScreen`'s top bar still uses the Material arrow; the list now uses `ConstanzaIcons.ChevronStart` — align when restyling the editor.
 - Native review: not run by the writer (parent owns RDD assessment).
 
+### T5 — done, commits `9d19860`, `932221c`, `a385ea1`, `630a2a8`, `2329dee`, `f824c39`
+Route: delegated writer (writer trigger). Commits (additions+deletions):
+- `9d19860` feat(progress): graphite progress with streak figures and compliance bar — 7 files, +317/-22 (339).
+- `932221c` feat(onboarding): graphite onboarding with segments and light primary pill — 4 files, +188/-66 (254).
+- `a385ea1` feat(habit): graphite editor with filled fields, dot picker and pinned save — 13 files, +500/-298 (798).
+- `630a2a8` fix(onboarding): drop body tracking to match the graphite copy — 1 file, +1.
+- `2329dee` feat(settings): graphite settings with snooze chips and choice dialogs — 14 files, +667/-225 (892; includes the render test).
+- `f824c39` docs(spec): require a distinguishable selected time-picker half — 1 file, +8/-1.
+Each feature commit compiled and kept unit tests green (`:app:testDebugUnitTest :app:detektMain :app:compileDebugAndroidTestKotlin` per commit; progress verified with the later work set aside).
+
+Test-first: `ReminderTimeSelectorContrastTest` run against the old selector tones (SurfaceSelected vs SurfaceRaised) → RED (3/3 failed), then the new tones → GREEN.
+
+Verification (JAVA_HOME = Android Studio JBR), on `2329dee` (spec commit is docs-only):
+- `:domain:test` → 57 tests, 0 failures (XML).
+- `:app:testDebugUnitTest` → 373 tests, 0 failures/errors (XML; 370 + 3 selector-contrast tests).
+- `:app:detektMain` → pass. `:app:compileDebugAndroidTestKotlin` → pass.
+- `:app:lintDebug` → 0 errors, 9 warnings (pre-existing kinds; none new).
+- `:app:api37DebugAndroidTest` (whole suite) → Gradle "Finished 226 tests"; XML 220 tests, 0 failures, 0 errors, 6 skipped (API-level assumption skips). Includes all habit/progress/reminding/onboarding/localization/portability/e2e classes plus new `ProgressScreenComposeTest` (3), `SnoozeSettingsScreenComposeTest` (2), rewritten `DayReviewSectionComposeTest` (2). api31 not run (T6).
+- Renders (Spanish, api37, `core/ui/GraphiteScreensRealRenderTest`, logcat base64): `/private/tmp/claude-501/-Users-jorge-dev-constanza-android/393ec5f2-5fc2-4458-93b1-0cc69a55357b/scratchpad/t5-editor.png`, `t5-progress.png`, `t5-settings.png`, `t5-onboarding.png`. Checked against the E boards: editor, progress and settings match; onboarding matches except the deviation below.
+
+What changed:
+- Shared (`core/ui/component`): `ScreenTopBar` (glyph + titleLarge on background), `ProgressLine`, `PrimaryPillButton` (52dp light pill), `SettingsNavigationRow`/`SettingsRowDivider`/`SingleChoiceDialog`. `SectionDivider` removed (no callers left). Dimens: `PagerDot`, `Swatch*` replaced by `PagerSegment*`, `ColorDot*`, `PrimaryButtonHeight`, `SettingsRow`, `Chip`, `Stepper`.
+- Progress: chevron + habit dot + name; two streak columns (48sp/500, `tnum`, -0.03em) with plural `progress_streak_days`; divider; "Compliance · last 30 days" + right-aligned % + 4dp bar. `ProgressUiState.habitColorArgb` added. Strings: `progress_current_streak`/`best_streak` lost their `%1$d`, `progress_compliance` is now just `%1$d%%` (ES `%1$d %%` with NBSP), new `progress_compliance_label`.
+- Onboarding: 24x4dp segments top-left (current OnBackground, others `outline`), content vertically centred and scrollable, title 32sp/600 balanced, body 17sp/25.5sp secondary, primary = 52dp light pill (Continue/Finish as before); in-page asks are outlined pills.
+- Editor: ✕ + title; labels above filled fields (`FieldLabel` cleared from semantics, label put on the field node via `Modifier.fieldLabel` so `onNodeWithText(label)` and TalkBack still reach the field); notes placeholder (new string), notes starts at 1 line; frequency dropdown same look with the thin chevron; round 40dp −/+ steppers; day chips light-filled when selected; colour dots 24dp in 44dp targets, selected = 30dp OnBackground ring around 20dp dot, "More/Fewer" as text button closing the first row; Remind me / reminder time as divided list rows with the neutral Switch; Save pinned bottom (navigation bar + IME insets), still always enabled with tap-time validation. Custom colour dialog: neutral thumbs, plain preview dot (tick removed). Discard / import confirm in `error` tone. `ReminderTimeField` is now a list row (label left, time right, one Button node).
+- Time picker: selected hour/minute and AM/PM halves = ChromeInteractive fill with OnChromeInteractive ink; unselected = SurfaceSelected with OnBackground; dial on SurfaceSelected. Measured by `ReminderTimeSelectorContrastTest` (≥3:1 between states and against the dialog surface, ≥4.5:1 numerals).
+- Settings: chevron back; order Default snooze → Day review → Language → Data & backup (no spec or test fixed the old order); snooze = 40dp pill chips (selected light, others outlined) keeping `selectable`/`Role.RadioButton` in a `selectableGroup`; day review = time row + ceiling note + "When to notify" row (new `settings_day_review_mode_label`) opening a single-choice dialog; language = row naming the current choice opening a single-choice dialog (it was inline radios); data = Export/Import rows with chevron. `SnoozeSettingsScreen` takes `SettingsSections` slots (defaults = real Hilt sections) so the whole screen is testable/renderable; `DataPortabilitySectionContent` split out. ES `settings_snooze_section_title` → "Aplazamiento predeterminado" (board copy).
+- Tests migrated: E2E Save taps lost `performScrollTo` (Save no longer scrolls); `SnoozeDurationRow` → `SnoozeDurationChip`; language/day-review tests open the dialog and assert inside it (`hasAnyAncestor(isDialog())`).
+- Spec: visual-design-system gains the fill-only selector floor + scenario. No other spec described the old visuals of these screens.
+
+Deviations:
+- Onboarding keeps "Allow" as an in-page outlined pill and has no secondary text button: the onboarding spec gives the notification and exact-alarm asks equal visual and interactive weight and keeps the forward action independent of either, so "Permitir" as the primary pill with "Finalizar" as a text button (board) would contradict it.
+- Colour dot targets are 44dp (as specified by the parent), below the 48dp minimum the old swatch honoured.
+- Failure text of an import is now drawn in the destructive tone.
+- `settings` commit is 892 lines (includes the render test file covering all four screens).
+
+Hand-off notes:
+- **T6:** run api31 too; the render test lives at `androidTest/.../core/ui/GraphiteScreensRealRenderTest.kt` (tags `GraphiteRender*`; extractor `/private/tmp/claude-501/-Users-jorge-dev-constanza-android/393ec5f2-5fc2-4458-93b1-0cc69a55357b/scratchpad/t5extract.py`).
+- Out of surface, stale: `tracking/TodaySectionHeader.kt` KDoc links the removed `SectionDivider`; `tracking/TodayChangeAnswerDialog.kt` cites `SnoozeDurationRow`; Today keeps its own private `ProgressLine` (could reuse `core/ui/component/ProgressLine`).
+- Settings chip label uses bodyLarge (17sp) — slightly larger than the board's chips; tweak if the owner minds.
+- Native review: not run by the writer (owner disabled RDD).
+
+### T6 — done (`check` partial: pre-existing detekt findings), commits `8b519d6`, `124694f`, `c436f21`
+Route: delegated verifier/writer (cleanup touched 2+ files).
+- `8b519d6` chore: drop stale graphite references — 16 files, +48/-87. `NotificationPoster.postReminder` loses the unused `colorArgb` and its suppression (`ReminderFireWorker`, `NotificationPosterTest`, `ReminderFireWorkerTest`, `NotificationPosterInstrumentedTest` — accent test renamed `postedNotificationCarriesTheNeutralAccent` — and `NotificationActionWiringInstrumentedTest` adjusted); Today reuses `core/ui/component/ProgressLine` (private copy removed; shared one also clamps); stale comments fixed (`SectionDivider`, `SnoozeDurationRow`, `TodaySlotTrailing`/`TodayOneLineRowPrototype` → `SlotTrailing`, `TodayAnswerPills`/`AnswerPill*` → `TodayAnswerButtons`/`AnswerButton`, test renamed `theAnswerButtonsStayOnScreenNextToALongHabitNameOnAPhone`, `HabitColor.GREEN` comment, launcher XML comments no longer cite `StatusCompleted`/`BACKGROUND_ARGB`; colours/paths unchanged). Historical prose ("warm-dark", frozen remap names) left as history.
+- `124694f` test: clear detekt findings added by the graphite tests — 5 files, +47/-27 (7 findings blamed to `131117e`, `fa8b44b`, `5b3ad96`, `9340811`, `a385ea1`).
+- `c436f21` test(today): render Today in Spanish on any API level — 1 file, +29/-20 (configuration context in `LocalContext`, as `HabitListRealRenderTest`).
+
+Verification:
+- `./gradlew check` with JBR 25 → plain `:app:detekt`/`:domain:detekt`/`:domain:detektMain` crash: "Invalid value (25) passed to --jvm-target" (detekt 1.23.8 accepts ≤22; build scripts untouched by the redesign). Environmental.
+- `./gradlew clean check assembleDebug --continue` with the Gradle-provisioned JDK 21 (`~/.gradle/jdks/eclipse_adoptium-21-…/jdk-21.0.7+6`), on `124694f` → **FAILED only on plain `detekt`**: `:app:detekt` 15 findings, `:domain:detekt` 1 finding, all in test sources and all blamed to commits before `2af4246` (pre-existing; `check` was already red on the base). Everything else green: `:domain:test` 57 tests / 0 failures; `:app:testDebugUnitTest` 373 / 0 failures / 0 errors (XML); `:app:detektMain` and `:domain:detektMain` pass; `:app:lintDebug` 0 errors, 9 warnings, 1 hint.
+- `assembleDebug` → BUILD OK, `app/build/outputs/apk/debug/app-debug.apk`.
+- `:app:emulatorMatrixGroupDebugAndroidTest` (JBR) on `124694f` → BUILD SUCCESSFUL in 7m59s; XML: api31 220 tests, 0 failures, 0 errors, 3 skipped; api37 220 tests, 0 failures, 0 errors, 6 skipped (API-level assumption skips; Gradle reported "Finished 223/226", the difference is the skipped count). No flake, no rerun.
+- `c436f21` only changes a render-only test; verified by `:app:api37DebugAndroidTest` on the three render classes → 6 tests, BUILD SUCCESSFUL.
+- Renders (Spanish, api37, logcat base64): `/private/tmp/claude-501/-Users-jorge-dev-constanza-android/393ec5f2-5fc2-4458-93b1-0cc69a55357b/scratchpad/final-today.png`, `final-habit-list.png`, `final-editor.png`, `final-progress.png`, `final-settings.png`, `final-onboarding.png`.
+
+Open: the 16 pre-existing plain-detekt findings in test sources (and the JDK 25 `--jvm-target` crash) keep `./gradlew check` red independently of this feature; fix in a separate change.
+- Native review: not run (owner disabled RDD).
+
+### Delivery plan (proposal)
+Chained PRs by compilability, each ≤ ~900 authored lines (additions+deletions; generated Room schema JSON excluded), in commit order. Before opening each PR run `:app:compileDebugKotlin` on its slice branch.
+
+| # | Slice | Commits | Lines |
+|---|---|---|---|
+| 1 | Theme foundation | `131117e`, `7f55a2a` | 775 |
+| 2 | Frozen legacy band | `fa8b44b` | 672 |
+| 3 | Muted palette | `5b3ad96` | 704 |
+| 4 | Room v8 remap + specs | `83e127c` (418 generated), `e553317`, `a47ac1d`, `01154eb`, `b871c97` | 517 + 418 gen |
+| 5 | Today header | `9340811` | 683 |
+| 6 | Today answer buttons + notification accent | `81d8e56`, `ae3b7fb` | 568 |
+| 7 | Today rows | `dd63fa7`, `ffe0947` | 1104 (known exception: old and new row code cannot compile apart) |
+| 8 | Habit list subtitle data | `eb01e05` | 377 |
+| 9 | Habit list UI | `f22637e`, `0dd0ca3` | 734 |
+| 10 | Progress + onboarding | `9d19860`, `932221c` | 593 |
+| 11 | Editor | `a385ea1`, `630a2a8` | 799 |
+| 12 | Settings | `2329dee` | 892 |
+| 13 | Spec, cleanup, verification | `f824c39`, `090fbc8`, `8b519d6`, `124694f`, `c436f21`, T6 docs commit | ~350 |
+
 ### Native review log
 - T1 `131117e`..`7f55a2a` (775 lines): granted → approved, acknowledged (lineage review-fca3c9fb01a9e39f). 2 WARNING + 1 SUGGESTION informational (migration test ground → fixed in T2; ReminderTimeField selected contrast → T5; spec floors unproved → covered in T2).
 - T2 first attempt (2253 / 1835 lines): granted, stopped `lens_context_budget_exceeded`. Owner chose to split; T2 rewritten into `fa8b44b`, `5b3ad96`, `83e127c`, `e553317`, `a47ac1d`, `01154eb` (tree identical to `backup/graphite-t2`).
@@ -147,4 +225,4 @@ Hand-off notes:
 - Owner raised the slicing budget to ~900 lines (2026-10-04). The native reviewer context budget is not configurable.
 
 ## Next step
-T5 (after a docs(odd) commit recording T4).
+Owner decides delivery (push/PR slices).

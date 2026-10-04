@@ -12,10 +12,9 @@ import com.jjrapps.constanza.core.ui.component.SectionHeader
  * screen out, and by this point it was already at detekt's file-level `TooManyFunctions` ceiling.
  *
  * settings-section-headings: the actual rendering moved out to
- * [com.jjrapps.constanza.core.ui.component.SectionHeader] /
- * [com.jjrapps.constanza.core.ui.component.SectionDivider] so Settings' three sections could adopt
- * the same treatment. Both functions here stay as thin wrappers rather than being inlined at their
- * call site in `TodayScreen.kt` — mapping [TodaySectionKind] to a string resource is Today-specific
+ * [com.jjrapps.constanza.core.ui.component.SectionHeader] so Settings' sections could adopt the
+ * same treatment. The wrapper here stays rather than being inlined at its call site in
+ * `TodayScreen.kt` — mapping [TodaySectionKind] to a string resource is Today-specific
  * vocabulary that has no business living in a shared `core.ui` component.
  *
  * Graphite redesign: the hairline rule under each header is gone — the uppercase muted label and

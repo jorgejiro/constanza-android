@@ -35,10 +35,9 @@ import com.jjrapps.constanza.domain.model.EntryStatus
  * which is why [EntryStatus.UNKNOWN] has no branch below.
  *
  * today-one-line-row: this used to also draw the habit's scheduled slot time beside the glyph, and
- * `muted`-recolour it. Both now belong to the caller (`TodaySlotTrailing` in `TodayScreen.kt`),
- * which renders time once, uniformly, ahead of EITHER this glyph or the pending pills — the exact
- * shape `TodayOneLineRowPrototype`'s own `Trailing` composable already established. This function is
- * left with the one thing only it can draw: the glyph itself.
+ * `muted`-recolour it. Both now belong to the caller (`SlotTrailing` in `TodayHabitRows.kt`),
+ * which renders time once, uniformly, ahead of EITHER this glyph or the pending answer buttons.
+ * This function is left with the one thing only it can draw: the glyph itself.
  */
 @Composable
 internal fun AnsweredStatusRow(status: EntryStatus, modifier: Modifier = Modifier) {

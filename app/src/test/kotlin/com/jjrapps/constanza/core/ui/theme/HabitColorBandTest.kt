@@ -47,27 +47,28 @@ class HabitColorBandTest {
     @Test
     fun `every custom colour clears 3 to 1 on every surface and stays under the ceiling`() {
         val surfaces = listOf(ConstanzaColors.Background, ConstanzaColors.Surface, ConstanzaColors.SurfaceRaised)
-        for (hueStep in 0 until HUE_STEPS) {
-            for (satStep in 0..SAT_STEPS) {
-                for (position in listOf(0f, 0.1f, 0.5f, 1f)) {
-                    val hue = hueStep * FULL_TURN / HUE_STEPS
-                    val saturation = satStep.toFloat() / SAT_STEPS
-                    val color = Color(habitBandColor(hue, saturation, position))
-                    surfaces.forEach { surface ->
-                        val ratio = contrastRatio(color, surface)
-                        assertTrue(
-                            ratio >= NON_TEXT_FLOOR,
-                            "hue=$hue sat=$saturation pos=$position measured %.3f:1 on $surface".format(ratio),
-                        )
-                    }
-                    val onBackground = contrastRatio(color, ConstanzaColors.Background)
-                    assertTrue(
-                        onBackground <= HABIT_BAND_CEILING + RATIO_TOLERANCE,
-                        "hue=$hue sat=$saturation pos=$position measured %.3f:1, above the ceiling"
-                            .format(onBackground),
-                    )
+        val samples = (0 until HUE_STEPS).flatMap { hueStep ->
+            (0..SAT_STEPS).flatMap { satStep ->
+                listOf(0f, 0.1f, 0.5f, 1f).map { position ->
+                    Triple(hueStep * FULL_TURN / HUE_STEPS, satStep.toFloat() / SAT_STEPS, position)
                 }
             }
+        }
+        samples.forEach { (hue, saturation, position) ->
+            val color = Color(habitBandColor(hue, saturation, position))
+            surfaces.forEach { surface ->
+                val ratio = contrastRatio(color, surface)
+                assertTrue(
+                    ratio >= NON_TEXT_FLOOR,
+                    "hue=$hue sat=$saturation pos=$position measured %.3f:1 on $surface".format(ratio),
+                )
+            }
+            val onBackground = contrastRatio(color, ConstanzaColors.Background)
+            assertTrue(
+                onBackground <= HABIT_BAND_CEILING + RATIO_TOLERANCE,
+                "hue=$hue sat=$saturation pos=$position measured %.3f:1, above the ceiling"
+                    .format(onBackground),
+            )
         }
     }
 
@@ -136,7 +137,8 @@ class HabitColorBandTest {
         val distinctCount = results.toSet().size
         assertTrue(
             distinctCount >= MIN_DISTINCT_SWEEP_COUNT,
-            "hue=$hue sat=$saturation produced only $distinctCount distinct colours across ${SWEEP_STEPS + 1} positions",
+            "hue=$hue sat=$saturation produced only $distinctCount distinct colours " +
+                "across ${SWEEP_STEPS + 1} positions",
         )
     }
 

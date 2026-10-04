@@ -1,5 +1,6 @@
 package com.jjrapps.constanza.tracking
 
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.util.Base64
 import android.util.Log
@@ -7,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
@@ -18,8 +21,6 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.test.platform.app.InstrumentationRegistry
 import com.jjrapps.constanza.core.ui.theme.ConstanzaTheme
 import com.jjrapps.constanza.core.ui.theme.HabitColor
-import com.jjrapps.constanza.localization.AppLanguage
-import com.jjrapps.constanza.localization.ProvideAppLocale
 import com.jjrapps.constanza.domain.model.DayStatus
 import com.jjrapps.constanza.domain.model.EntryStatus
 import org.junit.Rule
@@ -28,6 +29,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.time.LocalDate
 import java.time.ZoneId
+import java.util.Locale
 
 /**
  * Not an assertion — a camera. Renders the real [TodayScreen] to a PNG at exactly 360dp/2.625 so a
@@ -77,25 +79,32 @@ class TodayRealRenderTest {
             date = today,
         )
 
+        // Spanish, because that is the app the owner actually looks at. Provided by hand (a
+        // configuration context in LocalContext and its configuration in LocalConfiguration)
+        // rather than through `ProvideAppLocale`, which only bites below API 33, so the render is
+        // Spanish on any emulator — the same technique as `HabitListRealRenderTest`.
+        val base = InstrumentationRegistry.getInstrumentation().targetContext
+        val spanish = Configuration(base.resources.configuration).apply { setLocale(Locale.forLanguageTag("es-ES")) }
+        val spanishContext = base.createConfigurationContext(spanish)
+
         composeTestRule.setContent {
-            // Spanish, because that is the app the owner actually looks at. `ProvideAppLocale` is
-            // the app's own override and it only bites below API 33 (its KDoc, Finding A/D1), which
-            // is exactly why this render runs on the API 31 emulator.
-            ProvideAppLocale(AppLanguage.Spanish) {
-                CompositionLocalProvider(LocalDensity provides Density(RENDER_DENSITY)) {
-                    ConstanzaTheme {
-                        Box(
-                            Modifier
-                                .size(RENDER_WIDTH_DP.dp, RENDER_HEIGHT_DP.dp)
-                                .testTag(RENDER_TAG),
-                        ) {
-                            TodayScreen(
-                                state = state,
-                                onToggleExpanded = {},
-                                onAnswer = { _, _, _ -> },
-                                onManageHabits = {},
-                            )
-                        }
+            CompositionLocalProvider(
+                LocalContext provides spanishContext,
+                LocalConfiguration provides spanishContext.resources.configuration,
+                LocalDensity provides Density(RENDER_DENSITY),
+            ) {
+                ConstanzaTheme {
+                    Box(
+                        Modifier
+                            .size(RENDER_WIDTH_DP.dp, RENDER_HEIGHT_DP.dp)
+                            .testTag(RENDER_TAG),
+                    ) {
+                        TodayScreen(
+                            state = state,
+                            onToggleExpanded = {},
+                            onAnswer = { _, _, _ -> },
+                            onManageHabits = {},
+                        )
                     }
                 }
             }
