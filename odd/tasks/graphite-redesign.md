@@ -35,7 +35,7 @@ Strategy: ask-on-risk resolved by owner policy (no process prompts) → work-uni
 - [x] T3 Today screen: dot + neutral names, round answer buttons, answered glyphs, section headers, progress bar, reminder segments, FAB, notification accent; migrate tests. Route: delegated.
 - [x] T4 Habit list: dot, schedule subtitle (new data flow), menu, archived switch; rewrite HabitNameColourComposeTest. Route: delegated.
 - [x] T5 Editor, Progress, Settings, Onboarding restyle. Route: delegated.
-- [ ] T6 Full verification: `./gradlew check`, `assembleDebug`, `:app:emulatorMatrixGroupDebugAndroidTest`, rendered review on emulator. Route: delegated verifier.
+- [x] T6 Full verification: `./gradlew check`, `assembleDebug`, `:app:emulatorMatrixGroupDebugAndroidTest`, rendered review on emulator. Route: delegated verifier.
 
 ## Checks per task
 `./gradlew :domain:test :app:testDebugUnitTest :app:detektMain :app:compileDebugAndroidTestKotlin` (JAVA_HOME = Android Studio JBR).
@@ -182,6 +182,42 @@ Hand-off notes:
 - Settings chip label uses bodyLarge (17sp) — slightly larger than the board's chips; tweak if the owner minds.
 - Native review: not run by the writer (owner disabled RDD).
 
+### T6 — done (`check` partial: pre-existing detekt findings), commits `8b519d6`, `124694f`, `c436f21`
+Route: delegated verifier/writer (cleanup touched 2+ files).
+- `8b519d6` chore: drop stale graphite references — 16 files, +48/-87. `NotificationPoster.postReminder` loses the unused `colorArgb` and its suppression (`ReminderFireWorker`, `NotificationPosterTest`, `ReminderFireWorkerTest`, `NotificationPosterInstrumentedTest` — accent test renamed `postedNotificationCarriesTheNeutralAccent` — and `NotificationActionWiringInstrumentedTest` adjusted); Today reuses `core/ui/component/ProgressLine` (private copy removed; shared one also clamps); stale comments fixed (`SectionDivider`, `SnoozeDurationRow`, `TodaySlotTrailing`/`TodayOneLineRowPrototype` → `SlotTrailing`, `TodayAnswerPills`/`AnswerPill*` → `TodayAnswerButtons`/`AnswerButton`, test renamed `theAnswerButtonsStayOnScreenNextToALongHabitNameOnAPhone`, `HabitColor.GREEN` comment, launcher XML comments no longer cite `StatusCompleted`/`BACKGROUND_ARGB`; colours/paths unchanged). Historical prose ("warm-dark", frozen remap names) left as history.
+- `124694f` test: clear detekt findings added by the graphite tests — 5 files, +47/-27 (7 findings blamed to `131117e`, `fa8b44b`, `5b3ad96`, `9340811`, `a385ea1`).
+- `c436f21` test(today): render Today in Spanish on any API level — 1 file, +29/-20 (configuration context in `LocalContext`, as `HabitListRealRenderTest`).
+
+Verification:
+- `./gradlew check` with JBR 25 → plain `:app:detekt`/`:domain:detekt`/`:domain:detektMain` crash: "Invalid value (25) passed to --jvm-target" (detekt 1.23.8 accepts ≤22; build scripts untouched by the redesign). Environmental.
+- `./gradlew clean check assembleDebug --continue` with the Gradle-provisioned JDK 21 (`~/.gradle/jdks/eclipse_adoptium-21-…/jdk-21.0.7+6`), on `124694f` → **FAILED only on plain `detekt`**: `:app:detekt` 15 findings, `:domain:detekt` 1 finding, all in test sources and all blamed to commits before `2af4246` (pre-existing; `check` was already red on the base). Everything else green: `:domain:test` 57 tests / 0 failures; `:app:testDebugUnitTest` 373 / 0 failures / 0 errors (XML); `:app:detektMain` and `:domain:detektMain` pass; `:app:lintDebug` 0 errors, 9 warnings, 1 hint.
+- `assembleDebug` → BUILD OK, `app/build/outputs/apk/debug/app-debug.apk`.
+- `:app:emulatorMatrixGroupDebugAndroidTest` (JBR) on `124694f` → BUILD SUCCESSFUL in 7m59s; XML: api31 220 tests, 0 failures, 0 errors, 3 skipped; api37 220 tests, 0 failures, 0 errors, 6 skipped (API-level assumption skips; Gradle reported "Finished 223/226", the difference is the skipped count). No flake, no rerun.
+- `c436f21` only changes a render-only test; verified by `:app:api37DebugAndroidTest` on the three render classes → 6 tests, BUILD SUCCESSFUL.
+- Renders (Spanish, api37, logcat base64): `/private/tmp/claude-501/-Users-jorge-dev-constanza-android/393ec5f2-5fc2-4458-93b1-0cc69a55357b/scratchpad/final-today.png`, `final-habit-list.png`, `final-editor.png`, `final-progress.png`, `final-settings.png`, `final-onboarding.png`.
+
+Open: the 16 pre-existing plain-detekt findings in test sources (and the JDK 25 `--jvm-target` crash) keep `./gradlew check` red independently of this feature; fix in a separate change.
+- Native review: not run (owner disabled RDD).
+
+### Delivery plan (proposal)
+Chained PRs by compilability, each ≤ ~900 authored lines (additions+deletions; generated Room schema JSON excluded), in commit order. Before opening each PR run `:app:compileDebugKotlin` on its slice branch.
+
+| # | Slice | Commits | Lines |
+|---|---|---|---|
+| 1 | Theme foundation | `131117e`, `7f55a2a` | 775 |
+| 2 | Frozen legacy band | `fa8b44b` | 672 |
+| 3 | Muted palette | `5b3ad96` | 704 |
+| 4 | Room v8 remap + specs | `83e127c` (418 generated), `e553317`, `a47ac1d`, `01154eb`, `b871c97` | 517 + 418 gen |
+| 5 | Today header | `9340811` | 683 |
+| 6 | Today answer buttons + notification accent | `81d8e56`, `ae3b7fb` | 568 |
+| 7 | Today rows | `dd63fa7`, `ffe0947` | 1104 (known exception: old and new row code cannot compile apart) |
+| 8 | Habit list subtitle data | `eb01e05` | 377 |
+| 9 | Habit list UI | `f22637e`, `0dd0ca3` | 734 |
+| 10 | Progress + onboarding | `9d19860`, `932221c` | 593 |
+| 11 | Editor | `a385ea1`, `630a2a8` | 799 |
+| 12 | Settings | `2329dee` | 892 |
+| 13 | Spec, cleanup, verification | `f824c39`, `090fbc8`, `8b519d6`, `124694f`, `c436f21`, T6 docs commit | ~350 |
+
 ### Native review log
 - T1 `131117e`..`7f55a2a` (775 lines): granted → approved, acknowledged (lineage review-fca3c9fb01a9e39f). 2 WARNING + 1 SUGGESTION informational (migration test ground → fixed in T2; ReminderTimeField selected contrast → T5; spec floors unproved → covered in T2).
 - T2 first attempt (2253 / 1835 lines): granted, stopped `lens_context_budget_exceeded`. Owner chose to split; T2 rewritten into `fa8b44b`, `5b3ad96`, `83e127c`, `e553317`, `a47ac1d`, `01154eb` (tree identical to `backup/graphite-t2`).
@@ -189,4 +225,4 @@ Hand-off notes:
 - Owner raised the slicing budget to ~900 lines (2026-10-04). The native reviewer context budget is not configurable.
 
 ## Next step
-T6 full verification (after the docs(odd) commit recording T5).
+Owner decides delivery (push/PR slices).
