@@ -7,10 +7,12 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.MainActivity
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.localization.AppLocaleController
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -31,9 +33,13 @@ private const val NO_ACTION_ICON = 0
  * Uses standard [NotificationCompat] templates only, never `RemoteViews` (design.md §5.7 C2):
  * Android 17 enforces a hard `1.5 * screenWidth * screenHeight * 4` combined Bitmap/Icon memory
  * limit on a `RemoteViews` parcel and throws a **fatal**, process-crashing
- * `IllegalArgumentException` past it. The per-habit colour is applied as a
- * [NotificationCompat.Builder.setColor] tint over a vector small icon
- * ([R.drawable.ic_notification_reminder]), never as a bitmap.
+ * `IllegalArgumentException` past it. The accent is a [NotificationCompat.Builder.setColor] tint
+ * over a vector small icon ([R.drawable.ic_notification_reminder]), never a bitmap.
+ *
+ * Graphite redesign: that accent is the app's neutral interactive tone
+ * ([ConstanzaColors.ChromeInteractive], #ECECEE) for every habit, not the habit's own colour — the
+ * habit colour is a dot inside the app, and a shade full of differently-tinted Constanza icons
+ * read as noise rather than identity.
  */
 class NotificationPoster @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -76,10 +82,13 @@ class NotificationPoster @Inject constructor(
      * own content, and is deliberately NOT resolved through [localizedContext] or any string
      * resource (reminder-response: the notification body is never localized).
      */
+    // `colorArgb` is no longer painted (see the class KDoc) but stays in the signature: removing it
+    // touches the scheduling worker that calls this, which belongs to a separate change.
+    @Suppress("UnusedParameter", "UNUSED_PARAMETER")
     suspend fun postReminder(occurrenceId: Long, habitName: String, colorArgb: Int): Boolean {
         val localizedContext = appLocaleController.localizedApplicationContext()
         if (!canPost(localizedContext)) return false
-        postToSystem(occurrenceId, buildNotification(localizedContext, occurrenceId, habitName, colorArgb))
+        postToSystem(occurrenceId, buildNotification(localizedContext, occurrenceId, habitName))
         return true
     }
 
@@ -150,11 +159,10 @@ class NotificationPoster @Inject constructor(
         ctx: Context,
         occurrenceId: Long,
         habitName: String,
-        colorArgb: Int,
     ): Notification =
         NotificationCompat.Builder(ctx, REMINDER_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_reminder)
-            .setColor(colorArgb)
+            .setColor(ConstanzaColors.ChromeInteractive.toArgb())
             .setContentTitle(ctx.getString(R.string.notification_reminder_title))
             .setContentText(habitName)
             .setStyle(NotificationCompat.BigTextStyle().bigText(habitName))

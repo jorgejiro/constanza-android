@@ -70,7 +70,8 @@ The app's chrome MUST be achromatic: no saturated accent may be used for app bar
 indicators, primary controls, answer controls or any other chrome role. A habit's own colour — as
 its identity dot — is the only chroma the interface carries, with one exception: the destructive
 tone, a desaturated warm red used only for destructive actions and errors. Answer controls and
-answered-state glyphs are neutral.
+answered-state glyphs are neutral. The reminder notification's accent is the neutral interactive
+tone (#ECECEE) for every habit, not the habit's colour.
 
 This supersedes the retired requirement `Accent Reserved For Chrome`, which required the opposite
 arrangement — a single reserved chrome accent, excluded from the habit palette. That accent was
@@ -82,6 +83,11 @@ answers neutral.)
 - GIVEN the app's colour scheme
 - WHEN each chrome role is inspected
 - THEN none of them resolves to a saturated colour, the destructive tone excepted
+
+#### Scenario: The reminder notification carries the neutral accent
+- GIVEN a habit whose colour is any palette or custom colour
+- WHEN its reminder notification is posted
+- THEN the notification's accent colour is the neutral interactive tone, not the habit's colour
 
 #### Scenario: Every hue family is available to a habit
 - GIVEN the set of colours offered when creating or editing a habit
