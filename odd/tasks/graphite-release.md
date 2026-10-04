@@ -19,7 +19,7 @@ Ship the merged graphite redesign (PRs #140–#152) as a new release with a gree
 ## Tasks
 - [x] R1 detekt green. Route: delegated writer + parent (daemon JDK pin inline, one mechanical build change).
 - [x] R2 store screenshots. Route: delegated.
-- [ ] R3 release 1.1.0. Route: delegated + parent verification.
+- [x] R3 release 1.1.0. Route: inline (sequential release commands + verification).
 
 ## Delivery
 One PR per task, merged by the owner in order. Slicing budget ~900 lines. RDD disabled by owner.
@@ -42,5 +42,13 @@ One PR per task, merged by the owner in order. Slicing budget ~900 lines. RDD di
   - Visual review of every image via contact sheets (session scratchpad `r2-phone-es.png`, `r2-phone-en.png`, `r2-tablets.png`, `r2-cabeceras.png`): graphite look, Spanish in es and English in en (system shade too), no clipped app text, demo-mode status bar.
   - Accepted as-is: the tablet notification scenes show Android's own quick-settings tiles with marquee-truncated labels ("Do Not Disturb", "Datos móviles", "Wallet"), identical in the previous set (system chrome, not the app). Feature-graphic icon tile keeps the launcher's warm background by design (icon out of scope).
 
+- R2 merged as #154; bump + es/en changelogs `19.txt` merged as #155 (`b825ada`).
+
+- R3 done:
+  - `con-claves './gradlew :app:assembleRelease'` → `app-release.apk`; `apksigner` → `CN=Constanza`, SHA-256 `59659af6…64c912d0`, identical to the v1.0.0 asset; `aapt2 dump badging` → versionCode 19, versionName 1.1.0; permissions identical to 1.0.0 (6 entries).
+  - GitHub Release `v1.1.0` on `b825ada` with `constanza-1.1.0.apk`; anonymous download HTTP 200.
+  - Play: `con-claves 'fastlane subir track:production release_status:draft images:true'` → "Successfully finished the upload to Google Play"; AAB verified with bundletool (versionCode 19, 1.1.0); listing, es/en changelogs and the new screenshots/graphics uploaded. Release left as draft for the owner to send to review.
+  - F-Droid: MR !50477 merged 2026-10-03 (not yet on f-droid.org); recipe has `UpdateCheckMode: Tags`, so the checkupdates bot picks `v1.1.0`. Buildserver is Debian trixie with `default-jdk-headless` (OpenJDK 21), matching the daemon JDK pin.
+
 ## Next step
-R3 release 1.1.0.
+Owner sends the Play draft to review. Watch the F-Droid build of 1.1.0 once 1.0.0 is published.
