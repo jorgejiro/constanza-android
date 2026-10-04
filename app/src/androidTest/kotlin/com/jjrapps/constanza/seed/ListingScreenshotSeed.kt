@@ -289,7 +289,7 @@ class ListingScreenshotSeed {
         val habitId = daos.habitDao.insert(
             HabitEntity(
                 name = if (english) "Drink water" else "Beber agua",
-                colorArgb = HabitColor.LIGHT_BLUE.argb,
+                colorArgb = HabitColor.BLUE.argb,
                 notes = if (english) "One glass at a time, no pressure." else "Un vaso cada vez, sin agobios.",
                 archived = false,
                 archivedAt = null,
@@ -341,7 +341,7 @@ class ListingScreenshotSeed {
         val habitId = daos.habitDao.insert(
             HabitEntity(
                 name = if (english) "Read 20 minutes" else "Leer 20 minutos",
-                colorArgb = HabitColor.AMBER.argb,
+                colorArgb = HabitColor.SAND.argb,
                 notes = if (english) "No screens, paper or e-reader." else "Sin pantallas, papel o libro electrónico.",
                 archived = false,
                 archivedAt = null,
@@ -380,7 +380,7 @@ class ListingScreenshotSeed {
         val habitId = daos.habitDao.insert(
             HabitEntity(
                 name = if (english) "Walk" else "Caminar",
-                colorArgb = HabitColor.GREEN.argb,
+                colorArgb = HabitColor.SAGE.argb,
                 notes = if (english) "At least twenty minutes straight." else "Al menos veinte minutos seguidos.",
                 archived = false,
                 archivedAt = null,
@@ -431,7 +431,7 @@ class ListingScreenshotSeed {
         val habitId = daos.habitDao.insert(
             HabitEntity(
                 name = if (english) "Meditate" else "Meditar",
-                colorArgb = HabitColor.VIOLET.argb,
+                colorArgb = HabitColor.LAVENDER.argb,
                 notes = if (english) "Five minutes of breathing is enough." else "Cinco minutos de respiración basta.",
                 archived = false,
                 archivedAt = null,
@@ -472,7 +472,7 @@ class ListingScreenshotSeed {
         val habitId = daos.habitDao.insert(
             HabitEntity(
                 name = if (english) "Stretch" else "Estirar",
-                colorArgb = HabitColor.ORANGE.argb,
+                colorArgb = HabitColor.CLAY.argb,
                 notes = if (english) "Back, legs and neck." else "Espalda, piernas y cuello.",
                 archived = false,
                 archivedAt = null,

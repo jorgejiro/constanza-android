@@ -35,10 +35,10 @@ private const val MID_SLIDER = 0.5f
 
 /** A preset in the collapsed row that is deliberately not [HabitPalette.DEFAULT], so "selecting
  *  one" is a real change of selection rather than a click on the swatch that was already ticked. */
-private val TARGET_COLOR = HabitColor.GREEN
+private val TARGET_COLOR = HabitColor.SAGE
 
 /** A preset that is NOT in the collapsed row — the case the expander exists for. */
-private val HIDDEN_COLOR = HabitColor.BROWN
+private val HIDDEN_COLOR = HabitColor.TAN
 
 /**
  * The colour picker, driven through the real [HabitEditorScreen] rather than through
@@ -172,12 +172,12 @@ class HabitColorPickerComposeTest {
      *  custom cell, which competes with the presets rather than sitting outside them. */
     @Test
     fun exactlyOneSwatchIsSelectedAtATime() {
-        setEditorContent(HabitColor.LIGHT_BLUE.argb)
+        setEditorContent(HabitColor.BLUE.argb)
         composeTestRule.onNodeWithTag(HABIT_COLOR_EXPANDER_TEST_TAG).performScrollTo().performClick()
         composeTestRule.waitForIdle()
 
-        composeTestRule.onNodeWithTag(habitColorSwatchTestTag(HabitColor.LIGHT_BLUE.argb)).assertIsSelected()
-        HabitPalette.ARGB.filter { it != HabitColor.LIGHT_BLUE.argb }.forEach { argb ->
+        composeTestRule.onNodeWithTag(habitColorSwatchTestTag(HabitColor.BLUE.argb)).assertIsSelected()
+        HabitPalette.ARGB.filter { it != HabitColor.BLUE.argb }.forEach { argb ->
             composeTestRule.onNodeWithTag(habitColorSwatchTestTag(argb)).assertIsNotSelected()
         }
         composeTestRule.onNodeWithTag(HABIT_COLOR_CUSTOM_SWATCH_TEST_TAG).assertIsNotSelected()

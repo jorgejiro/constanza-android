@@ -6,11 +6,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * The custom-colour band: [habitBandColor] must only ever produce a colour inside
- * `[HABIT_BAND_FLOOR, HABIT_BAND_CEILING]` against [HabitBandGround]. The frozen clamp the migrations
- * replay is pinned separately by `LegacyHabitColorBandTest`.
+ * The live custom-colour band (graphite redesign T2): [habitBandColor] must only ever produce a
+ * colour inside `[HABIT_BAND_FLOOR, HABIT_BAND_CEILING]` against the live
+ * [ConstanzaColors.Background], and — the reason the floor is 3.6 rather than 3.0 — every such
+ * colour must clear WCAG 1.4.11's 3:1 non-text floor on [ConstanzaColors.SurfaceRaised], the
+ * lightest surface an identity dot is drawn on.
  */
 class HabitColorBandTest {
+
+    @Test
+    fun `the band is measured against the live graphite background`() {
+        assertEquals(Color(0xFF141416), ConstanzaColors.Background)
+    }
 
     @Test
     fun `habitBandColor spans the whole band for saturated red`() =
@@ -32,15 +39,46 @@ class HabitColorBandTest {
     fun `habitBandColor spans the whole band for pure grey`() =
         assertBandBoundary(hue = 0f, saturation = 0f)
 
-    /** Every preset sits inside the band, so editing one in the custom dialog seeds a slider
+    /**
+     * The non-text floor, asserted where it binds. A sweep over hue (every 15°), saturation (five
+     * steps) and the darkest slider positions: every result must clear 3:1 on Background, Surface
+     * and SurfaceRaised, and no result may exceed the ceiling on Background.
+     */
+    @Test
+    fun `every custom colour clears 3 to 1 on every surface and stays under the ceiling`() {
+        val surfaces = listOf(ConstanzaColors.Background, ConstanzaColors.Surface, ConstanzaColors.SurfaceRaised)
+        for (hueStep in 0 until HUE_STEPS) {
+            for (satStep in 0..SAT_STEPS) {
+                for (position in listOf(0f, 0.1f, 0.5f, 1f)) {
+                    val hue = hueStep * FULL_TURN / HUE_STEPS
+                    val saturation = satStep.toFloat() / SAT_STEPS
+                    val color = Color(habitBandColor(hue, saturation, position))
+                    surfaces.forEach { surface ->
+                        val ratio = contrastRatio(color, surface)
+                        assertTrue(
+                            ratio >= NON_TEXT_FLOOR,
+                            "hue=$hue sat=$saturation pos=$position measured %.3f:1 on $surface".format(ratio),
+                        )
+                    }
+                    val onBackground = contrastRatio(color, ConstanzaColors.Background)
+                    assertTrue(
+                        onBackground <= HABIT_BAND_CEILING + RATIO_TOLERANCE,
+                        "hue=$hue sat=$saturation pos=$position measured %.3f:1, above the ceiling"
+                            .format(onBackground),
+                    )
+                }
+            }
+        }
+    }
+
+    /** Every muted preset sits inside the band, so editing one in the custom dialog seeds a slider
      *  position that reproduces it rather than snapping it to an end. */
     @Test
     fun `every preset sits inside the custom band`() {
-        val band = (HABIT_BAND_FLOOR - HABIT_BAND_TOLERANCE)..(HABIT_BAND_CEILING + HABIT_BAND_TOLERANCE)
         HabitPalette.ORDERED.forEach { habitColor ->
-            val ratio = contrastRatio(Color(habitColor.argb), HabitBandGround)
+            val ratio = contrastRatio(Color(habitColor.argb), ConstanzaColors.Background)
             assertTrue(
-                ratio in band,
+                ratio in HABIT_BAND_FLOOR..HABIT_BAND_CEILING,
                 "${habitColor.name} measured %.2f:1, outside the custom band".format(ratio),
             )
         }
@@ -60,8 +98,8 @@ class HabitColorBandTest {
             val hsv = hsvOf(habitColor.argb)
             val reconstructed = habitBandColor(hsv.hue, hsv.saturation, habitBandPositionOf(habitColor.argb))
 
-            val originalRatio = contrastRatio(Color(habitColor.argb), HabitBandGround)
-            val reconstructedRatio = contrastRatio(Color(reconstructed), HabitBandGround)
+            val originalRatio = contrastRatio(Color(habitColor.argb), ConstanzaColors.Background)
+            val reconstructedRatio = contrastRatio(Color(reconstructed), ConstanzaColors.Background)
 
             assertTrue(
                 kotlin.math.abs(originalRatio - reconstructedRatio) <= ROUND_TRIP_RATIO_TOLERANCE,
@@ -78,16 +116,16 @@ class HabitColorBandTest {
     }
 
     private fun assertBandBoundary(hue: Float, saturation: Float) {
-        val floorRatio = contrastRatio(Color(habitBandColor(hue, saturation, 0f)), HabitBandGround)
-        val ceilingRatio = contrastRatio(Color(habitBandColor(hue, saturation, 1f)), HabitBandGround)
+        val floorRatio = contrastRatio(Color(habitBandColor(hue, saturation, 0f)), ConstanzaColors.Background)
+        val ceilingRatio = contrastRatio(Color(habitBandColor(hue, saturation, 1f)), ConstanzaColors.Background)
 
         assertTrue(
-            kotlin.math.abs(floorRatio - HABIT_BAND_FLOOR) <= HABIT_BAND_TOLERANCE,
+            kotlin.math.abs(floorRatio - HABIT_BAND_FLOOR) <= RATIO_TOLERANCE,
             "hue=$hue sat=$saturation at position 0f measured %.3f:1, expected close to $HABIT_BAND_FLOOR:1"
                 .format(floorRatio),
         )
         assertTrue(
-            kotlin.math.abs(ceilingRatio - HABIT_BAND_CEILING) <= HABIT_BAND_TOLERANCE,
+            kotlin.math.abs(ceilingRatio - HABIT_BAND_CEILING) <= RATIO_TOLERANCE,
             "hue=$hue sat=$saturation at position 1f measured %.3f:1, expected close to $HABIT_BAND_CEILING:1"
                 .format(ceilingRatio),
         )
@@ -104,6 +142,16 @@ class HabitColorBandTest {
 
     private companion object {
         const val OPAQUE = 0xFF shl 24
+
+        /** WCAG 2.1 SC 1.4.11, non-text contrast. */
+        const val NON_TEXT_FLOOR = 3.0
+
+        /** 8-bit rounding slack around a solved target ratio. */
+        const val RATIO_TOLERANCE = 0.1
+
+        const val HUE_STEPS = 24
+        const val SAT_STEPS = 4
+        const val FULL_TURN = 360f
 
         /** 101 positions (`0f` to `1f` in steps of `0.01`), matching the slider's own resolution. */
         const val SWEEP_STEPS = 100

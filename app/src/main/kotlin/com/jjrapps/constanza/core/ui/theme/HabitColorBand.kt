@@ -2,26 +2,37 @@ package com.jjrapps.constanza.core.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-/** The darkest contrast [habitBandColor] will produce against [HabitBandGround]. */
-internal const val HABIT_BAND_FLOOR = 7.0
-
-/** The lightest contrast [habitBandColor] will produce against [HabitBandGround]. */
-internal const val HABIT_BAND_CEILING = 11.0
+/**
+ * The darkest contrast [habitBandColor] will produce against [ConstanzaColors.Background].
+ *
+ * **Why 3.6 and not WCAG's bare 3.0.** A habit's colour is now only an 8dp identity dot — a
+ * non-text graphic, so WCAG 2.1 SC 1.4.11's **3:1** is the floor that applies (graphite redesign T2).
+ * But the dot is not drawn only on [ConstanzaColors.Background]: rows and sheets sit on
+ * [ConstanzaColors.SurfaceRaised] (`#232327`), the lightest surface in the theme. A colour measuring
+ * exactly 3.0:1 on the background measures only 2.55:1 there. Solving for 3:1 on SurfaceRaised gives
+ * 3.53:1 on the background; 3.6 (3.06:1 there) adds 8-bit rounding headroom. So this one number,
+ * measured against the live background as every other theme measurement is, guarantees 3:1 on every
+ * surface a dot is drawn on — `HabitColorBandTest` sweeps it against SurfaceRaised to prove it.
+ */
+internal const val HABIT_BAND_FLOOR = 3.6
 
 /**
- * 8-bit channel quantisation slack. [Hsv.toArgb] rounds every channel to a byte, so
- * [HABIT_BAND_FLOOR] and [HABIT_BAND_CEILING] are targets, not values the discrete 24-bit colour
- * space is guaranteed to contain: `HabitColor`'s 21 presets measure `6.98:1` to `11.05:1`. Every test
- * asserting band membership compares against the band widened by this tolerance.
+ * The lightest contrast [habitBandColor] will produce against [ConstanzaColors.Background].
+ *
+ * **Why a ceiling at all, for a non-text dot.** Legibility needs no ceiling; calm does. The graphite
+ * palette is deliberately muted — its twelve presets measure 6.20:1 to 8.37:1 on the background — and
+ * an unbounded custom pick could still be a near-white or a fluorescent yellow (pure white is
+ * 18.4:1) that out-shouts every named habit. 9.0 sits just above the lightest preset ([HabitColor.LIME],
+ * 8.37:1), so a custom colour can be as light as any preset and no lighter.
  */
-internal const val HABIT_BAND_TOLERANCE = 0.1
+internal const val HABIT_BAND_CEILING = 9.0
 
 private const val MIN_POSITION = 0f
 private const val MAX_POSITION = 1f
 
 /**
  * The custom colour picker's third slider axis, in place of raw HSV `value`: [bandPosition] moves the
- * target contrast ratio against [HabitBandGround] linearly across
+ * target contrast ratio against [ConstanzaColors.Background] linearly across
  * `[`[HABIT_BAND_FLOOR]`, `[HABIT_BAND_CEILING]`]`, and the colour at [hue]/[saturation] whose
  * contrast equals that target is solved for ([solveForContrast]).
  *
@@ -31,23 +42,28 @@ private const val MAX_POSITION = 1f
  * Driving the target contrast itself means every position asks for a different point on the same
  * monotonic contrast curve, and the result is in-band by construction — no downstream clamp exists.
  *
+ * **Saturation is not capped** (graphite redesign T2 decision). Muting customs by capping saturation
+ * would change what the saturation slider's existing positions mean and how an existing colour seeds
+ * them — not a trivial change — while the ceiling already removes the loudest picks. A fully
+ * saturated custom is therefore still possible, but only between 3.6:1 and 9:1.
+ *
  * @param bandPosition `0f` (darkest, [HABIT_BAND_FLOOR]) to `1f` (lightest, [HABIT_BAND_CEILING]),
  *   coerced into range.
  */
 fun habitBandColor(hue: Float, saturation: Float, bandPosition: Float): Int {
     val clamped = bandPosition.coerceIn(MIN_POSITION, MAX_POSITION)
     val target = HABIT_BAND_FLOOR + clamped * (HABIT_BAND_CEILING - HABIT_BAND_FLOOR)
-    return solveForContrast(hue, saturation, target, HabitBandGround)
+    return solveForContrast(hue, saturation, target, ConstanzaColors.Background)
 }
 
 /**
  * The inverse of [habitBandColor]'s mapping: given a colour, the slider position that would
  * reproduce it. Used to seed `CustomColorDialog`'s third slider when it opens on an existing colour.
- * Coerced so a colour outside the band (a pre-band legacy value, or pure black/white) still yields a
- * valid slider position.
+ * Coerced so a colour outside the band (an older custom colour clamped to the previous palette's
+ * band, or pure black/white) still yields a valid slider position.
  */
 fun habitBandPositionOf(argb: Int): Float {
-    val ratio = contrastRatio(Color(argb), HabitBandGround)
+    val ratio = contrastRatio(Color(argb), ConstanzaColors.Background)
     val position = (ratio - HABIT_BAND_FLOOR) / (HABIT_BAND_CEILING - HABIT_BAND_FLOOR)
     return position.toFloat().coerceIn(MIN_POSITION, MAX_POSITION)
 }

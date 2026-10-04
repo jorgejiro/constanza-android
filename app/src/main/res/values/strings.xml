@@ -63,27 +63,18 @@
          (see HabitColorDot's KDoc). Names are the ordinary ones a person would use, which is the
          point of the palette: someone picking "Red" should get a red. Listed here in the grid's
          own scattered order, so this table and HabitColor read the same way round. -->
-    <string name="habit_color_teal">Teal</string>
-    <string name="habit_color_purple">Purple</string>
-    <string name="habit_color_olive">Olive</string>
-    <string name="habit_color_cyan">Cyan</string>
-    <string name="habit_color_violet">Violet</string>
-    <string name="habit_color_brown">Brown</string>
-    <string name="habit_color_pink">Pink</string>
-    <string name="habit_color_green">Green</string>
-    <string name="habit_color_lilac">Lilac</string>
-    <string name="habit_color_red">Red</string>
-    <string name="habit_color_yellow">Yellow</string>
-    <string name="habit_color_amber">Amber</string>
-    <string name="habit_color_light_blue">Light blue</string>
-    <string name="habit_color_peach">Peach</string>
-    <string name="habit_color_indigo">Indigo</string>
-    <string name="habit_color_orange">Orange</string>
-    <string name="habit_color_mint">Mint</string>
-    <string name="habit_color_lime">Lime</string>
+    <string name="habit_color_sage">Sage</string>
     <string name="habit_color_blue">Blue</string>
-    <string name="habit_color_light_green">Light green</string>
-    <string name="habit_color_magenta">Magenta</string>
+    <string name="habit_color_sand">Sand</string>
+    <string name="habit_color_clay">Clay</string>
+    <string name="habit_color_lavender">Lavender</string>
+    <string name="habit_color_teal">Teal</string>
+    <string name="habit_color_olive">Olive</string>
+    <string name="habit_color_rose">Rose</string>
+    <string name="habit_color_indigo">Indigo</string>
+    <string name="habit_color_lime">Lime</string>
+    <string name="habit_color_tan">Tan</string>
+    <string name="habit_color_grey">Grey</string>
     <string name="habit_color_custom">Custom colour</string>
 
     <!-- habit-management: the free colour picker behind the custom swatch. -->

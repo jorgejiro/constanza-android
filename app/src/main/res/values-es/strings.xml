@@ -53,27 +53,18 @@
     <string name="habit_editor_color_label">Color</string>
 
     <!-- habit-management: paleta estándar del selector de color, en el mismo orden que la retícula. -->
-    <string name="habit_color_teal">Verde azulado</string>
-    <string name="habit_color_purple">Púrpura</string>
-    <string name="habit_color_olive">Oliva</string>
-    <string name="habit_color_cyan">Cian</string>
-    <string name="habit_color_violet">Violeta</string>
-    <string name="habit_color_brown">Marrón</string>
-    <string name="habit_color_pink">Rosa</string>
-    <string name="habit_color_green">Verde</string>
-    <string name="habit_color_lilac">Lila</string>
-    <string name="habit_color_red">Rojo</string>
-    <string name="habit_color_yellow">Amarillo</string>
-    <string name="habit_color_amber">Ámbar</string>
-    <string name="habit_color_light_blue">Azul claro</string>
-    <string name="habit_color_peach">Melocotón</string>
-    <string name="habit_color_indigo">Índigo</string>
-    <string name="habit_color_orange">Naranja</string>
-    <string name="habit_color_mint">Menta</string>
-    <string name="habit_color_lime">Lima</string>
+    <string name="habit_color_sage">Salvia</string>
     <string name="habit_color_blue">Azul</string>
-    <string name="habit_color_light_green">Verde claro</string>
-    <string name="habit_color_magenta">Magenta</string>
+    <string name="habit_color_sand">Arena</string>
+    <string name="habit_color_clay">Arcilla</string>
+    <string name="habit_color_lavender">Lavanda</string>
+    <string name="habit_color_teal">Verde azulado</string>
+    <string name="habit_color_olive">Oliva</string>
+    <string name="habit_color_rose">Rosa</string>
+    <string name="habit_color_indigo">Índigo</string>
+    <string name="habit_color_lime">Lima</string>
+    <string name="habit_color_tan">Tostado</string>
+    <string name="habit_color_grey">Gris</string>
     <string name="habit_color_custom">Color personalizado</string>
 
     <!-- habit-management: selector libre de color detrás del círculo personalizado. -->

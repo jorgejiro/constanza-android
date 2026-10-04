@@ -10,27 +10,26 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * The palette's own invariants. Contrast is `ColorContrastTest`'s job and is deliberately not
- * repeated here; what this file guards is everything else — that the set is wide, that no two of its
- * members read as one colour with two names, and that neighbouring cells in the grid are obviously
- * different.
+ * The graphite palette's own invariants (graphite redesign T2): twelve muted presets, mutually
+ * distinguishable, each clearing WCAG 1.4.11's 3:1 non-text floor as an identity dot on every
+ * surface it is drawn on, with a five-colour collapsed row that holds the default.
  *
- * **Why CIE Lab ΔE and not a hue comparison.** The defect this replaces was six colours that were
- * *far apart in hue and still hard to tell apart*, because they shared one narrow band of lightness
- * and saturation — `RED` `#FF9FA8` and `PINK` `#FFA8DC` sat 32° apart and still read as one colour.
- * A hue-only rule would have passed that palette. ΔE measures the thing actually complained about.
- * [OLD_PALETTE_WORST_PAIR] is that pair's measured separation, used here as the calibration point:
- * it is the number a real person looked at and called too similar, so every threshold below is
- * stated relative to it rather than pulled from the air.
+ * **Why CIE Lab ΔE.** The defect the palette history keeps returning to is colours that are far apart
+ * in hue and still hard to tell apart, because they share one band of lightness and saturation. A
+ * muted palette is exactly that situation by design, so separation is measured perceptually.
+ *
+ * **Where the floors come from.** CIE76 ΔE ≈ 2.3 is a just-noticeable difference for adjacent large
+ * patches; ΔE 10 is the conventional "clearly different at a glance" threshold, and it is what
+ * [GLOBAL_SEPARATION_FLOOR] asks of every pair. The twelve measure 10.8 at their closest
+ * (`SAND`/`TAN`) — a muted palette cannot be pushed much further apart without leaving "muted".
+ * Grid neighbours and the collapsed row, where a person compares colours side by side, get stricter
+ * floors the palette actually satisfies (17.5 and 21.1 measured).
  */
 class HabitPaletteTest {
 
     @Test
-    fun `the palette offers a wide set of distinct colours`() {
-        assertTrue(
-            HabitPalette.ARGB.size >= MINIMUM_OFFERED,
-            "the picker offers ${HabitPalette.ARGB.size} presets; the point of this change was a wide standard set",
-        )
+    fun `the palette offers twelve distinct colours`() {
+        assertEquals(PALETTE_SIZE, HabitPalette.ARGB.size, "the graphite palette is exactly twelve muted presets")
         assertEquals(
             HabitPalette.ARGB.size,
             HabitPalette.ARGB.toSet().size,
@@ -38,13 +37,9 @@ class HabitPaletteTest {
         )
     }
 
-    /**
-     * No two swatches anywhere in the palette may be as close as the pair that prompted this change.
-     * A twenty-one colour palette is necessarily denser than a six colour one, so the bar here is
-     * "closer than the pair a person rejected", not "as far apart as six colours can be".
-     */
+    /** No two swatches anywhere in the palette may read as one colour with two names. */
     @Test
-    fun `no two offered colours are as alike as the pair that was complained about`() {
+    fun `no two offered colours read as one colour`() {
         var worst = Double.MAX_VALUE
         var worstPair = ""
         HabitPalette.ORDERED.forEachIndexed { i, a ->
@@ -57,10 +52,6 @@ class HabitPaletteTest {
             }
         }
         assertTrue(
-            worst < OLD_PALETTE_WORST_PAIR,
-            "expected a dense palette to have closer pairs than the old six; $worstPair measured %.1f".format(worst),
-        )
-        assertTrue(
             worst >= GLOBAL_SEPARATION_FLOOR,
             "$worstPair measured ΔE %.1f, below the %.1f floor — those two read as one colour with two names"
                 .format(worst, GLOBAL_SEPARATION_FLOOR),
@@ -68,8 +59,7 @@ class HabitPaletteTest {
     }
 
     /**
-     * The assertion that carries the actual complaint. "The first two are too alike" was about two
-     * cells sitting next to each other, so this walks the grid as it is drawn — six wide, checking
+     * Neighbouring cells are what a person compares side by side, so this walks the grid as it is drawn — six wide, checking
      * across **and** down — and requires every neighbouring pair to be far more separated than the
      * rejected pair was.
      *
@@ -108,15 +98,8 @@ class HabitPaletteTest {
         )
     }
 
-    /**
-     * The collapsed row is what most users will ever see, so it carries the strictest separation
-     * requirement in this file: these five must be *obviously* different from one another, not
-     * merely different.
-     *
-     * The floor is stated as a multiple of the rejected pair rather than as a bare number, because
-     * that is where it comes from: [OLD_PALETTE_WORST_PAIR] is what a person called too similar, and
-     * a row of five chosen for distinctness should not be arguing about the margin.
-     */
+    /** The collapsed row is what most users will ever see, so it carries the strictest separation
+     *  requirement in this file: these five must be *obviously* different from one another. */
     @Test
     fun `the visible row's colours are obviously different from each other`() {
         assertEquals(VISIBLE_ROW_SIZE, HabitPalette.VISIBLE.size, "the collapsed row shows a fixed number of presets")
@@ -133,10 +116,10 @@ class HabitPaletteTest {
         }
         assertTrue(
             worst >= VISIBLE_SEPARATION_FLOOR,
-            ("$worstPair are both in the collapsed row and measure ΔE %.1f, below the %.1f floor " +
-                "(the pair a person rejected measured %.1f). The visible row is chosen for distinctness; " +
-                "reordering ORDERED without re-checking that is what this test exists to catch.")
-                .format(worst, VISIBLE_SEPARATION_FLOOR, OLD_PALETTE_WORST_PAIR),
+            ("$worstPair are both in the collapsed row and measure ΔE %.1f, below the %.1f floor. " +
+                "The visible row is chosen for distinctness; reordering ORDERED without re-checking that " +
+                "is what this test exists to catch.")
+                .format(worst, VISIBLE_SEPARATION_FLOOR),
         )
     }
 
@@ -147,11 +130,11 @@ class HabitPaletteTest {
     fun `the visible row covers the families a person would name`() {
         val visible = HabitPalette.VISIBLE.toSet()
         mapOf(
-            "a red" to setOf(HabitColor.RED),
-            "a warm yellow or orange" to setOf(HabitColor.AMBER, HabitColor.ORANGE, HabitColor.YELLOW),
-            "a green" to setOf(HabitColor.GREEN, HabitColor.LIGHT_GREEN),
-            "a blue" to setOf(HabitColor.BLUE, HabitColor.LIGHT_BLUE),
-            "a violet or pink" to setOf(HabitColor.VIOLET, HabitColor.PURPLE, HabitColor.MAGENTA, HabitColor.PINK),
+            "a red" to setOf(HabitColor.CLAY, HabitColor.ROSE),
+            "a warm yellow or sand" to setOf(HabitColor.SAND, HabitColor.OLIVE, HabitColor.TAN),
+            "a green" to setOf(HabitColor.SAGE, HabitColor.LIME),
+            "a blue" to setOf(HabitColor.BLUE, HabitColor.INDIGO, HabitColor.TEAL),
+            "a violet" to setOf(HabitColor.LAVENDER),
         ).forEach { (description, family) ->
             assertTrue(
                 visible.any { it in family },
@@ -172,26 +155,6 @@ class HabitPaletteTest {
         )
     }
 
-    /** The families the maintainer named as missing. Asserted by value, so a re-tone that quietly
-     *  drops one back out of the palette fails here rather than on his device. */
-    @Test
-    fun `the palette carries the families that were missing from the old six`() {
-        listOf(
-            HabitColor.RED to "a true red, not a salmon",
-            HabitColor.BROWN to "a brown",
-            HabitColor.LILAC to "a lilac",
-            HabitColor.BLUE to "a full-strength blue",
-            HabitColor.LIGHT_BLUE to "a light blue distinct from it",
-            HabitColor.MAGENTA to "a pink distinct from the red",
-        ).forEach { (color, description) ->
-            assertTrue(HabitPalette.contains(color.argb), "the palette must offer $description")
-        }
-        assertTrue(
-            deltaE(HabitColor.RED.argb, HabitColor.MAGENTA.argb) >= GLOBAL_SEPARATION_FLOOR,
-            "the red and the pink must not repeat the RED/PINK collision of the old palette",
-        )
-    }
-
     @Test
     fun `every preset is fully opaque`() {
         HabitPalette.ORDERED.forEach { habitColor ->
@@ -204,24 +167,37 @@ class HabitPaletteTest {
     }
 
     /**
-     * The invariant this re-tone exists to create: a habit's own colour is now painted directly on
-     * its name text, so no preset may read as either dimmer or louder than another. Every preset must
-     * sit inside the `[HABIT_BAND_FLOOR, HABIT_BAND_CEILING]` contrast band against
-     * [HabitBandGround], widened by [HABIT_BAND_TOLERANCE] — the same tolerance
-     * `clampToHabitBand` itself checks against, and for the same reason (`HabitColorBand.kt`'s KDoc):
-     * these presets were produced by that clamp's own reasoning, and an exact `7.0`/`11.0` is not
-     * itself a reachable 8-bit value. The previous 23-colour palette spanned 5.31:1 to 16.01:1, a
-     * 3.02x spread, which is exactly the defect this test pins shut.
+     * The non-text floor the identity dot needs (WCAG 2.1 SC 1.4.11, 3:1), on every surface it is
+     * drawn on: Background (Today, the list), Surface and SurfaceRaised (sheets, raised rows). This
+     * is the floor `openspec/specs/visual-design-system/spec.md` states for a habit's colour.
      */
     @Test
-    fun `every preset sits inside the legible contrast band against Background`() {
-        val band = (HABIT_BAND_FLOOR - HABIT_BAND_TOLERANCE)..(HABIT_BAND_CEILING + HABIT_BAND_TOLERANCE)
+    fun `every preset clears the non-text floor on every surface`() {
+        val surfaces = mapOf(
+            "Background" to ConstanzaColors.Background,
+            "Surface" to ConstanzaColors.Surface,
+            "SurfaceRaised" to ConstanzaColors.SurfaceRaised,
+        )
         HabitPalette.ORDERED.forEach { habitColor ->
-            val ratio = contrastRatio(Color(habitColor.argb), HabitBandGround)
+            surfaces.forEach { (name, surface) ->
+                val ratio = contrastRatio(Color(habitColor.argb), surface)
+                assertTrue(
+                    ratio >= NON_TEXT_FLOOR,
+                    "${habitColor.name} measured %.2f:1 on $name, below the 3:1 non-text floor".format(ratio),
+                )
+            }
+        }
+    }
+
+    /** Muted means no preset shouts: none may be lighter than the custom band's ceiling, so a preset
+     *  is never louder than anything the custom dialog could produce either. */
+    @Test
+    fun `every preset stays under the muted ceiling`() {
+        HabitPalette.ORDERED.forEach { habitColor ->
+            val ratio = contrastRatio(Color(habitColor.argb), ConstanzaColors.Background)
             assertTrue(
-                ratio in band,
-                "${habitColor.name} measured %.2f:1 against Background, outside the [%.1f, %.1f] band"
-                    .format(ratio, band.start, band.endInclusive),
+                ratio <= HABIT_BAND_CEILING,
+                "${habitColor.name} measured %.2f:1, above the %.1f:1 muted ceiling".format(ratio, HABIT_BAND_CEILING),
             )
         }
     }
@@ -234,6 +210,10 @@ class HabitPaletteTest {
         assertFalse(
             HabitPalette.contains(RETIRED_PASTEL_RED),
             "a colour from the retired six must read as custom, not as a preset",
+        )
+        assertFalse(
+            HabitPalette.contains(RETIRED_LEGIBLE_BAND_GREEN),
+            "a colour from the retired 21 must read as custom, not as a preset",
         )
     }
 
@@ -296,27 +276,25 @@ class HabitPaletteTest {
         if (t > LAB_EPSILON) cbrt(t) else LAB_KAPPA * t + LAB_PIVOT_OFFSET
 
     private companion object {
-        /** The maintainer asked for "many more" than six, of the order of twenty. */
-        const val MINIMUM_OFFERED = 20
+        /** The graphite redesign's muted palette. */
+        const val PALETTE_SIZE = 12
 
         /** Must match `HabitColorPicker`'s `SWATCHES_PER_ROW`. Duplicated rather than exposed: that
          *  constant is a layout detail of a private composable, and making it public so a test could
          *  read it would be the test dictating the production API. */
         const val SWATCHES_PER_ROW = 6
 
-        /** ΔE between the old palette's `RED` (`#FF9FA8`) and `PINK` (`#FFA8DC`) — the pair a real
-         *  person looked at and called indistinguishable. Every threshold here is relative to it. */
-        const val OLD_PALETTE_WORST_PAIR = 23.9
+        /** "Clearly different at a glance" (CIE76). The twelve measure 10.8 at their closest. */
+        const val GLOBAL_SEPARATION_FLOOR = 10.0
 
-        /** No two colours anywhere may be closer than this. Below the calibration point, because a
-         *  twenty-one colour palette is legitimately denser than a six colour one. */
-        const val GLOBAL_SEPARATION_FLOOR = 14.0
+        /** Cells that touch in the grid are compared side by side. Measured minimum 17.5. */
+        const val NEIGHBOUR_SEPARATION_FLOOR = 15.0
 
-        /** Cells that touch in the grid, though, must be far clearer than the rejected pair. */
-        const val NEIGHBOUR_SEPARATION_FLOOR = 40.0
+        /** The collapsed row is stricter still. Measured minimum 21.1. */
+        const val VISIBLE_SEPARATION_FLOOR = 20.0
 
-        /** The collapsed row is stricter still: roughly twice the rejected pair's separation. */
-        const val VISIBLE_SEPARATION_FLOOR = 48.0
+        /** WCAG 2.1 SC 1.4.11, non-text contrast. */
+        const val NON_TEXT_FLOOR = 3.0
 
         /** Five, because six cells fit on one row at 360dp and one of them is the custom wheel.
          *  See [HabitPalette.VISIBLE] for the measurement. */
@@ -324,6 +302,9 @@ class HabitPaletteTest {
 
         /** One of the six warm-dark pastels this palette replaced. */
         const val RETIRED_PASTEL_RED = 0xFFFF9FA8.toInt()
+
+        /** The 21-preset legible-band palette's `GREEN`, retired by Room v8. */
+        const val RETIRED_LEGIBLE_BAND_GREEN = 0xFF4CAF50.toInt()
 
         const val OPAQUE_ALPHA = 0xFF
         const val ALPHA_SHIFT = 24
