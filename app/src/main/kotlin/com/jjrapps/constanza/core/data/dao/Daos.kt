@@ -56,6 +56,11 @@ interface ScheduleDao {
 
     @Query("SELECT * FROM schedules WHERE habitId = :habitId")
     suspend fun findByHabitId(habitId: Long): ScheduleEntity?
+
+    /** habit-management: the habit list's schedule subtitle — every habit's schedule, observed so
+     *  an edit made in the editor reaches the list without a reload. Read-only. */
+    @Query("SELECT * FROM schedules")
+    fun observeAll(): Flow<List<ScheduleEntity>>
 }
 
 @Dao
@@ -70,6 +75,11 @@ interface ReminderSlotDao {
 
     @Query("SELECT * FROM reminder_slots WHERE habitId = :habitId")
     suspend fun findByHabitId(habitId: Long): List<ReminderSlotEntity>
+
+    /** habit-management: the habit list's schedule subtitle names each habit's reminder time (or
+     *  count), so it observes every slot alongside [ScheduleDao.observeAll]. Read-only. */
+    @Query("SELECT * FROM reminder_slots")
+    fun observeAll(): Flow<List<ReminderSlotEntity>>
 
     @Query("DELETE FROM reminder_slots WHERE id = :id")
     suspend fun deleteById(id: Long)

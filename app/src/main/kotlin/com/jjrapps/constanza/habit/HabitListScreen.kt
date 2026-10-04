@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -49,7 +50,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jjrapps.constanza.R
-import com.jjrapps.constanza.domain.model.Habit
+import com.jjrapps.constanza.core.ui.rememberTimeOfDayFormat
 
 /**
  * Task 6a.4 (habit-management: Habit Archiving) — container. No navigation library is used
@@ -130,7 +131,7 @@ data class HabitListActions(
 @Composable
 fun HabitListScreen(state: HabitListUiState, actions: HabitListActions) {
     var pendingDeleteId by rememberSaveable { mutableStateOf<Long?>(null) }
-    val pendingDeleteHabit = state.habits.firstOrNull { it.id == pendingDeleteId }
+    val pendingDeleteHabit = state.items.firstOrNull { it.habit.id == pendingDeleteId }?.habit
     BackHandler(enabled = pendingDeleteHabit == null, onBack = actions.onBack)
     if (pendingDeleteHabit != null) {
         DeleteHabitDialog(
@@ -184,7 +185,7 @@ private fun HabitListTopBar(onBack: () -> Unit) {
 private fun HabitListContent(state: HabitListUiState, actions: HabitListActions, onRequestDelete: (Long) -> Unit) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item { ShowArchivedRow(state.showArchived, actions.onToggleShowArchived) }
-        if (state.habits.isEmpty()) {
+        if (state.items.isEmpty()) {
             item {
                 val emptyRes = if (state.showArchived) {
                     R.string.habit_list_empty_archived
@@ -194,8 +195,8 @@ private fun HabitListContent(state: HabitListUiState, actions: HabitListActions,
                 Text(stringResource(emptyRes), modifier = Modifier.padding(16.dp))
             }
         }
-        items(state.habits, key = { it.id }) { habit ->
-            HabitRow(habit, actions.onArchiveToggle, actions.onEditHabit, actions.onShowProgress, onRequestDelete)
+        items(state.items, key = { it.habit.id }) { item ->
+            HabitRow(item, actions.onArchiveToggle, actions.onEditHabit, actions.onShowProgress, onRequestDelete)
         }
     }
 }
@@ -251,12 +252,13 @@ private fun ShowArchivedRow(showArchived: Boolean, onToggleShowArchived: () -> U
  */
 @Composable
 private fun HabitRow(
-    habit: Habit,
+    item: HabitListItem,
     onArchiveToggle: (Long, Boolean) -> Unit,
     onEditHabit: (Long) -> Unit,
     onShowProgress: (Long) -> Unit,
     onRequestDelete: (Long) -> Unit,
 ) {
+    val habit = item.habit
     var menuExpanded by remember { mutableStateOf(false) }
     ListItem(
         // Colour overhaul: the habit's identity colour used to sit in a leading dot ahead of the
@@ -278,6 +280,7 @@ private fun HabitRow(
                 overflow = TextOverflow.Ellipsis,
             )
         },
+        supportingContent = item.schedule?.let { schedule -> { HabitScheduleSummary(schedule) } },
         trailingContent = {
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
@@ -323,6 +326,14 @@ private fun HabitRow(
         },
         modifier = Modifier.fillMaxWidth().clickable { onEditHabit(habit.id) },
     )
+}
+
+@Composable
+private fun HabitScheduleSummary(schedule: HabitSchedule) {
+    val strings = rememberScheduleSummaryStrings()
+    val timeFormat = rememberTimeOfDayFormat()
+    val locale = LocalConfiguration.current.locales[0]
+    Text(scheduleSummary(schedule.schedule, schedule.slots, strings, timeFormat, locale))
 }
 
 /** habit-management: Habit Deletion (design.md D4). Same [AlertDialog] shape as

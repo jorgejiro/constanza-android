@@ -28,6 +28,10 @@ import javax.inject.Inject
  * therefore never a guessed default, it is the honest answer for a habit absent from the
  * `GROUP BY` result because it has zero entries.
  *
+ * Graphite redesign: [HabitRepository.schedules] joins the same `combine`, so each
+ * [HabitListItem] carries its habit's schedule and reminder slots for the row subtitle, and a
+ * schedule saved in the editor reaches the list reactively.
+ *
  * The visible order is alphabetical by [Habit.name], applied here rather than in
  * [com.jjrapps.constanza.core.data.dao.HabitDao.observeAll]: that query is shared with the Today
  * screen, which groups its rows into time-of-day sections and must keep deciding its own order.
@@ -47,11 +51,14 @@ class HabitListViewModel @Inject constructor(
     val uiState: StateFlow<HabitListUiState> =
         combine(
             habitRepository.observeAll(),
+            habitRepository.schedules,
             showArchived,
             entryDao.observeCountsByHabit(),
-        ) { habits, archivedFilter, counts ->
+        ) { habits, schedules, archivedFilter, counts ->
             HabitListUiState(
-                habits = habits.filter { it.archived == archivedFilter }.sortedWith(byName()),
+                items = habits.filter { it.archived == archivedFilter }
+                    .sortedWith(byName())
+                    .map { HabitListItem(it, schedules[it.id]) },
                 showArchived = archivedFilter,
                 entryCounts = counts.associate { it.habitId to it.count },
             )
@@ -84,8 +91,12 @@ private fun byName(): Comparator<Habit> = Collator.getInstance().let { collator 
     Comparator { left, right -> collator.compare(left.name, right.name) }
 }
 
+/** One habit-list row: the habit and, for its subtitle, its schedule and reminder slots — `null`
+ *  only in the one-commit window where the habit row exists and its schedule row does not yet. */
+data class HabitListItem(val habit: Habit, val schedule: HabitSchedule?)
+
 data class HabitListUiState(
-    val habits: List<Habit> = emptyList(),
+    val items: List<HabitListItem> = emptyList(),
     val showArchived: Boolean = false,
     val entryCounts: Map<Long, Int> = emptyMap(),
 )

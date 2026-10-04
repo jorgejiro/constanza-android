@@ -37,6 +37,25 @@
     <string name="habit_list_archive">Archive</string>
     <string name="habit_list_unarchive">Un-archive</string>
 
+    <!-- habit-management: the habit list row's schedule subtitle (graphite redesign), e.g.
+         "Daily · 9:30 AM" or "Several times a day · 3 reminders". The " · " separator, the day
+         abbreviations and the time come from code. -->
+    <string name="habit_list_summary_daily">Daily</string>
+    <string name="habit_list_summary_times_per_day">Several times a day</string>
+    <plurals name="habit_list_summary_reminder_count">
+        <item quantity="one">%1$d reminder</item>
+        <item quantity="other">%1$d reminders</item>
+    </plurals>
+    <plurals name="habit_list_summary_times_per_week">
+        <item quantity="one">%1$d time a week</item>
+        <item quantity="other">%1$d times a week</item>
+    </plurals>
+    <string name="habit_list_summary_monthly">Monthly on day %1$d</string>
+    <plurals name="habit_list_summary_every_n_days">
+        <item quantity="one">Every day</item>
+        <item quantity="other">Every %1$d days</item>
+    </plurals>
+
     <!-- habit-management: Habit Deletion (design.md D2/D4, task 3.4). The dialog is irreversible,
          so it names the habit and states the exact count of records it destroys; zero is worded
          honestly by the "other" plural category (English has no CLDR "zero"), never a separate
