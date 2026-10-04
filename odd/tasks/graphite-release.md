@@ -17,7 +17,7 @@ Ship the merged graphite redesign (PRs #140–#152) as a new release with a gree
 1.1.0 (versionCode 19): a visible redesign and a DB migration justify a minor bump. (Precedent was patch bumps pre-1.0; 1.0.0 is the first public version.)
 
 ## Tasks
-- [ ] R1 detekt green. Route: delegated writer.
+- [x] R1 detekt green. Route: delegated writer + parent (daemon JDK pin inline, one mechanical build change).
 - [ ] R2 store screenshots. Route: delegated.
 - [ ] R3 release 1.1.0. Route: delegated + parent verification.
 
@@ -32,5 +32,8 @@ One PR per task, merged by the owner in order. Slicing budget ~900 lines. RDD di
   - Evidence: JDK 21 (`~/.gradle/jdks/eclipse_adoptium-21…`) `clean check assembleDebug`: BUILD SUCCESSFUL, 0 detekt findings. JBR 25 `clean check --no-build-cache`: BUILD FAILED, `:app:detekt`, `:domain:detekt`, `:domain:detektMain` with `25.0.3`.
   - README.md:175 / README.es.md:178 say "the Gradle daemon downloads it if missing", but the repo has no `gradle/gradle-daemon-jvm.properties`; that claim is currently unbacked.
 
+  - Blocker resolved: `settings.gradle.kts` applies `org.gradle.toolchains.foojay-resolver-convention` 1.0.0 and `./gradlew updateDaemonJvm --jvm-version=21` generated `gradle/gradle-daemon-jvm.properties` (toolchain 21 + download URLs). The daemon now runs on JDK 21 whatever JAVA_HOME says (observed process: `~/.gradle/jdks/eclipse_adoptium-21…/bin/java` while JAVA_HOME = JBR 25). README "the Gradle daemon downloads it if missing" is now true.
+  - Evidence (JAVA_HOME = JBR 25): `clean check --no-build-cache` → BUILD SUCCESSFUL, app unit 373 tests / 0 failures, domain 0 failures; `:app:detekt :domain:detekt :app:detektMain :domain:detektMain --rerun-tasks --no-build-cache` → all four executed, BUILD SUCCESSFUL.
+
 ## Next step
-Owner/parent decision on the JDK 25 blocker (candidate: add `gradle/gradle-daemon-jvm.properties` with `toolchainVersion=21` so the daemon runs on 21 regardless of JAVA_HOME), then re-run `clean check --no-build-cache` on JBR and tick R1; then R2.
+R2 store screenshots.
