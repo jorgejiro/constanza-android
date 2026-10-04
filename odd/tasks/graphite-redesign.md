@@ -33,7 +33,7 @@ Strategy: ask-on-risk resolved by owner policy (no process prompts) → work-uni
 - [x] T1 Theme foundation: graphite tokens, M3 mapping, Geist typography, window background, contrast tests, visual-design-system spec. Route: delegated (writer trigger, 2+ non-trivial files).
 - [x] T2 Muted 12-colour palette: enum, colour band for a non-text dot, picker + custom dialog, DB v8 remap + backup schema 5 normalisation, tests, seeds, habit-management/data-portability specs. Route: delegated.
 - [x] T3 Today screen: dot + neutral names, round answer buttons, answered glyphs, section headers, progress bar, reminder segments, FAB, notification accent; migrate tests. Route: delegated.
-- [ ] T4 Habit list: dot, schedule subtitle (new data flow), menu, archived switch; rewrite HabitNameColourComposeTest. Route: delegated.
+- [x] T4 Habit list: dot, schedule subtitle (new data flow), menu, archived switch; rewrite HabitNameColourComposeTest. Route: delegated.
 - [ ] T5 Editor, Progress, Settings, Onboarding restyle. Route: delegated.
 - [ ] T6 Full verification: `./gradlew check`, `assembleDebug`, `:app:emulatorMatrixGroupDebugAndroidTest`, rendered review on emulator. Route: delegated verifier.
 
@@ -113,6 +113,33 @@ Hand-off notes:
 - Out of surface, stale: `res/drawable/ic_launcher_foreground.xml` comment cites `ConstanzaColors.StatusCompleted` (token retired; colour value unchanged in the drawable); `ReminderFireWorker` still passes `habit.colorArgb`.
 - Native review: not run by the writer (parent owns RDD assessment).
 
+### T4 — done, commits `eb01e05`, `f22637e`
+Route: delegated writer (writer trigger). Commits (additions+deletions):
+- `eb01e05` feat(habit): schedule summary subtitle on the habit list — 9 files, +358/-19 (377).
+- `f22637e` feat(habit): graphite habit list with dots and neutral menu — 7 files, +547/-156 (703).
+
+Test-first: `ScheduleSummaryTest` against a stub returning "" → RED (8/8 failed), implemented → GREEN. `HabitListViewModelTest."each row carries its own habit's schedule and reminder slots"` against a VM mapping `schedule = null` → RED (1 failed), wired → GREEN.
+
+Verification (JAVA_HOME = Android Studio JBR), on `f22637e`:
+- `:domain:test` → 57 tests, 0 failures (XML).
+- `:app:testDebugUnitTest` → 370 tests, 0 failures/errors (XML; 361 + 8 summary + 1 VM mapping).
+- `:app:detektMain` → pass. `:app:compileDebugAndroidTestKotlin` → pass.
+- `:app:lintDebug` → 0 errors; 10 warnings, none in files T4 touched (the 3 new ES plurals carry `many`).
+- `:app:api37DebugAndroidTest` with packages `habit`, `e2e`, `core.ui.component` → 73 tests, 0 failures, 1 skipped (XML). Includes HabitNameColourComposeTest (both halves), new HabitListSubtitleComposeTest (2), CoreFlowE2ETest, TodayAddHabitE2ETest, all habit-list/editor/repository classes. api31 not run in T4 (T6).
+- Render: `HabitListRealRenderTest` on api37, Spanish via a configuration context, PNG from pulled logcat → `/private/tmp/claude-501/-Users-jorge-dev-constanza-android/393ec5f2-5fc2-4458-93b1-0cc69a55357b/scratchpad/t4-list.png`. Matches the "E · Hábitos" board (menu popup not captured: it is a separate window).
+
+What changed: `ScheduleDao.observeAll`/`ReminderSlotDao.observeAll` (read-only, no schema change) → `HabitRepository.schedules` (`Map<habitId, HabitSchedule>`) → `HabitListViewModel` joins into `HabitListItem(habit, schedule?)` (`HabitListUiState.items` replaces `habits`). Pure `scheduleSummary(schedule, slots, strings, timeFormat, locale)` + `rememberScheduleSummaryStrings()` / `HabitScheduleSummary` in `habit/ScheduleSummary.kt`. Rows: `HabitDot` + name (bodyLarge, OnBackground, 2 lines ellipsis) + subtitle (bodyMedium, OnBackgroundVariant) + ⋮ menu (SurfaceRaised, 14dp, Divider hairline, Delete in `error`). Show-archived label in OnBackgroundVariant + divider; `ConstanzaControlDefaults.switchColors()` (new, reusable for T5 Settings). Top bar on background with `ConstanzaIcons.ChevronStart`; FAB light-filled flat like Today; empty states OnBackgroundVariant; delete dialog on SurfaceRaised with confirm in `error`.
+
+Deviations:
+- Several-times-a-day subtitle reads "3 reminders"/"3 recordatorios", not the board's "3 horas" (more natural; matches "Horas de recordatorio" wording elsewhere).
+- `HabitRepository.schedules` is a cold-`Flow` property, not an `observe…()` function: the class sat at detekt's `TooManyFunctions` threshold.
+- Days of week are ordered from the schedule's `weekStart`.
+- Monthly ES copy: "Mensual, el día 5".
+
+Hand-off notes:
+- **T5:** `ConstanzaControlDefaults.switchColors()` exists for the Settings switches. `HabitEditorScreen`'s top bar still uses the Material arrow; the list now uses `ConstanzaIcons.ChevronStart` — align when restyling the editor.
+- Native review: not run by the writer (parent owns RDD assessment).
+
 ### Native review log
 - T1 `131117e`..`7f55a2a` (775 lines): granted → approved, acknowledged (lineage review-fca3c9fb01a9e39f). 2 WARNING + 1 SUGGESTION informational (migration test ground → fixed in T2; ReminderTimeField selected contrast → T5; spec floors unproved → covered in T2).
 - T2 first attempt (2253 / 1835 lines): granted, stopped `lens_context_budget_exceeded`. Owner chose to split; T2 rewritten into `fa8b44b`, `5b3ad96`, `83e127c`, `e553317`, `a47ac1d`, `01154eb` (tree identical to `backup/graphite-t2`).
@@ -120,4 +147,4 @@ Hand-off notes:
 - Owner raised the slicing budget to ~900 lines (2026-10-04). The native reviewer context budget is not configurable.
 
 ## Next step
-T4.
+T5 (after a docs(odd) commit recording T4).
