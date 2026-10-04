@@ -53,13 +53,15 @@ class ProgressViewModel @Inject constructor(
 
     private suspend fun buildState(id: Long, entities: List<EntryEntity>): ProgressUiState {
         val habit = habitRepository.findById(id) ?: return ProgressUiState()
-        val schedule = habitRepository.findScheduleFor(id) ?: return ProgressUiState(habitName = habit.name)
+        val schedule = habitRepository.findScheduleFor(id)
+            ?: return ProgressUiState(habitName = habit.name, habitColorArgb = habit.colorArgb)
         val archivedAt = habit.archivedAt
         val today = effectiveToday(timeProvider.today(), archivedAt)
         val entries = entities.map { it.toDomain() }
             .filter { archivedAt == null || it.date.isBefore(archivedAt) }
         return ProgressUiState(
             habitName = habit.name,
+            habitColorArgb = habit.colorArgb,
             currentStreak = StreakCalculator.current(schedule, entries, today),
             bestStreak = StreakCalculator.best(schedule, entries, today),
             complianceRatio = ComplianceCalculator.ratio(schedule, entries, today, PROGRESS_WINDOW_DAYS),
@@ -103,8 +105,10 @@ class ProgressViewModel @Inject constructor(
     }
 }
 
+/** [habitColorArgb] paints the title's habit dot (graphite redesign); `null` until the habit loads. */
 data class ProgressUiState(
     val habitName: String = "",
+    val habitColorArgb: Int? = null,
     val currentStreak: Int = 0,
     val bestStreak: Int = 0,
     val complianceRatio: Double = 0.0,

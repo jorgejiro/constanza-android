@@ -200,9 +200,15 @@
          (D9, scenario "A literal percent sign survives translation"). -->
     <string name="progress_title">Progreso</string>
     <string name="progress_no_schedule">No se encontró ninguna programación para este hábito.</string>
-    <string name="progress_current_streak">Racha actual: %1$d</string>
-    <string name="progress_best_streak">Mejor racha: %1$d</string>
-    <string name="progress_compliance">Cumplimiento (últimos 30 días): %1$d%%</string>
+    <string name="progress_current_streak">Racha actual</string>
+    <string name="progress_best_streak">Mejor racha</string>
+    <plurals name="progress_streak_days">
+        <item quantity="one">día</item>
+        <item quantity="many">días</item>
+        <item quantity="other">días</item>
+    </plurals>
+    <string name="progress_compliance_label">Cumplimiento · últimos 30 días</string>
+    <string name="progress_compliance">%1$d %%</string>
 
     <!-- reminder-response: Snooze Configuration and Re-arm (task 6b.5, bound to task 5.6's DataStore entry). -->
     <string name="settings_title">Ajustes</string>

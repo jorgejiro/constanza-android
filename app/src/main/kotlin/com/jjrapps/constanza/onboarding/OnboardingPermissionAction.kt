@@ -8,7 +8,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,6 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.jjrapps.constanza.R
+import androidx.compose.ui.text.font.FontWeight
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
+import com.jjrapps.constanza.core.ui.theme.ConstanzaControlDefaults
+import com.jjrapps.constanza.core.ui.theme.Dimens
 import com.jjrapps.constanza.core.ui.theme.Spacing
 import com.jjrapps.constanza.reminding.NotificationPermissionDecision
 
@@ -51,20 +58,20 @@ internal fun OnboardingPermissionAction(
 
         NotificationPermissionDecision.GRANTED -> Text(
             stringResource(R.string.onboarding_permission_granted_body),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = onboardingBodyStyle(),
+            color = ConstanzaColors.OnBackgroundVariant,
         )
 
         NotificationPermissionDecision.SHOULD_REQUEST -> Column {
             Text(
                 stringResource(R.string.onboarding_permission_should_request_body),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = onboardingBodyStyle(),
+                color = ConstanzaColors.OnBackgroundVariant,
             )
-            Button(
+            OnboardingAskButton(
+                text = stringResource(R.string.onboarding_permission_should_request_action),
                 onClick = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
-                modifier = Modifier.padding(top = Spacing.md),
-            ) {
-                Text(stringResource(R.string.onboarding_permission_should_request_action))
-            }
+            )
         }
 
         // Byte-for-byte the com.jjrapps.constanza.tracking.TodayBanners.kt:82-89 gesture — never
@@ -72,19 +79,18 @@ internal fun OnboardingPermissionAction(
         NotificationPermissionDecision.BLOCKED -> Column {
             Text(
                 stringResource(R.string.onboarding_permission_blocked_body),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = onboardingBodyStyle(),
+                color = ConstanzaColors.OnBackgroundVariant,
             )
-            Button(
+            OnboardingAskButton(
+                text = stringResource(R.string.onboarding_permission_blocked_action),
                 onClick = {
                     context.startActivity(
                         Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                             .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
                     )
                 },
-                modifier = Modifier.padding(top = Spacing.md),
-            ) {
-                Text(stringResource(R.string.onboarding_permission_blocked_action))
-            }
+            )
         }
     }
 }
@@ -97,8 +103,8 @@ internal fun OnboardingPermissionAction(
  *
  * [canSchedule] `true` renders one confirmation line and no button — a button whose only honest
  * action is "nothing" is exactly the dead-button defect this design avoids. `false` renders the
- * degradation copy plus a FILLED [Button] (design decision 5: sibling parity with
- * [OnboardingPermissionAction]'s own controls, not a lighter, "less important" outlined one) that
+ * degradation copy plus an [OnboardingAskButton] (design decision 5: sibling parity with
+ * [OnboardingPermissionAction]'s own controls — the same control, never a lighter, "less important" one) that
  * deep-links to `ACTION_REQUEST_SCHEDULE_EXACT_ALARM`. No launcher and no callback (decision 6): the
  * only outbound edge is `startActivity`, and the caller re-reads the real state on `ON_RESUME`
  * regardless of what the user did in settings.
@@ -109,15 +115,18 @@ internal fun OnboardingExactAlarmAction(canSchedule: Boolean) {
     if (canSchedule) {
         Text(
             stringResource(R.string.onboarding_exact_alarm_granted_body),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = onboardingBodyStyle(),
+            color = ConstanzaColors.OnBackgroundVariant,
         )
     } else {
         Column {
             Text(
                 stringResource(R.string.onboarding_exact_alarm_denied_body),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = onboardingBodyStyle(),
+                color = ConstanzaColors.OnBackgroundVariant,
             )
-            Button(
+            OnboardingAskButton(
+                text = stringResource(R.string.onboarding_exact_alarm_denied_action),
                 onClick = {
                     context.startActivity(
                         Intent(
@@ -126,10 +135,25 @@ internal fun OnboardingExactAlarmAction(canSchedule: Boolean) {
                         ),
                     )
                 },
-                modifier = Modifier.padding(top = Spacing.md),
-            ) {
-                Text(stringResource(R.string.onboarding_exact_alarm_denied_action))
-            }
+            )
         }
+    }
+}
+
+/**
+ * Graphite redesign: a permission ask inside the page — an outlined pill in the control stroke
+ * with the text colour, so both asks carry the same weight (onboarding spec) and neither competes
+ * with the bottom bar's light-filled forward action.
+ */
+@Composable
+private fun OnboardingAskButton(text: String, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.padding(top = Spacing.md).heightIn(min = Dimens.CompactIconButton),
+        shape = CircleShape,
+        border = ConstanzaControlDefaults.outlinedButtonBorder(enabled = true),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground),
+    ) {
+        Text(text, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium))
     }
 }
