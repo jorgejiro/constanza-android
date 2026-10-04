@@ -18,6 +18,7 @@ import com.jjrapps.constanza.scheduling.AlarmScheduler
 import com.jjrapps.constanza.scheduling.OccurrencePlanner
 import com.jjrapps.constanza.scheduling.ScheduleEditor
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
@@ -79,6 +80,19 @@ class HabitRepository @Inject constructor(
 ) {
     /** habit-management: the habit list, filterable by [Habit.archived] in the presentation layer. */
     fun observeAll(): Flow<List<Habit>> = daos.habitDao.observeAll().map(::toDomainHabits)
+
+    /** habit-management: the habit list's schedule subtitle — every habit's [Schedule] and
+     *  [ReminderSlot]s keyed by habit id, observed over both tables so an editor save reaches the
+     *  list. A habit with no schedule row yet (mid-create, one commit ahead) is simply absent.
+     *  A cold-`Flow` property rather than an `observe…()` function: each collector still gets its
+     *  own Room subscription, and the class stays under detekt's `TooManyFunctions` threshold. */
+    val schedules: Flow<Map<Long, HabitSchedule>> =
+        combine(daos.scheduleDao.observeAll(), daos.reminderSlotDao.observeAll()) { schedules, slots ->
+            val slotsByHabit = slots.map { it.toDomain() }.groupBy { it.habitId }
+            schedules.associate { row ->
+                row.habitId to HabitSchedule(row.toDomain(), slotsByHabit[row.habitId].orEmpty())
+            }
+        }
 
     suspend fun findById(habitId: Long): Habit? = daos.habitDao.findById(habitId)?.toDomain()
 
@@ -158,5 +172,8 @@ class HabitRepository @Inject constructor(
         }
     }
 }
+
+/** One habit's schedule and its reminder slots, as [HabitRepository.schedules] pairs them. */
+data class HabitSchedule(val schedule: Schedule, val slots: List<ReminderSlot>)
 
 private fun toDomainHabits(entities: List<HabitEntity>): List<Habit> = entities.map { it.toDomain() }

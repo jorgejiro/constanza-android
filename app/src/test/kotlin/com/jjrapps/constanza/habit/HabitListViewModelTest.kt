@@ -3,6 +3,8 @@ package com.jjrapps.constanza.habit
 import app.cash.turbine.test
 import com.jjrapps.constanza.core.data.dao.EntryDao
 import com.jjrapps.constanza.domain.model.Habit
+import com.jjrapps.constanza.domain.model.ReminderSlot
+import com.jjrapps.constanza.domain.model.Schedule
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -44,6 +46,8 @@ class HabitListViewModelTest {
      *  withhold [HabitListViewModel.uiState] waiting on a source these tests do not otherwise use. */
     private fun entryDao(): EntryDao = mockk { every { observeCountsByHabit() } returns flowOf(emptyList()) }
 
+    private fun HabitListUiState.names() = items.map { it.habit.name }
+
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -69,13 +73,14 @@ class HabitListViewModelTest {
         )
         val habitRepository = mockk<HabitRepository> {
             every { observeAll() } returns habits
+            every { schedules } returns flowOf(emptyMap())
         }
         val viewModel = HabitListViewModel(habitRepository, entryDao())
 
         viewModel.uiState.test {
             assertEquals(
                 listOf("afeitarme", "Ánimo", "Cenar antes de las 22h", "Trabajar 20 min al sol"),
-                awaitItem().habits.map { it.name },
+                awaitItem().names(),
             )
         }
     }
@@ -87,15 +92,16 @@ class HabitListViewModelTest {
         )
         val habitRepository = mockk<HabitRepository> {
             every { observeAll() } returns habits
+            every { schedules } returns flowOf(emptyMap())
         }
         val viewModel = HabitListViewModel(habitRepository, entryDao())
 
         viewModel.uiState.test {
-            assertTrue(awaitItem().habits.isEmpty()) // initial: active filter, both are archived
+            assertTrue(awaitItem().items.isEmpty()) // initial: active filter, both are archived
 
             viewModel.toggleShowArchived()
 
-            assertEquals(listOf("Beber agua", "Zen"), awaitItem().habits.map { it.name })
+            assertEquals(listOf("Beber agua", "Zen"), awaitItem().names())
         }
     }
 
@@ -104,12 +110,13 @@ class HabitListViewModelTest {
         val habits = MutableStateFlow(listOf(habit(1, "Read", archived = false), habit(2, "Old", archived = true)))
         val habitRepository = mockk<HabitRepository> {
             every { observeAll() } returns habits
+            every { schedules } returns flowOf(emptyMap())
         }
         val viewModel = HabitListViewModel(habitRepository, entryDao())
 
         viewModel.uiState.test {
             val state = awaitItem()
-            assertEquals(listOf("Read"), state.habits.map { it.name })
+            assertEquals(listOf("Read"), state.names())
             assertFalse(state.showArchived)
         }
     }
@@ -119,16 +126,17 @@ class HabitListViewModelTest {
         val habits = MutableStateFlow(listOf(habit(1, "Read", archived = false), habit(2, "Old", archived = true)))
         val habitRepository = mockk<HabitRepository> {
             every { observeAll() } returns habits
+            every { schedules } returns flowOf(emptyMap())
         }
         val viewModel = HabitListViewModel(habitRepository, entryDao())
 
         viewModel.uiState.test {
-            assertEquals(listOf("Read"), awaitItem().habits.map { it.name }) // initial: active filter
+            assertEquals(listOf("Read"), awaitItem().names()) // initial: active filter
 
             viewModel.toggleShowArchived()
 
             val state = awaitItem()
-            assertEquals(listOf("Old"), state.habits.map { it.name })
+            assertEquals(listOf("Old"), state.names())
             assertTrue(state.showArchived)
         }
     }
@@ -138,6 +146,7 @@ class HabitListViewModelTest {
         val habits = MutableStateFlow(listOf(habit(1, "Read", archived = false)))
         val habitRepository = mockk<HabitRepository> {
             every { observeAll() } returns habits
+            every { schedules } returns flowOf(emptyMap())
             coEvery { setArchived(1L, true) } coAnswers {
                 habits.value = habits.value.map { it.copy(archived = true) }
             }
@@ -145,12 +154,12 @@ class HabitListViewModelTest {
         val viewModel = HabitListViewModel(habitRepository, entryDao())
 
         viewModel.uiState.test {
-            assertEquals(listOf("Read"), awaitItem().habits.map { it.name }) // initial: active filter
+            assertEquals(listOf("Read"), awaitItem().names()) // initial: active filter
 
             viewModel.setArchived(1L, true)
 
             val state = awaitItem()
-            assertTrue(state.habits.isEmpty())
+            assertTrue(state.items.isEmpty())
             coVerify(exactly = 1) { habitRepository.setArchived(1L, true) }
         }
     }
@@ -160,6 +169,7 @@ class HabitListViewModelTest {
         val habits = MutableStateFlow(listOf(habit(1, "Read", archived = true)))
         val habitRepository = mockk<HabitRepository> {
             every { observeAll() } returns habits
+            every { schedules } returns flowOf(emptyMap())
             coEvery { setArchived(1L, false) } coAnswers {
                 habits.value = habits.value.map { it.copy(archived = false) }
             }
@@ -167,12 +177,44 @@ class HabitListViewModelTest {
         val viewModel = HabitListViewModel(habitRepository, entryDao())
 
         viewModel.uiState.test {
-            assertTrue(awaitItem().habits.isEmpty()) // initial: active filter, seeded habit is archived
+            assertTrue(awaitItem().items.isEmpty()) // initial: active filter, seeded habit is archived
 
             viewModel.setArchived(1L, false)
 
             val state = awaitItem()
-            assertEquals(listOf("Read"), state.habits.map { it.name })
+            assertEquals(listOf("Read"), state.names())
+        }
+    }
+
+    /** graphite redesign: each row carries its own habit's schedule and slots for the subtitle,
+     *  joined by habit id after sorting, and follows a schedule edit reactively. */
+    @Test
+    fun `each row carries its own habit's schedule and reminder slots`() = runTest {
+        val habits = MutableStateFlow(listOf(habit(1, "Walk", archived = false), habit(2, "Drink", archived = false)))
+        val walk = HabitSchedule(Schedule.Daily(), listOf(ReminderSlot(10, 1, 570, enabled = true)))
+        val drink = HabitSchedule(
+            Schedule.TimesPerDay(),
+            listOf(ReminderSlot(20, 2, 600, enabled = true), ReminderSlot(21, 2, 900, enabled = true)),
+        )
+        val scheduleFlow = MutableStateFlow(mapOf(1L to walk, 2L to drink))
+        val habitRepository = mockk<HabitRepository> {
+            every { observeAll() } returns habits
+            every { schedules } returns scheduleFlow
+        }
+        val viewModel = HabitListViewModel(habitRepository, entryDao())
+
+        viewModel.uiState.test {
+            val items = awaitItem().items
+            assertEquals(listOf("Drink", "Walk"), items.map { it.habit.name })
+            assertEquals(drink, items[0].schedule)
+            assertEquals(walk, items[1].schedule)
+
+            val weekly = HabitSchedule(Schedule.NTimesPerWeek(3), emptyList())
+            scheduleFlow.value = mapOf(1L to weekly)
+
+            val updated = awaitItem().items
+            assertEquals(null, updated[0].schedule) // Drink's schedule row is gone
+            assertEquals(weekly, updated[1].schedule)
         }
     }
 }

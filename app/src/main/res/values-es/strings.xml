@@ -33,6 +33,24 @@
     <string name="habit_list_empty_archived">No hay hábitos archivados.</string>
     <string name="habit_list_archive">Archivar</string>
     <string name="habit_list_unarchive">Desarchivar</string>
+    <string name="habit_list_summary_daily">Diaria</string>
+    <string name="habit_list_summary_times_per_day">Varias veces al día</string>
+    <plurals name="habit_list_summary_reminder_count">
+        <item quantity="one">%1$d recordatorio</item>
+        <item quantity="many">%1$d de recordatorios</item>
+        <item quantity="other">%1$d recordatorios</item>
+    </plurals>
+    <plurals name="habit_list_summary_times_per_week">
+        <item quantity="one">%1$d vez por semana</item>
+        <item quantity="many">%1$d de veces por semana</item>
+        <item quantity="other">%1$d veces por semana</item>
+    </plurals>
+    <string name="habit_list_summary_monthly">Mensual, el día %1$d</string>
+    <plurals name="habit_list_summary_every_n_days">
+        <item quantity="one">Cada día</item>
+        <item quantity="many">Cada %1$d de días</item>
+        <item quantity="other">Cada %1$d días</item>
+    </plurals>
 
     <!-- habit-management: Habit Deletion (design.md D2/D4, task 3.4). -->
     <string name="habit_list_more_options">Más opciones</string>
