@@ -50,10 +50,10 @@ FACE_BOLD = 1
 
 # Paleta fija de la app — ConstanzaColors.kt (no hay tema claro: spec
 # "Dark-Only Rendering"). No se recalcula aquí: se copian los mismos ARGB.
-BACKGROUND = (0x11, 0x0B, 0x06)
-ON_BACKGROUND = (0xEF, 0xEA, 0xE6)
-ON_BACKGROUND_VARIANT = (0xC4, 0xBC, 0xB6)
-CONTROL_STROKE = (0x7A, 0x6B, 0x5D)
+BACKGROUND = (0x14, 0x14, 0x16)
+ON_BACKGROUND = (0xEC, 0xEC, 0xEE)
+ON_BACKGROUND_VARIANT = (0xAD, 0xAD, 0xB5)
+CONTROL_STROKE = (0x6C, 0x6C, 0x73)
 
 FEATURE_GRAPHIC_TEXT = {
     "es": "Hábitos que se contestan desde la notificación.",
