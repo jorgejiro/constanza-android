@@ -19,10 +19,11 @@ object Spacing {
 /**
  * Fixed component dimensions shared across screens. [Swatch] is the colour picker swatch, moved here from
  * `HabitEditorScreen.kt`'s private constants (work unit 5) so the editor and both list screens
- * agree on one number instead of each holding a private copy. [PagerDot] is
- * `first-run-onboarding`'s progress indicator (design.md §12, A7) — a size, not a gap, so it belongs
- * here as a `Dimens` token rather than being reused from `Spacing`, which is a scale of gaps and
- * padding, not sizes.
+ * agree on one number instead of each holding a private copy. [PagerSegmentWidth]/
+ * [PagerSegmentHeight] are `first-run-onboarding`'s progress indicator (graphite redesign: 24x4dp
+ * segments, replacing the 8dp pager dots) — sizes, not gaps, so they belong here as `Dimens` tokens
+ * rather than being reused from `Spacing`, which is a scale of gaps and padding, not sizes.
+ * [PrimaryButtonHeight] is the graphite full-width light pill (editor Save, onboarding primary).
  *
  * **`SwatchBorder` is gone, and so is what it drew.** It was a 3dp ring in `primary` around the
  * selected swatch, and it read badly on every fill it circled. The selected swatch now carries a
@@ -72,7 +73,9 @@ object Dimens {
     val Swatch = 40.dp
     val SwatchTouchTarget = 48.dp
     val SwatchTick = 22.dp
-    val PagerDot = 8.dp
+    val PagerSegmentWidth = 24.dp
+    val PagerSegmentHeight = 4.dp
+    val PrimaryButtonHeight = 52.dp
     val FieldBorder = 1.dp
     val PickerTrack = 12.dp
     val PickerPreview = 56.dp
