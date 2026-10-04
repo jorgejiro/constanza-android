@@ -70,7 +70,11 @@ class HabitColorRetoneRemapTest {
         val map = HabitColorRetoneRemap.LEGACY_TO_CURRENT
 
         assertEquals(EXPECTED_ENTRY_COUNT, map.keys.size, "expected one entry per preset whose value changed")
-        assertEquals(EXPECTED_ENTRY_COUNT, map.values.toSet().size, "two legacy colours must never collapse onto one current colour")
+        assertEquals(
+            EXPECTED_ENTRY_COUNT,
+            map.values.toSet().size,
+            "two legacy colours must never collapse onto one current colour",
+        )
     }
 
     @Test

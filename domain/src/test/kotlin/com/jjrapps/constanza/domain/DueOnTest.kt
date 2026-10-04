@@ -58,7 +58,13 @@ class DueOnTest {
     @Test
     fun `DAYS_OF_WEEK is NotDue on a day outside the set, never treated as missed`() {
         val schedule = Schedule.DaysOfWeek(
-            days = setOf(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+            days = setOf(
+                DayOfWeek.MONDAY,
+                DayOfWeek.TUESDAY,
+                DayOfWeek.WEDNESDAY,
+                DayOfWeek.THURSDAY,
+                DayOfWeek.FRIDAY,
+            ),
         )
         // 2026-03-07 is a Saturday.
         assertIs<Due.NotDue>(dueOn(schedule, LocalDate.of(2026, 3, 7), noProgress))

@@ -283,7 +283,7 @@ class TodayViewModelTest {
      *  clears presented state on its own. `reopenedSlots`, this test's original second half, is
      *  gone with today-one-line-row — see [TodayUiState]'s own KDoc for why. */
     @Test
-    fun `crossing midnight while displayed re-subscribes EntryDao and moves both the rollup and the occurrence filter`() =
+    fun `crossing midnight while displayed re-subscribes EntryDao and moves the rollup and the occurrence filter`() =
         runTest {
             val currentDateSource = FakeCurrentDateSource(TODAY)
             val viewModel = buildViewModel(
@@ -739,6 +739,9 @@ class TodayViewModelTest {
 
     private fun twoSlots() = listOf(slot(MORNING_SLOT_ID, MORNING_MINUTE), slot(EVENING_SLOT_ID, EVENING_MINUTE))
 
+    // Mirrors TodayViewModel's own eight collaborators (suppressed there too), each a defaulted
+    // override that tests name at the call site; a holder object would only restate the same list.
+    @Suppress("LongParameterList")
     private fun buildViewModel(
         entryWriter: EntryWriter = mockk(relaxUnitFun = true),
         alarmScheduler: AlarmScheduler = mockk {

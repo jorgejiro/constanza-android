@@ -23,7 +23,11 @@ private fun entryEntity(habitId: Long, status: EntryStatus) = EntryEntity(
     value = null, answeredAt = FIXED_INSTANT.toString(), source = "IN_APP",
 )
 
-private fun rowsFor(habits: List<Habit>, schedules: Map<Long, Schedule>, entries: List<EntryEntity>): List<TodayHabitRow> {
+private fun rowsFor(
+    habits: List<Habit>,
+    schedules: Map<Long, Schedule>,
+    entries: List<EntryEntity>,
+): List<TodayHabitRow> {
     val snapshot = TodaySnapshot(entriesToday = entries, unresolvedOccurrences = emptyList(), today = TODAY)
     return habits.mapNotNull { habit ->
         buildTodayHabitRow(habit, schedules.getValue(habit.id), emptyList(), snapshot)
@@ -99,7 +103,11 @@ class DayReviewDecisionTest {
     fun `nothing due at all posts nothing even in fires-every-night mode`() {
         val notToday = TODAY.dayOfWeek.plus(1)
         val h = habit(1)
-        val rows = rowsFor(habits = listOf(h), schedules = mapOf(h.id to Schedule.DaysOfWeek(days = setOf(notToday))), entries = emptyList())
+        val rows = rowsFor(
+            habits = listOf(h),
+            schedules = mapOf(h.id to Schedule.DaysOfWeek(days = setOf(notToday))),
+            entries = emptyList(),
+        )
 
         val decision = decideDayReview(rows, firesEveryNight = true)
 
@@ -110,7 +118,11 @@ class DayReviewDecisionTest {
     fun `nothing due at all posts nothing in only-when-pending mode too`() {
         val notToday = TODAY.dayOfWeek.plus(1)
         val h = habit(1)
-        val rows = rowsFor(habits = listOf(h), schedules = mapOf(h.id to Schedule.DaysOfWeek(days = setOf(notToday))), entries = emptyList())
+        val rows = rowsFor(
+            habits = listOf(h),
+            schedules = mapOf(h.id to Schedule.DaysOfWeek(days = setOf(notToday))),
+            entries = emptyList(),
+        )
 
         val decision = decideDayReview(rows, firesEveryNight = false)
 
