@@ -17,30 +17,25 @@ object Spacing {
 }
 
 /**
- * Fixed component dimensions shared across screens. [Swatch] is the colour picker swatch, moved here from
- * `HabitEditorScreen.kt`'s private constants (work unit 5) so the editor and both list screens
- * agree on one number instead of each holding a private copy. [PagerSegmentWidth]/
+ * Fixed component dimensions shared across screens. [PagerSegmentWidth]/
  * [PagerSegmentHeight] are `first-run-onboarding`'s progress indicator (graphite redesign: 24x4dp
  * segments, replacing the 8dp pager dots) — sizes, not gaps, so they belong here as `Dimens` tokens
  * rather than being reused from `Spacing`, which is a scale of gaps and padding, not sizes.
  * [PrimaryButtonHeight] is the graphite full-width light pill (editor Save, onboarding primary).
  *
- * **`SwatchBorder` is gone, and so is what it drew.** It was a 3dp ring in `primary` around the
- * selected swatch, and it read badly on every fill it circled. The selected swatch now carries a
- * tick drawn *inside* it, tinted black or white by the fill's own luminance (`contrastingInk`), so
- * the marker is legible on a palette that is no longer a closed set of six. [SwatchTick] is that
- * tick's size.
- *
- * [SwatchTouchTarget] is the swatch's *hit* area, not its paint: [Swatch] is 40dp, below the 48dp
- * minimum touch target, and a grid of twenty-two of them a finger-width apart is exactly where that
- * matters. The circle stays 40dp; the selectable box around it is 48dp.
+ * [ColorDot] is the colour picker's swatch (graphite redesign): a 24dp dot hit through a
+ * [ColorDotTouchTarget] box. Selection is a [ColorDotRing] ring in the text colour,
+ * [ColorDotRingStroke] wide, around a [ColorDotSelected] dot — the ring is one achromatic tone that
+ * reads on any fill, which is why it replaced the per-fill tick.
  *
  * [FieldBorder] is Material 3's own unfocused outlined-text-field border width, named here so a
- * control that is *shaped* like a form field without *being* an `OutlinedTextField` can line up
- * with the real ones instead of guessing (`habit.ScheduleEditors`'s reminder-time row).
+ * control that is *shaped* like a form field without *being* one can line up with the real ones.
+ *
+ * [SettingsRow] is the minimum height of a graphite list row (editor switch and time rows,
+ * settings rows); [Chip] the height of a settings pill chip; [Stepper] one round −/+ button.
  *
  * [PickerTrack]/[PickerPreview] are the custom-colour dialog's gradient slider bar and its live
- * preview chip.
+ * preview dot.
  *
  * [StatusGlyph] (today-status-icons) is the square an answered Today slot's status glyph draws in
  * — `Icon`'s own default size for a `material-icons-core` vector is 24dp, but that glyph now sits
@@ -53,7 +48,7 @@ object Spacing {
  *
  * [AnswerButton]/[AnswerButtonTouchTarget] (graphite redesign) are the pending Today slot's round
  * ✕/✓ controls: painted as a 44dp circle, hit as a 48dp square around it — the same paint/hit
- * split [Swatch]/[SwatchTouchTarget] already established.
+ * split the colour picker also uses ([ColorDot]/[ColorDotTouchTarget]).
  *
  * [HabitDot] is the habit-colour dot leading a row, the only place a habit's colour is painted.
  * [CompactIconButton] is the graphite 44dp icon button (Today's header actions, day chevrons and
@@ -62,7 +57,7 @@ object Spacing {
  * per-reminder bar.
  *
  * [MinTouchTarget] (today-one-line-row, vertical-rhythm correction) is the standard 48dp Android
- * accessible minimum, same value as [SwatchTouchTarget]/[AnswerButtonTouchTarget] but named
+ * accessible minimum, same value as [AnswerButtonTouchTarget] but named
  * generically because it is applied to a whole Today ROW now, not one small control inside it: an
  * answered row's line is itself the tap target that opens the change dialog, and text/glyph
  * content alone measures well under 48dp on a muted (Contestados) row. A pending row takes the
@@ -70,9 +65,14 @@ object Spacing {
  * merely by coincidence of their own content heights.
  */
 object Dimens {
-    val Swatch = 40.dp
-    val SwatchTouchTarget = 48.dp
-    val SwatchTick = 22.dp
+    val ColorDot = 24.dp
+    val ColorDotSelected = 20.dp
+    val ColorDotRing = 30.dp
+    val ColorDotRingStroke = 2.dp
+    val ColorDotTouchTarget = 44.dp
+    val SettingsRow = 56.dp
+    val Chip = 40.dp
+    val Stepper = 40.dp
     val PagerSegmentWidth = 24.dp
     val PagerSegmentHeight = 4.dp
     val PrimaryButtonHeight = 52.dp

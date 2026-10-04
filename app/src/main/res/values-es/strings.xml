@@ -68,6 +68,7 @@
     <string name="habit_editor_name_label">Nombre</string>
     <string name="habit_editor_name_error">El nombre es obligatorio</string>
     <string name="habit_editor_notes_label">Notas (opcional)</string>
+    <string name="habit_editor_notes_placeholder">Por ejemplo, después de comer</string>
     <string name="habit_editor_color_label">Color</string>
 
     <!-- habit-management: paleta estándar del selector de color, en el mismo orden que la retícula. -->

@@ -3,22 +3,23 @@
 package com.jjrapps.constanza.habit
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -34,10 +35,13 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.component.PrimaryPillButton
+import com.jjrapps.constanza.core.ui.component.ScreenTopBar
+import com.jjrapps.constanza.core.ui.icons.ConstanzaIcons
 import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
+import com.jjrapps.constanza.core.ui.theme.Spacing
 
 /**
  * Tasks 6a.1 (non-schedule half)/6a.2/6a.3 — container. [habitId] is `null` for creation, an
@@ -135,7 +139,7 @@ data class HabitEditorActions(
     val onColorChange: (Int) -> Unit,
     val onNotesChange: (String) -> Unit,
     val onSave: () -> Unit,
-    /** The back arrow. Whether it leaves straight away or opens the discard dialog is the
+    /** The close (✕) glyph. Whether it leaves straight away or opens the discard dialog is the
      *  container's decision, not this screen's — see [HabitEditorRoute]. */
     val onBackRequest: () -> Unit = {},
     val onDiscardConfirm: () -> Unit = {},
@@ -149,7 +153,11 @@ data class HabitEditorActions(
  *  per field — the same `LongParameterList`-avoidance reasoning as [HabitEditorActions], without
  *  needing a wrapper data class for either. IME and caret restoration across a configuration change
  *  (tasks 6a.5/6a.9) is [focusRestoring], applied to all three text fields and sharing one saveable
- *  record of which field held focus. */
+ *  record of which field held focus.
+ *
+ *  Graphite redesign: a ✕ close glyph and the title, labelled filled fields, and Save as a
+ *  full-width light pill pinned to the bottom (above the navigation bar and, while typing, the
+ *  keyboard) so it never scrolls out of reach. */
 @Composable
 fun HabitEditorScreen(
     state: HabitEditorUiState,
@@ -168,6 +176,7 @@ fun HabitEditorScreen(
     }
     Scaffold(
         topBar = { HabitEditorTopBar(titleRes, actions.onBackRequest) },
+        bottomBar = { HabitEditorSaveBar(actions.onSave) },
         containerColor = ConstanzaColors.Background,
     ) { padding ->
         HabitEditorForm(
@@ -194,8 +203,8 @@ private fun HabitEditorForm(
 ) {
     Column(
         modifier = modifier
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
     ) {
         // Shared across all three text fields on purpose (task 6a.9): it holds WHICH field
         // gained focus last, so a rotation restores the caret and keyboard where the user was
@@ -207,76 +216,68 @@ private fun HabitEditorForm(
             nameError = state.nameError,
             focusedFieldId = focusedFieldId,
         )
+        val notesLabel = stringResource(R.string.habit_editor_notes_label)
+        FieldLabel(notesLabel, modifier = Modifier.padding(top = Spacing.xl))
         OutlinedTextField(
             value = state.notes,
             onValueChange = actions.onNotesChange,
-            label = { Text(stringResource(R.string.habit_editor_notes_label)) },
+            placeholder = { Text(stringResource(R.string.habit_editor_notes_placeholder)) },
             minLines = NOTES_MIN_LINES,
             maxLines = NOTES_MAX_LINES,
+            shape = MaterialTheme.shapes.small,
+            colors = editorFieldColors(),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp)
+                .fieldLabel(notesLabel)
                 .then(focusRestoring(FIELD_NOTES, focusedFieldId)),
         )
-        // The label is inside HabitColorPicker, not here: it shares its line with the expander that
-        // opens the rest of the palette, and a heading with a control on it is one component.
+        // The label is inside HabitColorPicker, not here: the picker's own row also carries the
+        // expander that opens the rest of the palette.
         HabitColorPicker(selected = state.colorArgb, onColorChange = actions.onColorChange)
-        Text(
-            stringResource(R.string.habit_editor_schedule_label),
-            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
-        )
         ScheduleSection(
             state = state,
             onScheduleParamChange = onScheduleParamChange,
             onSlotAction = onSlotAction,
         )
-        Button(onClick = actions.onSave, modifier = Modifier.padding(top = 24.dp)) {
-            Text(stringResource(R.string.habit_editor_save))
-        }
     }
 }
 
-/** Task 6.0 decision: the unit-5 pin to [ConstanzaColors.Background] (`colors =
- *  TopAppBarDefaults.topAppBarColors(containerColor = ConstanzaColors.Background)`) is REMOVED. Its
- *  own KDoc justification — "`surfaceContainer` is not one of the roles `ConstanzaColors` repoints" —
- *  is exactly the gap task 6.0 closes at the theme layer: `Theme.kt`'s `DarkColors` now binds
- *  `surfaceContainer` to [ConstanzaColors.Surface], so the bar is warm by default across every
- *  screen, not just this one. Keeping a per-screen override here would silently re-diverge from
- *  every other top bar in the app (`ProgressScreen`, `SnoozeSettingsScreen`) the moment either of
- *  those needed a different tone, for no remaining reason. The composable extraction itself is kept
- *  — it still exists purely to hold [titleRes], the same reason `EditorNameField` is its own
- *  composable, not to hold a colour override.
- *
- *  The navigation icon is the editor's cancel affordance (carried-forward item
- *  `habit-editor-has-no-cancel-affordance`). It is an icon here rather than the `actions`-slot
- *  "Back" text button `ProgressScreen`/`SnoozeSettingsScreen` use: those two are read-only leaves
- *  where back is a minor action, while this screen's whole purpose is a form the user may need to
- *  abandon, and the leading navigation slot is where every Android user already looks for that.
- *  [Icons.AutoMirrored.Filled.ArrowBack] ships in `material-icons-core`, the only icon artifact
- *  this project depends on (`app/build.gradle.kts`), so no new dependency is pulled in; the
- *  auto-mirrored variant flips itself in right-to-left locales. `contentDescription` reuses the
- *  existing `action_back` string rather than adding a second resource with the same word in it. */
+/** Graphite redesign: Save, pinned below the form as a full-width 52dp light pill. Its insets are
+ *  its own — the navigation bar and, while typing, the keyboard — because a `Scaffold` applies window
+ *  insets to its content but leaves a `bottomBar` to place itself. Always enabled, as before:
+ *  validation runs on tap ([HabitEditorViewModel.save] surfaces the name and slot errors). */
+@Composable
+private fun HabitEditorSaveBar(onSave: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
+            .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+    ) {
+        PrimaryPillButton(text = stringResource(R.string.habit_editor_save), onClick = onSave)
+    }
+}
+
+/** The editor's cancel affordance (carried-forward item `habit-editor-has-no-cancel-affordance`):
+ *  the graphite ✕ ([ConstanzaIcons.Close]) in the leading navigation slot, since this screen is a
+ *  form the user may need to abandon, then the 22sp/600 title. `contentDescription` reuses the
+ *  existing `action_back` string, so tests and TalkBack keep finding the control by that word. */
 @Composable
 private fun HabitEditorTopBar(titleRes: Int, onBack: () -> Unit) {
-    TopAppBar(
+    ScreenTopBar(
         title = { Text(stringResource(titleRes)) },
-        navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.action_back),
-                )
-            }
-        },
+        navigationIcon = ConstanzaIcons.Close,
+        navigationLabel = stringResource(R.string.action_back),
+        onNavigate = onBack,
     )
 }
 
 /** The discard confirmation (carried-forward item `habit-editor-has-no-cancel-affordance`). Shown
  *  only when the form is actually dirty — [HabitEditorRoute] makes that call, this composable only
- *  renders. A plain M3 [AlertDialog]: every colour role it reads (`surfaceContainerHigh`, `scrim`,
- *  `onSurface`, `onSurfaceVariant`, `primary`) is already audited in `core/ui/theme/Theme.kt`, and
- *  `DataPortabilityScreen`'s import confirmation is the same shape, so this introduces no new
- *  theming surface. The dismiss button reuses `action_cancel` for the same reason that one does. */
+ *  renders. A plain M3 [AlertDialog] on the neutral raised surface (`surfaceContainerHigh` =
+ *  `SurfaceRaised`), its text buttons in the achromatic `primary`; the confirm button names the
+ *  destructive action in M3 `error` (the graphite destructive tone), the one exception to neutral
+ *  chrome. The dismiss button reuses `action_cancel`, as `DataPortabilityScreen`'s does. */
 @Composable
 private fun DiscardChangesDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
@@ -284,7 +285,9 @@ private fun DiscardChangesDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
         title = { Text(stringResource(R.string.habit_editor_discard_title)) },
         text = { Text(stringResource(R.string.habit_editor_discard_body)) },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text(stringResource(R.string.habit_editor_discard_confirm)) }
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.habit_editor_discard_confirm), color = MaterialTheme.colorScheme.error)
+            }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
@@ -315,11 +318,10 @@ private fun DiscardChangesDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 private const val FIELD_NAME = "name"
 private const val FIELD_NOTES = "notes"
 
-/** Notes grows from a single-line field into a small multi-line one: `minLines` reserves the room
- *  up front so the field does not visibly jump taller the moment a second line is typed, and
- *  `maxLines` caps it before it could crowd the colour swatches and schedule section below out of
- *  the initial viewport. */
-private const val NOTES_MIN_LINES = 3
+/** Notes starts as a single line, like the graphite board's filled field, and grows as the user
+ *  types; `maxLines` caps it before it could crowd the colour swatches and schedule section below
+ *  out of the initial viewport. */
+private const val NOTES_MIN_LINES = 1
 private const val NOTES_MAX_LINES = 5
 
 @Composable
@@ -344,10 +346,13 @@ private fun EditorNameField(
     nameError: Boolean,
     focusedFieldId: MutableState<String?>,
 ) {
+    val label = stringResource(R.string.habit_editor_name_label)
+    FieldLabel(label)
     OutlinedTextField(
         value = name,
         onValueChange = onNameChange,
-        label = { Text(stringResource(R.string.habit_editor_name_label)) },
+        shape = MaterialTheme.shapes.small,
+        colors = editorFieldColors(),
         isError = nameError,
         supportingText = if (nameError) {
             { Text(stringResource(R.string.habit_editor_name_error)) }
@@ -356,6 +361,7 @@ private fun EditorNameField(
         },
         modifier = Modifier
             .fillMaxWidth()
+            .fieldLabel(label)
             .then(focusRestoring(FIELD_NAME, focusedFieldId)),
     )
 }

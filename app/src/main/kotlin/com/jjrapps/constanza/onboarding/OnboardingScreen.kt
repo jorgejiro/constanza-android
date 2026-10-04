@@ -61,6 +61,7 @@ internal fun onboardingBodyStyle(): TextStyle = MaterialTheme.typography.bodyLar
     fontSize = OnboardingBodySize,
     lineHeight = OnboardingBodyLineHeight,
     fontWeight = FontWeight.Normal,
+    letterSpacing = 0.sp,
 )
 
 /**

@@ -1,22 +1,18 @@
 package com.jjrapps.constanza.habit
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,23 +27,25 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.core.ui.theme.Dimens
 import com.jjrapps.constanza.core.ui.theme.HabitColor
 import com.jjrapps.constanza.core.ui.theme.HabitPalette
 import com.jjrapps.constanza.core.ui.theme.Spacing
-import com.jjrapps.constanza.core.ui.theme.contrastingInk
 
-/** Six per row puts the twelve presets and the custom swatch across three rows: 6 * 48dp
- *  plus five 4dp gaps is 308dp, inside the 328dp a 360dp-wide phone leaves after the form's own
- *  padding. `FlowRow` still wraps to fewer on a narrower screen or a large display scale, and the
- *  grid order's separation guarantee is written for this width — see [HabitColor]'s KDoc. */
-private const val SWATCHES_PER_ROW = 6
+/** Seven cells per row: collapsed, the five visible presets, the custom swatch and the "More"
+ *  expander share one row (6 * 44dp plus the text button fits the 328dp a 360dp-wide phone leaves
+ *  after the form's padding); expanded, the seven remaining presets fill the row below. `FlowRow`
+ *  still wraps to fewer on a narrower screen or a large display scale, and the grid order's
+ *  separation guarantee is written for this width — see [HabitColor]'s KDoc. */
+private const val CELLS_PER_ROW = 7
 
 
 /** Non-visual hooks the picker's compose tests assert on. Not `contentDescription`s — each swatch
@@ -61,8 +59,8 @@ const val HABIT_COLOR_EXPANDER_TEST_TAG = "habit_color_expander"
 fun habitColorSwatchTestTag(argb: Int): String = "habit_color_swatch_%08X".format(argb)
 
 /**
- * The habit colour picker: one row of five well-separated presets plus the custom wheel, and an
- * expander on the heading that opens the full twelve-colour grid.
+ * The habit colour picker: one row of five well-separated presets plus the custom wheel, and a
+ * "More" text button at the end of that row that opens the full twelve-colour grid.
  *
  * **Collapsed by default, always — including when editing an existing habit.** Twenty-two circles
  * is four rows, and four rows of colour in the middle of a form pushes the schedule section and the
@@ -79,10 +77,10 @@ fun habitColorSwatchTestTag(argb: Int): String = "habit_color_swatch_%08X".forma
  * The drawing order is [HabitPalette.ORDERED]'s, arranged so no two neighbouring cells look alike;
  * this composable must not re-sort it.
  *
- * **Selection is a tick, not a ring.** The previous marker was a 3dp `primary` border around the
- * chosen circle. A single fixed colour cannot mark selection legibly across a palette that now
- * includes any colour a user can mix, so the tick is tinted per-swatch by `contrastingInk`, which
- * guarantees at least 4.58:1 against *any* fill. See its KDoc for that bound.
+ * **Selection is a ring around the dot** (graphite redesign): the selected 24dp dot shrinks to 20dp
+ * inside a 30dp ring in the text colour. The ring sits on the screen background, not on the fill,
+ * so one achromatic tone (15.59:1 on the background) marks every colour a user can mix — which is
+ * why it replaced the earlier per-fill tick.
  *
  * **A habit holding a colour that is not a preset is not orphaned.** It selects the custom swatch,
  * which renders that exact colour — so a habit created with one of the six retired pastels opens
@@ -106,16 +104,15 @@ fun HabitColorPicker(selected: Int, onColorChange: (Int) -> Unit, modifier: Modi
     val shownPresets = if (expanded) HabitPalette.ORDERED else HabitPalette.VISIBLE
     val lastCircleCarriesSelection = shownPresets.none { it.argb == selected }
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        ColorPickerHeader(expanded = expanded, onToggle = { expanded = !expanded })
+    Column(modifier = modifier.fillMaxWidth().padding(top = Spacing.xl)) {
+        FieldLabel(stringResource(R.string.habit_editor_color_label))
         FlowRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .selectableGroup()
                 .testTag(HABIT_COLOR_GRID_TEST_TAG),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-            maxItemsInEachRow = SWATCHES_PER_ROW,
+            itemVerticalAlignment = Alignment.CenterVertically,
+            maxItemsInEachRow = CELLS_PER_ROW,
         ) {
             HabitPalette.VISIBLE.forEach { PresetSwatch(it, selected, onColorChange) }
             // Deliberately the sixth cell of the first row rather than the last cell overall, so
@@ -126,6 +123,7 @@ fun HabitColorPicker(selected: Int, onColorChange: (Int) -> Unit, modifier: Modi
                 selected = lastCircleCarriesSelection,
                 onClick = { showCustomPicker = true },
             )
+            ColorPickerExpander(expanded = expanded, onToggle = { expanded = !expanded })
             if (expanded) {
                 HabitPalette.COLLAPSED_REMAINDER.forEach { PresetSwatch(it, selected, onColorChange) }
             }
@@ -145,41 +143,28 @@ fun HabitColorPicker(selected: Int, onColorChange: (Int) -> Unit, modifier: Modi
 }
 
 /**
- * The "Colour" heading and, right-aligned on the same line, the control that opens and closes the
- * rest of the palette.
+ * "More" / "Fewer": a plain text button closing the first row, after the custom swatch.
  *
- * It sits here rather than in the swatch row because of arithmetic: six cells fit on one row at
- * 360dp, and spending one of them on an expander would leave four colours visible — fewer than the
- * six the old palette showed, which would be a regression dressed up as an improvement. On the
- * heading line it costs no swatch at all.
+ * It sits in that row rather than taking a swatch cell's place: spending one of the six cells on it
+ * would leave four colours visible. As the row's last item it never moves when the grid expands —
+ * the remaining presets grow downward beneath it.
  */
 @Composable
-private fun ColorPickerHeader(expanded: Boolean, onToggle: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = Spacing.lg),
-        verticalAlignment = Alignment.CenterVertically,
+private fun ColorPickerExpander(expanded: Boolean, onToggle: () -> Unit) {
+    val labelRes = if (expanded) {
+        R.string.habit_editor_color_show_fewer
+    } else {
+        R.string.habit_editor_color_show_more
+    }
+    TextButton(
+        onClick = onToggle,
+        modifier = Modifier.heightIn(min = Dimens.ColorDotTouchTarget).testTag(HABIT_COLOR_EXPANDER_TEST_TAG),
     ) {
-        Text(stringResource(R.string.habit_editor_color_label), modifier = Modifier.weight(1f))
-        val labelRes = if (expanded) {
-            R.string.habit_editor_color_show_fewer
-        } else {
-            R.string.habit_editor_color_show_more
-        }
-        TextButton(onClick = onToggle, modifier = Modifier.testTag(HABIT_COLOR_EXPANDER_TEST_TAG)) {
-            Text(stringResource(labelRes))
-            Icon(
-                // KeyboardArrowUp/Down rather than ExpandLess/ExpandMore: the latter pair ships only
-                // in material-icons-extended, and material-icons-core is the one icon artifact this
-                // project depends on (app/build.gradle.kts). Same chevron, no new dependency.
-                imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                // The adjacent label already says what this does; announcing the chevron too would
-                // make a screen reader read the control twice.
-                contentDescription = null,
-                modifier = Modifier.padding(start = Spacing.xs),
-            )
-        }
+        Text(
+            stringResource(labelRes),
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.onBackground,
+        )
     }
 }
 
@@ -194,18 +179,18 @@ private fun PresetSwatch(habitColor: HabitColor, selected: Int, onColorChange: (
     )
 }
 
-/** One preset circle. The 48dp box is the touch target; the 40dp circle is the paint. */
+/** One preset circle. The 44dp box is the touch target; the 24dp dot is the paint. */
 @Composable
 private fun ColorSwatch(argb: Int, selected: Boolean, label: String, testTag: String, onClick: () -> Unit) {
     SwatchBox(selected = selected, label = label, testTag = testTag, onClick = onClick) {
-        SwatchFill(fill = SolidColor(Color(argb)), tickTint = if (selected) contrastingInk(argb) else null)
+        SwatchFill(fill = SolidColor(Color(argb)), selected = selected)
     }
 }
 
 /**
  * The twentieth cell. Unselected it shows the hue wheel as a sweep gradient — the ordinary "pick
  * your own" affordance, and one that cannot be confused with any preset because no preset is a
- * gradient. Selected it shows the custom colour itself, ticked exactly like a preset, which is what
+ * gradient. Selected it shows the custom colour itself, ringed exactly like a preset, which is what
  * makes an off-palette habit colour visible rather than lost.
  */
 @Composable
@@ -219,7 +204,7 @@ private fun CustomColorSwatch(argb: Int, selected: Boolean, onClick: () -> Unit)
     ) {
         SwatchFill(
             fill = if (selected) SolidColor(Color(argb)) else Brush.sweepGradient(spectrum),
-            tickTint = if (selected) contrastingInk(argb) else null,
+            selected = selected,
         )
     }
 }
@@ -234,7 +219,7 @@ private fun SwatchBox(
 ) {
     Box(
         modifier = Modifier
-            .size(Dimens.SwatchTouchTarget)
+            .size(Dimens.ColorDotTouchTarget)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .semantics { contentDescription = label }
             .testTag(testTag),
@@ -243,24 +228,19 @@ private fun SwatchBox(
     )
 }
 
-/** [tickTint] is `null` when this swatch is not selected — the tick is the selection marker, so
- *  its presence and its colour are the same decision. */
+/** The dot itself: 24dp at rest; selected, a 20dp dot inside a 30dp ring in the text colour. */
 @Composable
-private fun SwatchFill(fill: Brush, tickTint: Color?) {
-    Box(
-        modifier = Modifier
-            .size(Dimens.Swatch)
-            .clip(CircleShape)
-            .background(fill),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (tickTint != null) {
-            Icon(
-                imageVector = Icons.Filled.Check,
-                contentDescription = null,
-                tint = tickTint,
-                modifier = Modifier.size(Dimens.SwatchTick),
-            )
+private fun SwatchFill(fill: Brush, selected: Boolean) {
+    if (selected) {
+        Box(
+            modifier = Modifier
+                .size(Dimens.ColorDotRing)
+                .border(Dimens.ColorDotRingStroke, ConstanzaColors.OnBackground, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(Modifier.size(Dimens.ColorDotSelected).clip(CircleShape).background(fill))
         }
+    } else {
+        Box(Modifier.size(Dimens.ColorDot).clip(CircleShape).background(fill))
     }
 }

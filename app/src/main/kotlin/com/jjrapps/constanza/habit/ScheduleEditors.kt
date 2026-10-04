@@ -5,15 +5,22 @@ package com.jjrapps.constanza.habit
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -27,11 +34,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.icons.ConstanzaIcons
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.core.ui.theme.ConstanzaControlDefaults
+import com.jjrapps.constanza.core.ui.theme.Dimens
 import com.jjrapps.constanza.core.ui.theme.Spacing
 import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.domain.model.Schedule
@@ -40,6 +51,7 @@ import java.time.format.TextStyle
 
 private const val MIN_STEPPER_VALUE = 1
 private const val MAX_DAY_OF_MONTH = 31
+private const val HALF_TURN_DEGREES = 180f
 
 
 /** Task 6a.1, slice ii-a (habit-scheduling: Six Frequency Kinds). Always shows the kind picker,
@@ -52,7 +64,7 @@ fun ScheduleSection(
     onScheduleParamChange: (ScheduleParamAction) -> Unit,
     onSlotAction: (SlotAction) -> Unit,
 ) {
-    Column {
+    Column(modifier = Modifier.padding(top = Spacing.xl)) {
         ScheduleKindPicker(
             selected = state.schedule.kind,
             onKindChange = { onScheduleParamChange(ScheduleParamAction.Kind(it)) },
@@ -70,13 +82,13 @@ fun ScheduleSection(
                 label = stringResource(R.string.habit_editor_times_per_week_label),
                 value = schedule.times,
                 onValueChange = { onScheduleParamChange(ScheduleParamAction.TimesPerWeek(it)) },
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = Spacing.md),
             )
 
             is Schedule.DaysOfWeek -> DayOfWeekPicker(
                 selectedDays = schedule.days,
                 onToggleDay = { onScheduleParamChange(ScheduleParamAction.ToggleDayOfWeek(it)) },
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = Spacing.md),
             )
 
             is Schedule.Monthly -> NumberStepper(
@@ -84,7 +96,7 @@ fun ScheduleSection(
                 value = schedule.dayOfMonth,
                 onValueChange = { onScheduleParamChange(ScheduleParamAction.DayOfMonth(it)) },
                 range = MIN_STEPPER_VALUE..MAX_DAY_OF_MONTH,
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = Spacing.md),
             )
 
             is Schedule.EveryNDays -> EveryNDaysEditor(
@@ -112,29 +124,40 @@ fun ScheduleSection(
  */
 @Composable
 private fun ReminderTimeEditor(slot: ReminderSlot?, onSlotAction: (SlotAction) -> Unit) {
-    Column(modifier = Modifier.padding(top = 16.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.habit_editor_reminder_time_switch), modifier = Modifier.weight(1f))
+    Column(modifier = Modifier.padding(top = Spacing.xl)) {
+        RowDivider()
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.SettingsRow),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.habit_editor_reminder_time_switch),
+                style = rowTextStyle(),
+                color = ConstanzaColors.OnBackground,
+                modifier = Modifier.weight(1f),
+            )
             Switch(
                 checked = slot != null,
                 onCheckedChange = { checked ->
                     if (checked) onSlotAction(SlotAction.Add) else onSlotAction(SlotAction.Remove(0))
                 },
+                colors = ConstanzaControlDefaults.switchColors(),
             )
         }
+        RowDivider()
         if (slot != null) {
             ReminderTimeField(
                 minuteOfDay = slot.minuteOfDay,
                 onMinuteOfDayChange = { onSlotAction(SlotAction.SetTime(0, it)) },
                 label = stringResource(R.string.habit_editor_reminder_time_label),
-                modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm),
             )
+            RowDivider()
         } else {
             Text(
                 stringResource(R.string.habit_editor_reminder_time_none),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = ConstanzaColors.OnBackgroundVariant,
+                modifier = Modifier.padding(top = Spacing.md),
             )
         }
     }
@@ -153,16 +176,26 @@ private val ScheduleKind.labelRes: Int
 @Composable
 private fun ScheduleKindPicker(selected: ScheduleKind, onKindChange: (ScheduleKind) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    val label = stringResource(R.string.habit_editor_schedule_label)
+    FieldLabel(label)
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
             value = stringResource(selected.labelRes),
             onValueChange = {},
             readOnly = true,
-            label = { Text(stringResource(R.string.habit_editor_schedule_label)) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            trailingIcon = {
+                Icon(
+                    ConstanzaIcons.ChevronDown,
+                    contentDescription = null,
+                    modifier = Modifier.rotate(if (expanded) HALF_TURN_DEGREES else 0f),
+                )
+            },
+            shape = MaterialTheme.shapes.small,
+            colors = editorFieldColors(),
             modifier = Modifier
                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .fieldLabel(label),
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             ScheduleKind.entries.forEach { kind ->
@@ -192,23 +225,27 @@ private fun NumberStepper(
     modifier: Modifier = Modifier,
     range: IntRange = DEFAULT_STEPPER_RANGE,
 ) {
-    Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, modifier = Modifier.weight(1f))
-        OutlinedButton(
-            onClick = { onValueChange(value - 1) },
+    Row(
+        modifier = modifier.fillMaxWidth().heightIn(min = Dimens.SettingsRow),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = rowTextStyle(), color = ConstanzaColors.OnBackground, modifier = Modifier.weight(1f))
+        StepperButton(
+            text = stringResource(R.string.habit_editor_decrement),
             enabled = value > range.first,
-            border = ConstanzaControlDefaults.outlinedButtonBorder(enabled = value > range.first),
-        ) {
-            Text(stringResource(R.string.habit_editor_decrement))
-        }
-        Text(value.toString(), modifier = Modifier.padding(horizontal = 12.dp))
-        OutlinedButton(
-            onClick = { onValueChange(value + 1) },
+            onClick = { onValueChange(value - 1) },
+        )
+        Text(
+            value.toString(),
+            style = rowTextStyle(),
+            color = ConstanzaColors.OnBackground,
+            modifier = Modifier.padding(horizontal = Spacing.md),
+        )
+        StepperButton(
+            text = stringResource(R.string.habit_editor_increment),
             enabled = value < range.last,
-            border = ConstanzaControlDefaults.outlinedButtonBorder(enabled = value < range.last),
-        ) {
-            Text(stringResource(R.string.habit_editor_increment))
-        }
+            onClick = { onValueChange(value + 1) },
+        )
     }
 }
 
@@ -243,13 +280,21 @@ private fun DayOfWeekPicker(
     modifier: Modifier = Modifier,
 ) {
     val locale = LocalConfiguration.current.locales[0]
-    FlowRow(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         DayOfWeek.entries.forEach { day ->
             val isSelected = day in selectedDays
+            // Graphite redesign: a selected day is light-filled with dark ink, like Settings' snooze
+            // chips; unselected keeps the control-stroke outline.
             FilterChip(
                 selected = isSelected,
                 onClick = { onToggleDay(day) },
                 label = { Text(day.getDisplayName(TextStyle.SHORT, locale)) },
+                shape = CircleShape,
+                colors = FilterChipDefaults.filterChipColors(
+                    labelColor = MaterialTheme.colorScheme.onBackground,
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                ),
                 border = ConstanzaControlDefaults.filterChipBorder(selected = isSelected),
             )
         }
@@ -263,23 +308,26 @@ private fun EveryNDaysEditor(
     anchorDateError: Boolean,
     onScheduleParamChange: (ScheduleParamAction) -> Unit,
 ) {
-    Column(modifier = Modifier.padding(top = 8.dp)) {
+    Column(modifier = Modifier.padding(top = Spacing.md)) {
         NumberStepper(
             label = stringResource(R.string.habit_editor_every_n_days_label),
             value = schedule.n,
             onValueChange = { onScheduleParamChange(ScheduleParamAction.EveryNDays(it)) },
         )
+        val anchorLabel = stringResource(R.string.habit_editor_anchor_date_label)
+        FieldLabel(anchorLabel, modifier = Modifier.padding(top = Spacing.lg))
         OutlinedTextField(
             value = anchorDateText,
             onValueChange = { onScheduleParamChange(ScheduleParamAction.AnchorDate(it)) },
-            label = { Text(stringResource(R.string.habit_editor_anchor_date_label)) },
+            shape = MaterialTheme.shapes.small,
+            colors = editorFieldColors(),
             isError = anchorDateError,
             supportingText = if (anchorDateError) {
                 { Text(stringResource(R.string.habit_editor_anchor_date_error)) }
             } else {
                 null
             },
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            modifier = Modifier.fillMaxWidth().fieldLabel(anchorLabel),
         )
     }
 }
@@ -289,7 +337,7 @@ private fun EveryNDaysEditor(
  *  name field surfaces its own required-field error. */
 @Composable
 private fun ReminderSlotEditor(slots: List<ReminderSlot>, slotsError: Boolean, onSlotAction: (SlotAction) -> Unit) {
-    Column(modifier = Modifier.padding(top = 8.dp)) {
+    Column(modifier = Modifier.padding(top = Spacing.md)) {
         Text(stringResource(R.string.habit_editor_slots_label))
         slots.forEachIndexed { index, slot ->
             ReminderSlotRow(index = index, slot = slot, onSlotAction = onSlotAction)
@@ -298,10 +346,10 @@ private fun ReminderSlotEditor(slots: List<ReminderSlot>, slotsError: Boolean, o
             Text(
                 stringResource(R.string.habit_editor_slots_error),
                 color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = Spacing.xs),
             )
         }
-        TextButton(onClick = { onSlotAction(SlotAction.Add) }, modifier = Modifier.padding(top = 4.dp)) {
+        TextButton(onClick = { onSlotAction(SlotAction.Add) }, modifier = Modifier.padding(top = Spacing.xs)) {
             Text(stringResource(R.string.habit_editor_slot_add))
         }
     }
@@ -309,7 +357,7 @@ private fun ReminderSlotEditor(slots: List<ReminderSlot>, slotsError: Boolean, o
 
 @Composable
 private fun ReminderSlotRow(index: Int, slot: ReminderSlot, onSlotAction: (SlotAction) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         ReminderTimeField(
             minuteOfDay = slot.minuteOfDay,
             onMinuteOfDayChange = { onSlotAction(SlotAction.SetTime(index, it)) },
@@ -318,11 +366,19 @@ private fun ReminderSlotRow(index: Int, slot: ReminderSlot, onSlotAction: (SlotA
         Checkbox(
             checked = slot.enabled,
             onCheckedChange = { onSlotAction(SlotAction.SetEnabled(index, it)) },
-            modifier = Modifier.padding(start = 8.dp),
+            modifier = Modifier.padding(start = Spacing.sm),
         )
-        Text(stringResource(R.string.habit_editor_slot_enabled_label))
-        TextButton(onClick = { onSlotAction(SlotAction.Remove(index)) }, modifier = Modifier.padding(start = 8.dp)) {
+        Text(
+            stringResource(R.string.habit_editor_slot_enabled_label),
+            style = MaterialTheme.typography.bodyMedium,
+            color = ConstanzaColors.OnBackgroundVariant,
+        )
+        TextButton(
+            onClick = { onSlotAction(SlotAction.Remove(index)) },
+            modifier = Modifier.padding(start = Spacing.sm),
+        ) {
             Text(stringResource(R.string.habit_editor_slot_remove))
         }
     }
+    RowDivider()
 }

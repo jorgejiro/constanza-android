@@ -439,7 +439,7 @@ class CoreFlowE2ETest {
         awaitText(string(R.string.habit_editor_name_label))
         compose.onNodeWithText(string(R.string.habit_editor_name_label)).performTextInput(name)
         compose.onNode(isToggleable()).performScrollTo().performClick()
-        compose.onNodeWithText(string(R.string.habit_editor_save)).performScrollTo().performClick()
+        compose.onNodeWithText(string(R.string.habit_editor_save)).performClick()
 
         awaitText(name)
     }

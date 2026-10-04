@@ -10,10 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -35,10 +32,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.jjrapps.constanza.R
+import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.core.ui.theme.Dimens
 import com.jjrapps.constanza.core.ui.theme.Hsv
 import com.jjrapps.constanza.core.ui.theme.Spacing
-import com.jjrapps.constanza.core.ui.theme.contrastingInk
 import com.jjrapps.constanza.core.ui.theme.habitBandColor
 import com.jjrapps.constanza.core.ui.theme.habitBandPositionOf
 import com.jjrapps.constanza.core.ui.theme.hsvOf
@@ -66,8 +63,9 @@ internal fun hueSpectrum(): List<Color> =
 
 /**
  * The free colour picker: three gradient sliders over hue, saturation and brightness, and a live
- * preview that shows the resulting colour with the same tick drawn on it — so the legibility of the
- * selection marker is visible *before* the colour is committed, not discovered afterwards.
+ * preview dot of the resulting colour. Graphite redesign: the dialog sits on the neutral raised
+ * surface, and each slider's thumb is the achromatic interactive tone — the only chroma in the
+ * dialog is the colour being mixed and the gradients that explain each axis.
  *
  * HSV rather than three RGB sliders because hue is the axis a person actually reasons in ("a bit
  * more orange"), and because a saturation or brightness slider is meaningless without it. The
@@ -159,9 +157,9 @@ internal fun CustomColorDialog(initialArgb: Int, onConfirm: (Int) -> Unit, onDis
     )
 }
 
-/** The colour being mixed, with the selection tick on it and its hex beside it. The tick is here
- *  on purpose: it is the one place a user can see whether the marker will be readable on the
- *  colour they are choosing. */
+/** The colour being mixed, as a plain preview dot with its hex beside it (graphite redesign: the
+ *  selection marker is now a ring on the background, legible on any fill, so the preview no longer
+ *  needs to prove a tick reads on it). */
 @Composable
 private fun CustomColorPreview(argb: Int) {
     Row(
@@ -176,17 +174,13 @@ private fun CustomColorPreview(argb: Int) {
                 .size(Dimens.PickerPreview)
                 .clip(CircleShape)
                 .background(Color(argb)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Check,
-                contentDescription = null,
-                tint = contrastingInk(argb),
-                modifier = Modifier.size(Dimens.SwatchTick),
-            )
-        }
+        )
         // A hex code, not a translatable phrase: the same six digits in every locale.
-        Text(text = "#%06X".format(argb and HEX_RGB_MASK), style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = "#%06X".format(argb and HEX_RGB_MASK),
+            style = MaterialTheme.typography.bodyMedium,
+            color = ConstanzaColors.OnBackgroundVariant,
+        )
     }
 }
 
@@ -206,7 +200,7 @@ private fun GradientSlider(
     onFractionChange: (Float) -> Unit,
 ) {
     Column(modifier = Modifier.padding(top = Spacing.md)) {
-        Text(text = label, style = MaterialTheme.typography.labelLarge)
+        Text(text = label, style = MaterialTheme.typography.labelLarge, color = ConstanzaColors.OnBackgroundVariant)
         Box(contentAlignment = Alignment.Center) {
             Box(
                 modifier = Modifier
@@ -223,6 +217,7 @@ private fun GradientSlider(
                     .semantics { contentDescription = label }
                     .testTag(testTag),
                 colors = SliderDefaults.colors(
+                    thumbColor = ConstanzaColors.ChromeInteractive,
                     activeTrackColor = Color.Transparent,
                     inactiveTrackColor = Color.Transparent,
                 ),
