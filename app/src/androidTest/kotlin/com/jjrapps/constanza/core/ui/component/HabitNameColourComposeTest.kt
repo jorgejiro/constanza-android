@@ -5,6 +5,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasParent
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -35,28 +38,15 @@ private const val HABIT_COLOR_ARGB = 0xFF2196F3.toInt() // HabitColor.BLUE, arbi
 private const val OTHER_HABIT_COLOR_ARGB = 0xFF4CAF50.toInt() // HabitColor.GREEN, arbitrary for this test
 
 /**
- * Colour overhaul, replacing `HabitColorDotComposeTest` (deleted with `HabitColorDot`, which this
- * class used to exercise). Task 4.7's spec requirement — `habit-management`: "Habit Colour Visible
- * Where Habits Are Listed" — is unchanged: a habit's colour must still be visibly rendered on both
- * listing screens. What moved is WHERE that colour is now drawn: onto the habit's own name text
- * rather than a leading dot beside it, because a future habits-by-days report needs colour ON the
- * name to follow a row across a grid, which a dot cannot do (see `TodayScreen.HabitRollupHeader`'s
- * own KDoc). This class asserts the same two on-screen scenarios `HabitColorDotComposeTest` did —
- * colour visible on the today screen, and two habits distinguished by colour on the habit list —
- * against the new location, and additionally names the row by its still-present habit name rather
- * than by a now-deleted test tag.
+ * `habit-management`: "Habit Colour Visible Where Habits Are Listed", in its graphite form
+ * (`visual-design-system`: the habit colour is shown only as a dot). On both listing screens the
+ * 8dp [HabitDot] paints the habit's colour and the name renders in the text colour; on the habit
+ * list two habits stay distinguishable by their dots.
  *
- * Asserted through the real [androidx.compose.ui.text.AnnotatedString] Compose exposes on
- * [SemanticsProperties.Text], not a `captureToImage` pixel sample. Neither `TodayScreen`'s
- * `demotedSuffix` nor `HabitListScreen`'s `HabitRow` pass the habit colour through `Text`'s own
- * `color` parameter — that paints only at the layout layer and never reaches semantics — both build
- * an `AnnotatedString` with an explicit `SpanStyle(color = …)` instead, so the colour is part of the
- * rendered content itself and is exactly what a screen reader's text object would carry. Reading
- * [SemanticsProperties.Text] back off a node is already this suite's own precedent
- * ([com.jjrapps.constanza.localization.LanguageOverrideComposeTest],
- * [com.jjrapps.constanza.portability.ImportResultMessageComposeTest]); this only reaches one layer
- * deeper, into the span carried alongside the string rather than the plain string alone. No
- * precedent in this suite asserts a *painted* pixel colour, and none is added here.
+ * The dot is read through its [HabitDotColor] semantics hook in the unmerged tree. The name's colour
+ * is read from the laid-out text ([SemanticsActions.GetTextLayoutResult]), which is where `Text`'s
+ * own `color` parameter ends up, plus a check that no span of the name carries the habit colour. No
+ * painted pixel is sampled.
  */
 @RunWith(AndroidJUnit4::class)
 class HabitNameColourComposeTest {
@@ -109,10 +99,11 @@ class HabitNameColourComposeTest {
         )
     }
 
-    /** Habit list half — still the pre-graphite assertion (name painted in the habit colour);
-     *  the habit-list redesign (T4 of graphite-redesign) moves it onto the dot like Today. */
+    /** Graphite redesign, habit list half: each row's [HabitDot] carries that habit's own colour —
+     *  so two habits are still told apart by colour — and neither name is painted in it. The dot is
+     *  matched to its row through their shared parent (the clickable row) in the unmerged tree. */
     @Test
-    fun theHabitNameRendersInEachHabitsOwnColourOnTheHabitListScreenAndDistinguishesTwoHabits() = runBlocking {
+    fun eachRowsDotCarriesItsHabitsColourAndTheNamesDoNotOnTheHabitListScreen() = runBlocking {
         fixture.habitRepository.create(habitWithColor("Read", HABIT_COLOR_ARGB), Schedule.Daily())
         fixture.habitRepository.create(habitWithColor("Journal", OTHER_HABIT_COLOR_ARGB), Schedule.Daily())
         val viewModel = fixture.habitListViewModel()
@@ -122,8 +113,10 @@ class HabitNameColourComposeTest {
         }
         awaitNodeWithText("Read")
 
-        assertNameColour("Read", HABIT_COLOR_ARGB)
-        assertNameColour("Journal", OTHER_HABIT_COLOR_ARGB)
+        assertEquals(Color(HABIT_COLOR_ARGB), dotColourOfRow("Read"))
+        assertEquals(Color(OTHER_HABIT_COLOR_ARGB), dotColourOfRow("Journal"))
+        assertNameInTextColour("Read", HABIT_COLOR_ARGB)
+        assertNameInTextColour("Journal", OTHER_HABIT_COLOR_ARGB)
     }
 
     private fun habitWithColor(name: String, colorArgb: Int) = Habit(
@@ -137,20 +130,25 @@ class HabitNameColourComposeTest {
         }
     }
 
-    /** Reads the rendered [androidx.compose.ui.text.AnnotatedString] back off the node found by
-     *  [name] and asserts a span covering the substring [name] carries [colorArgb] — the exact
-     *  colour the habit was created with, on the exact substring that IS its name (a collapsed
-     *  multi-slot row appends a demoted day-status suffix after it, which must NOT share this span —
-     *  see `TodayScreen.demotedSuffix`'s own KDoc). */
-    private fun assertNameColour(name: String, colorArgb: Int) {
-        val node = composeTestRule.onNodeWithText(name, substring = true).fetchSemanticsNode()
+    /** The colour of the one [HabitDot] whose parent row also holds [name]. */
+    private fun dotColourOfRow(name: String): Color =
+        composeTestRule.onNode(
+            SemanticsMatcher.keyIsDefined(HabitDotColor) and hasParent(hasAnyDescendant(hasText(name))),
+            useUnmergedTree = true,
+        ).fetchSemanticsNode().config[HabitDotColor]
+
+    /** The name's own text node (unmerged, so the subtitle beside it is not in the way) lays out in
+     *  the text colour, and carries no span in the habit colour [colorArgb]. */
+    private fun assertNameInTextColour(name: String, colorArgb: Int) {
+        val node = composeTestRule.onNode(hasText(name), useUnmergedTree = true).fetchSemanticsNode()
+        val layouts = mutableListOf<TextLayoutResult>()
+        node.config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+        val nameColour = layouts.first().layoutInput.style.color
+        assertEquals("\"$name\" must render in the text colour", ConstanzaColors.OnBackground, nameColour)
         val annotated = node.config[SemanticsProperties.Text].first { it.text.contains(name) }
-        val start = annotated.text.indexOf(name)
-        val end = start + name.length
-        val nameColour = annotated.spanStyles
-            .firstOrNull { spanRange -> spanRange.start <= start && spanRange.end >= end }
-            ?.item
-            ?.color
-        assertEquals("\"$name\" must render in its own habit colour", Color(colorArgb), nameColour)
+        assertTrue(
+            "no span of \"$name\" may carry its habit colour",
+            annotated.spanStyles.none { it.item.color == Color(colorArgb) },
+        )
     }
 }
