@@ -63,11 +63,11 @@ private val NameInset = 22.dp
 /** The right-hand `done/total` column, wide enough for "7/7" at 17sp. */
 private val CountWidth = 40.dp
 
-/** weekly-recap — container. [weekStart] is the Monday the week begins on (ISO date string, the
- *  route's serializable form). */
+/** weekly-recap — container. [weekStart] is the Monday a notification named (ISO date string, the
+ *  route's serializable form), or `null` when opened from Today, meaning last week. */
 @Composable
-fun WeeklyRecapRoute(weekStart: String, onBack: () -> Unit, viewModel: WeeklyRecapViewModel = hiltViewModel()) {
-    LaunchedEffect(weekStart) { viewModel.load(LocalDate.parse(weekStart)) }
+fun WeeklyRecapRoute(weekStart: String?, onBack: () -> Unit, viewModel: WeeklyRecapViewModel = hiltViewModel()) {
+    LaunchedEffect(weekStart) { viewModel.load(weekStart?.let(LocalDate::parse)) }
     BackHandler(onBack = onBack)
     val state by viewModel.uiState.collectAsState()
     WeeklyRecapScreen(state, onBack)

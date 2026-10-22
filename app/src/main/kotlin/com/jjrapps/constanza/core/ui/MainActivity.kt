@@ -168,8 +168,9 @@ private sealed interface ConstanzaRoute : java.io.Serializable {
     data class Progress(val habitId: Long) : ConstanzaRoute
     data object Settings : ConstanzaRoute
 
-    /** weekly-recap: reached only from the recap notification; [weekStart] is an ISO date. */
-    data class WeeklyRecap(val weekStart: String) : ConstanzaRoute
+    /** weekly-recap: [weekStart] is the ISO date a recap notification named, or `null` from Today's
+     *  header (last week). */
+    data class WeeklyRecap(val weekStart: String? = null) : ConstanzaRoute
 }
 
 /** Task 6b.1: Today is the daily-use home screen; [ConstanzaRoute.HabitList] is reached from its
@@ -225,6 +226,7 @@ private fun ConstanzaApp(
                 )
             },
             onOpenSettings = { route = ConstanzaRoute.Settings },
+            onOpenWeeklyRecap = { route = ConstanzaRoute.WeeklyRecap() },
         )
 
         is ConstanzaRoute.HabitList -> HabitListRoute(

@@ -39,6 +39,7 @@ fun TodayRoute(
     onManageHabits: () -> Unit,
     onAddHabit: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onOpenWeeklyRecap: () -> Unit = {},
     viewModel: TodayViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -62,6 +63,7 @@ fun TodayRoute(
         onManageHabits = onManageHabits,
         onAddHabit = onAddHabit,
         onOpenSettings = onOpenSettings,
+        onOpenWeeklyRecap = onOpenWeeklyRecap,
         onNotificationPermissionRequested = viewModel::recordNotificationPermissionRequested,
         onPreviousDay = viewModel::showPreviousDay,
         onNextDay = viewModel::showNextDay,
@@ -87,6 +89,7 @@ fun TodayScreen(
     onManageHabits: () -> Unit,
     onAddHabit: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onOpenWeeklyRecap: () -> Unit = {},
     onNotificationPermissionRequested: () -> Unit = {},
     onPreviousDay: () -> Unit = {},
     onNextDay: () -> Unit = {},
@@ -106,8 +109,8 @@ fun TodayScreen(
             onToggleExpanded = onToggleExpanded,
         )
     }
-    val headerActions = remember(onManageHabits, onOpenSettings, onPreviousDay, onNextDay, onToday) {
-        TodayHeaderActions(onManageHabits, onOpenSettings, onPreviousDay, onNextDay, onToday)
+    val headerActions = remember(onManageHabits, onOpenSettings, onOpenWeeklyRecap, onPreviousDay, onNextDay, onToday) {
+        TodayHeaderActions(onManageHabits, onOpenSettings, onPreviousDay, onNextDay, onToday, onOpenWeeklyRecap)
     }
     val progress = remember(state.rows) { todayProgress(state.rows) }
     changeDialogTarget?.let { target ->
