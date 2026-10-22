@@ -315,4 +315,20 @@
     <string name="onboarding_exact_alarm_granted_body">Exact reminders are on. Habits will ring right on time.</string>
     <string name="onboarding_exact_alarm_denied_body">Reminders will still arrive, but on this device they may arrive a few minutes late unless you turn on exact alarms.</string>
     <string name="onboarding_exact_alarm_denied_action">Open settings</string>
+
+    <!-- weekly-recap -->
+    <string name="weekly_recap_title">Your week</string>
+    <string name="weekly_recap_percent">%1$d%%</string>
+    <string name="weekly_recap_count_suffix">" · %1$d of %2$d"</string>
+    <string name="weekly_recap_habit_count">%1$d/%2$d</string>
+    <string name="weekly_recap_row_a11y">%1$s: %2$d of %3$d done</string>
+    <string name="weekly_recap_legend_done">✓ done</string>
+    <string name="weekly_recap_legend_missed">✕ not done</string>
+    <string name="weekly_recap_empty">Nothing to count this week.</string>
+    <string name="notification_channel_weekly_recap_name">Weekly recap</string>
+    <string name="notification_weekly_recap_title">Your week: %1$d%% done</string>
+    <string name="notification_weekly_recap_text">%1$d of %2$d · tap to see each habit</string>
+    <string name="notification_weekly_recap_range">%1$s: %2$d of %3$d.</string>
+    <string name="notification_weekly_recap_best">Best: %1$s (%2$d of %3$d).</string>
+    <string name="notification_weekly_recap_worst">Needs work: %1$s (%2$d of %3$d).</string>
 </resources>
