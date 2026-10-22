@@ -25,6 +25,7 @@ import com.jjrapps.constanza.localization.AppLocaleController
 import com.jjrapps.constanza.localization.ProvideAppLocale
 import com.jjrapps.constanza.onboarding.OnboardingRoute
 import com.jjrapps.constanza.progress.ProgressRoute
+import com.jjrapps.constanza.recap.WeeklyRecapRoute
 import com.jjrapps.constanza.reminding.ReminderSettingsStore
 import com.jjrapps.constanza.reminding.SnoozeSettingsRoute
 import com.jjrapps.constanza.scheduling.ReplanOnResumeObserver
@@ -72,6 +73,12 @@ class MainActivity : ComponentActivity() {
      *  pending notification tap to replay across that recreation. */
     private var resetToTodaySignal by mutableStateOf(0)
 
+    /** weekly-recap: the last recap-notification tap, or `null`. Only a launch that is not a
+     *  restore reads it from [getIntent] in [onCreate], so a rotation never replays an old tap over
+     *  wherever the user has since navigated; [tapCount] makes two taps on the same week distinct. */
+    private var weeklyRecapRequest by mutableStateOf<WeeklyRecapRequest?>(null)
+    private var tapCount = 0
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Pins both system bars to dark-background icon style regardless of the device's
@@ -82,9 +89,10 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(AndroidColor.TRANSPARENT),
         )
         lifecycle.addObserver(replanOnResumeObserver)
+        if (savedInstanceState == null) readWeeklyRecapTap(intent)
         setContent {
             ConstanzaTheme {
-                FirstRunGate(resetToTodaySignal = resetToTodaySignal)
+                FirstRunGate(resetToTodaySignal = resetToTodaySignal, weeklyRecapRequest = weeklyRecapRequest)
             }
         }
     }
@@ -102,6 +110,12 @@ class MainActivity : ComponentActivity() {
         if (intent.getBooleanExtra(EXTRA_FROM_REMINDER_NOTIFICATION, false)) {
             resetToTodaySignal++
         }
+        readWeeklyRecapTap(intent)
+    }
+
+    private fun readWeeklyRecapTap(intent: Intent) {
+        val weekStart = intent.getStringExtra(EXTRA_WEEKLY_RECAP_WEEK_START) ?: return
+        weeklyRecapRequest = WeeklyRecapRequest(weekStart, ++tapCount)
     }
 
     companion object {
@@ -110,8 +124,15 @@ class MainActivity : ComponentActivity() {
          *  tapped the notification body" apart from any other way a new `Intent` could reach this
          *  already-running Activity. */
         const val EXTRA_FROM_REMINDER_NOTIFICATION = "com.jjrapps.constanza.EXTRA_FROM_REMINDER_NOTIFICATION"
+
+        /** weekly-recap: the recap notification's content intent carries the week's Monday as an
+         *  ISO date under this key; its presence alone means "open that week's recap". */
+        const val EXTRA_WEEKLY_RECAP_WEEK_START = "com.jjrapps.constanza.EXTRA_WEEKLY_RECAP_WEEK_START"
     }
 }
+
+/** weekly-recap: one recap-notification tap — the week to open, and which tap this is. */
+internal data class WeeklyRecapRequest(val weekStart: String, val tap: Int)
 
 /**
  * Task 6a's navigation decision: no navigation library. A list plus one editor is small enough
@@ -146,6 +167,9 @@ private sealed interface ConstanzaRoute : java.io.Serializable {
     data class HabitEditor(val habitId: Long?, val origin: EditorOrigin = EditorOrigin.HabitList) : ConstanzaRoute
     data class Progress(val habitId: Long) : ConstanzaRoute
     data object Settings : ConstanzaRoute
+
+    /** weekly-recap: reached only from the recap notification; [weekStart] is an ISO date. */
+    data class WeeklyRecap(val weekStart: String) : ConstanzaRoute
 }
 
 /** Task 6b.1: Today is the daily-use home screen; [ConstanzaRoute.HabitList] is reached from its
@@ -170,8 +194,15 @@ private sealed interface ConstanzaRoute : java.io.Serializable {
  *  that never taps a notification never constructs it a moment earlier than [TodayRoute] itself
  *  would have. */
 @Composable
-private fun ConstanzaApp(startRoute: ConstanzaRoute = ConstanzaRoute.Today, resetToTodaySignal: Int = 0) {
+private fun ConstanzaApp(
+    startRoute: ConstanzaRoute = ConstanzaRoute.Today,
+    resetToTodaySignal: Int = 0,
+    weeklyRecapRequest: WeeklyRecapRequest? = null,
+) {
     var route by rememberSaveable { mutableStateOf(startRoute) }
+    LaunchedEffect(weeklyRecapRequest) {
+        weeklyRecapRequest?.let { route = ConstanzaRoute.WeeklyRecap(it.weekStart) }
+    }
     if (resetToTodaySignal > 0) {
         val todayViewModel: TodayViewModel = hiltViewModel()
         LaunchedEffect(resetToTodaySignal) {
@@ -236,6 +267,11 @@ private fun ConstanzaApp(startRoute: ConstanzaRoute = ConstanzaRoute.Today, rese
         is ConstanzaRoute.Settings -> SnoozeSettingsRoute(
             onBack = { route = ConstanzaRoute.Today },
         )
+
+        is ConstanzaRoute.WeeklyRecap -> WeeklyRecapRoute(
+            weekStart = current.weekStart,
+            onBack = { route = ConstanzaRoute.Today },
+        )
     }
 }
 
@@ -295,7 +331,11 @@ internal data class StartupState(
  * simply never reads it.
  */
 @Composable
-private fun FirstRunGate(viewModel: FirstRunGateViewModel = hiltViewModel(), resetToTodaySignal: Int = 0) {
+private fun FirstRunGate(
+    viewModel: FirstRunGateViewModel = hiltViewModel(),
+    resetToTodaySignal: Int = 0,
+    weeklyRecapRequest: WeeklyRecapRequest? = null,
+) {
     val startupState by viewModel.startupState.collectAsState()
     // Write-once. Set synchronously inside onFinished, BEFORE the flag write is requested
     // (design.md §9). rememberSaveable, not remember: a rotation in the frame between onFinished
@@ -309,7 +349,11 @@ private fun FirstRunGate(viewModel: FirstRunGateViewModel = hiltViewModel(), res
         // whose device is in Spanish must not meet the first-run flow in English.
         else -> ProvideAppLocale(state.language) {
             if (state.onboardingDone) {
-                ConstanzaApp(startRoute = startRoute, resetToTodaySignal = resetToTodaySignal)
+                ConstanzaApp(
+                    startRoute = startRoute,
+                    resetToTodaySignal = resetToTodaySignal,
+                    weeklyRecapRequest = weeklyRecapRequest,
+                )
             } else {
                 OnboardingRoute(
                     onFinished = {

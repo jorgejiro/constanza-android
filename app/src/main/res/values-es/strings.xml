@@ -269,4 +269,20 @@
     <string name="onboarding_exact_alarm_granted_body">Los recordatorios exactos están activados. Los hábitos sonarán justo a tiempo.</string>
     <string name="onboarding_exact_alarm_denied_body">Los recordatorios seguirán llegando, pero en este dispositivo pueden llegar unos minutos tarde a menos que actives las alarmas exactas.</string>
     <string name="onboarding_exact_alarm_denied_action">Abrir ajustes</string>
+
+    <!-- weekly-recap -->
+    <string name="weekly_recap_title">Tu semana</string>
+    <string name="weekly_recap_percent">%1$d %%</string>
+    <string name="weekly_recap_count_suffix">" · %1$d de %2$d"</string>
+    <string name="weekly_recap_habit_count">%1$d/%2$d</string>
+    <string name="weekly_recap_row_a11y">%1$s: %2$d de %3$d cumplidos</string>
+    <string name="weekly_recap_legend_done">✓ cumplido</string>
+    <string name="weekly_recap_legend_missed">✕ no cumplido</string>
+    <string name="weekly_recap_empty">Esta semana no hay nada que contar.</string>
+    <string name="notification_channel_weekly_recap_name">Resumen semanal</string>
+    <string name="notification_weekly_recap_title">Tu semana: %1$d %% cumplido</string>
+    <string name="notification_weekly_recap_text">%1$d de %2$d · toca para ver cada hábito</string>
+    <string name="notification_weekly_recap_range">%1$s: %2$d de %3$d.</string>
+    <string name="notification_weekly_recap_best">Mejor: %1$s (%2$d de %3$d).</string>
+    <string name="notification_weekly_recap_worst">A reforzar: %1$s (%2$d de %3$d).</string>
 </resources>
