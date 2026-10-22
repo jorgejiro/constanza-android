@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.icons.ConstanzaIcons
 import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
+import com.jjrapps.constanza.core.ui.theme.ConstanzaControlDefaults
 import com.jjrapps.constanza.core.ui.theme.Dimens
 import com.jjrapps.constanza.core.ui.theme.Spacing
 
@@ -67,6 +70,51 @@ fun SettingsNavigationRow(title: String, onClick: () -> Unit, modifier: Modifier
             contentDescription = null,
             tint = ConstanzaColors.OnBackgroundVariant,
             modifier = Modifier.padding(start = Spacing.md).size(TrailingChevronSize),
+        )
+    }
+}
+
+/**
+ * One Settings on/off row: [title] and an optional [subtitle] like [SettingsNavigationRow], with a
+ * trailing [Switch] instead of a chevron. The whole row is the toggle ([Role.Switch]), so it is one
+ * semantics node carrying the label and the state, and a tap anywhere on it flips the value — the
+ * shape `HabitListScreen`'s "show archived" row settled on for the same reasons.
+ */
+@Composable
+fun SettingsSwitchRow(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = Dimens.SettingsRow)
+            .toggleable(value = checked, onValueChange = onCheckedChange, role = Role.Switch)
+            .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
+                color = ConstanzaColors.OnBackground,
+            )
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ConstanzaColors.OnBackgroundVariant,
+                )
+            }
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = null,
+            modifier = Modifier.padding(start = Spacing.md),
+            colors = ConstanzaControlDefaults.switchColors(),
         )
     }
 }

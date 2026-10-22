@@ -25,6 +25,11 @@ object ConstanzaIcons {
         strokeIcon("List", STROKE_REGULAR, "M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01")
     }
 
+    /** Today's "weekly recap" action: three bars of different heights on a baseline. */
+    val Bars: ImageVector by lazy {
+        strokeIcon("Bars", STROKE_REGULAR, "M4 20h16M7 16v-5M12 16V6M17 16v-8")
+    }
+
     /** Today's "settings" action: two sliders with their knobs. */
     val Sliders: ImageVector by lazy {
         strokeIcon(

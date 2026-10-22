@@ -31,7 +31,7 @@ class SnoozeSettingsScreenComposeTest {
     val composeTestRule = createComposeRule()
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
-    private val noSections = SettingsSections(dayReview = {}, language = {}, data = {})
+    private val noSections = SettingsSections(dayReview = {}, weeklyRecap = {}, language = {}, data = {})
 
     private fun minutes(duration: SnoozeDuration) = context.getString(R.string.settings_snooze_minutes, duration.minutes)
 

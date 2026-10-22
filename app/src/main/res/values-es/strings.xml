@@ -285,4 +285,8 @@
     <string name="notification_weekly_recap_range">%1$s: %2$d de %3$d.</string>
     <string name="notification_weekly_recap_best">Mejor: %1$s (%2$d de %3$d).</string>
     <string name="notification_weekly_recap_worst">A reforzar: %1$s (%2$d de %3$d).</string>
+    <string name="today_weekly_recap">Resumen semanal</string>
+    <string name="settings_weekly_recap_section_title">Resumen semanal</string>
+    <string name="settings_weekly_recap_toggle">Aviso del lunes</string>
+    <string name="settings_weekly_recap_toggle_supporting">Cada lunes a las %1$s, cómo fue la semana anterior.</string>
 </resources>

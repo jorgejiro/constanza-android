@@ -60,11 +60,12 @@ internal data class TodayHeaderActions(
     val onPreviousDay: () -> Unit,
     val onNextDay: () -> Unit,
     val onToday: () -> Unit,
+    val onOpenWeeklyRecap: () -> Unit = {},
 )
 
 /**
- * Today's header in the graphite design (direction E): the "Today" title with two quiet icon
- * actions (habit list, settings), then the date and the "N of M" progress line with its bar.
+ * Today's header in the graphite design (direction E): the "Today" title with three quiet icon
+ * actions (habit list, weekly recap, settings), then the date and the "N of M" progress line with its bar.
  *
  * It replaces both the `TopAppBar` and the separate date bar that sat under it, and it is the
  * `Scaffold`'s top bar, so it stays fixed above the list in both of `TodayContent`'s layouts — the
@@ -102,6 +103,11 @@ internal fun TodayHeader(date: LocalDate, isPastDay: Boolean, progress: TodayPro
                 TextButton(onClick = actions.onToday) { Text(stringResource(R.string.today_back_to_today)) }
             }
             HeaderIconButton(ConstanzaIcons.List, stringResource(R.string.today_manage_habits), actions.onManageHabits)
+            HeaderIconButton(
+                ConstanzaIcons.Bars,
+                stringResource(R.string.today_weekly_recap),
+                actions.onOpenWeeklyRecap,
+            )
             HeaderIconButton(ConstanzaIcons.Sliders, stringResource(R.string.today_settings), actions.onOpenSettings)
         }
         DateLine(date, isPastDay, progress, actions)
