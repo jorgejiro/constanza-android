@@ -94,7 +94,7 @@ internal fun TodayHabitRow(
         Column(modifier = Modifier.fillMaxWidth()) {
             MultiSlotHeader(row, section, expanded, actions)
             if (expanded) {
-                row.slots.forEach { slot -> SlotRow(row, slot, section, zone, actions) }
+                row.slots.forEach { slot -> SlotRow(row, slot, zone, actions) }
             }
         }
     } else {
@@ -139,7 +139,7 @@ private fun SingleSlotRow(
             subtitle?.let { Subtitle(it) }
         }
         Spacer(Modifier.width(Spacing.sm))
-        SlotTrailing(row, slot, section, actions)
+        SlotTrailing(row, slot, actions)
     }
 }
 
@@ -236,7 +236,6 @@ private fun ReminderSummary(row: TodayHabitRow) {
 private fun SlotRow(
     row: TodayHabitRow,
     slot: TodaySlot,
-    section: TodaySectionKind,
     zone: ZoneId,
     actions: SlotActions,
 ) {
@@ -264,15 +263,15 @@ private fun SlotRow(
             }
         }
         Spacer(Modifier.width(Spacing.sm))
-        SlotTrailing(row, slot, section, actions)
+        SlotTrailing(row, slot, actions)
     }
 }
 
 /** The answer buttons for a pending slot, or the answered glyph — never a status word. */
 @Composable
-private fun SlotTrailing(row: TodayHabitRow, slot: TodaySlot, section: TodaySectionKind, actions: SlotActions) {
+private fun SlotTrailing(row: TodayHabitRow, slot: TodaySlot, actions: SlotActions) {
     if (slot.status == EntryStatus.UNKNOWN) {
-        TodayAnswerButtons(row.habitName, filled = section == TodaySectionKind.NOW) { status ->
+        TodayAnswerButtons(row.habitName) { status ->
             actions.onAnswer(row.habitId, slot, status)
         }
     } else {

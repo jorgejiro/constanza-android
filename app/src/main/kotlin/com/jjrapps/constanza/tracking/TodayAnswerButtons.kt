@@ -1,7 +1,6 @@
 package com.jjrapps.constanza.tracking
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -37,20 +36,20 @@ private val ANSWER_ICON_SIZE = 20.dp
  * the SHAPE say "this is a button" and the glyph say what it means, without spending colour that
  * would compete with the habit's own dot.
  *
- * [filled] is `true` in the "Now" section only: there the ✓ is a light-filled circle, the one
- * emphasised control on screen, because that is the answer the user most likely came to give.
- * Everywhere else both buttons are outlined.
+ * Both are outlined in every section, "Now" included. A light-filled ✓ used to emphasise the likely
+ * answer there, but light fill with dark ink is this app's SELECTED state (the reminder-time
+ * toggle), so an unanswered slot read as already answered "Yes". The ✓ keeps only a quieter
+ * emphasis: its glyph in the primary text tone, the ✕ in the secondary one.
  *
  * The visible text is gone, so each button's accessible label is its contentDescription, which
  * names the habit — a screen full of bare "Yes" buttons would otherwise announce identically.
  */
 @Composable
-internal fun TodayAnswerButtons(habitName: String, filled: Boolean, onAnswer: (InAppEntryStatus) -> Unit) {
+internal fun TodayAnswerButtons(habitName: String, onAnswer: (InAppEntryStatus) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         AnswerButton(
             icon = ConstanzaIcons.Close,
             description = stringResource(R.string.today_answer_no_a11y, habitName),
-            fill = null,
             tint = ConstanzaColors.OnBackgroundVariant,
             onClick = { onAnswer(InAppEntryStatus.MISSED) },
         )
@@ -58,8 +57,7 @@ internal fun TodayAnswerButtons(habitName: String, filled: Boolean, onAnswer: (I
         AnswerButton(
             icon = ConstanzaIcons.Check,
             description = stringResource(R.string.today_answer_yes_a11y, habitName),
-            fill = if (filled) ConstanzaColors.ChromeInteractive else null,
-            tint = if (filled) ConstanzaColors.OnChromeInteractive else ConstanzaColors.OnBackground,
+            tint = ConstanzaColors.OnBackground,
             onClick = { onAnswer(InAppEntryStatus.COMPLETED) },
         )
     }
@@ -68,14 +66,13 @@ internal fun TodayAnswerButtons(habitName: String, filled: Boolean, onAnswer: (I
 /**
  * Painted at [Dimens.AnswerButton], hit at [Dimens.AnswerButtonTouchTarget]: the 48dp box is the
  * clickable, the 44dp circle centred in it is only paint — the same paint/hit split the colour
- * swatch uses. A `null` [fill] draws the outlined variant with a [ConstanzaColors.ControlStroke]
- * ring, the operable-stroke tone that clears 3:1 on every surface.
+ * swatch uses. The circle is a [ConstanzaColors.ControlStroke] ring, the operable-stroke tone that
+ * clears 3:1 on every surface.
  */
 @Composable
 private fun AnswerButton(
     icon: ImageVector,
     description: String,
-    fill: Color?,
     tint: Color,
     onClick: () -> Unit,
 ) {
@@ -87,13 +84,10 @@ private fun AnswerButton(
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
-        val circle = Modifier.size(Dimens.AnswerButton)
         Box(
-            modifier = if (fill != null) {
-                circle.background(fill, CircleShape)
-            } else {
-                circle.border(BorderStroke(1.dp, ConstanzaColors.ControlStroke), CircleShape)
-            },
+            modifier = Modifier
+                .size(Dimens.AnswerButton)
+                .border(BorderStroke(1.dp, ConstanzaColors.ControlStroke), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(ANSWER_ICON_SIZE))
