@@ -115,7 +115,7 @@ fun WeeklyRecapScreen(state: WeeklyRecapUiState, onBack: () -> Unit = {}) {
 @Composable
 private fun RecapHeader(recap: LoadedWeeklyRecap) {
     val locale = LocalConfiguration.current.locales[0]
-    val range = weekRangeLabel(LocalContext.current, recap.weekStart, locale)
+    val range = weekRangeLabel(recap.weekStart, locale)
     Row(modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm)) {
         Text(
             range,

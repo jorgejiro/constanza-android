@@ -1,10 +1,12 @@
 package com.jjrapps.constanza.core.time
 
+import java.time.DayOfWeek
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 import javax.inject.Inject
 
 private const val MINUTES_PER_HOUR = 60
@@ -74,4 +76,20 @@ fun TimeProvider.nextLocalDateForLocalTime(minuteOfDay: Int): LocalDate {
     val time = LocalTime.of(minuteOfDay / MINUTES_PER_HOUR, minuteOfDay % MINUTES_PER_HOUR)
     val todayAtTime = today().atTime(time).atZone(zone())
     return if (todayAtTime.toInstant().isAfter(now())) today() else today().plusDays(1)
+}
+
+/** weekly-recap: the LOCAL DATE of the next [day] at [minuteOfDay] — this week's [day] if that
+ *  moment is still ahead, otherwise the same day next week (standing exactly on it rolls forward,
+ *  as [nextLocalDateForLocalTime] does). The date is built first and resolved against [zone]
+ *  afterwards, for the DST reason [millisUntilNextLocalTime] documents. */
+fun TimeProvider.nextLocalDateForWeeklyTime(day: DayOfWeek, minuteOfDay: Int): LocalDate {
+    val candidate = today().with(TemporalAdjusters.nextOrSame(day))
+    val stillAhead = epochMilliAtLocalTime(candidate, minuteOfDay) > now().toEpochMilli()
+    return if (stillAhead) candidate else candidate.plusWeeks(1)
+}
+
+/** weekly-recap: the instant [date] reads [minuteOfDay] on the wall clock in [zone]. */
+fun TimeProvider.epochMilliAtLocalTime(date: LocalDate, minuteOfDay: Int): Long {
+    val time = LocalTime.of(minuteOfDay / MINUTES_PER_HOUR, minuteOfDay % MINUTES_PER_HOUR)
+    return date.atTime(time).atZone(zone()).toInstant().toEpochMilli()
 }

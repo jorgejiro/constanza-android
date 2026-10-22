@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import com.jjrapps.constanza.core.ui.theme.ConstanzaTheme
 import com.jjrapps.constanza.core.ui.theme.HabitColor
+import com.jjrapps.constanza.domain.RecapMark
 import com.jjrapps.constanza.domain.model.ReminderSlot
 import com.jjrapps.constanza.habit.HabitEditorActions
 import com.jjrapps.constanza.habit.HabitEditorScreen
@@ -37,6 +38,10 @@ import com.jjrapps.constanza.portability.DataPortabilitySectionContent
 import com.jjrapps.constanza.portability.ImportResult
 import com.jjrapps.constanza.progress.ProgressScreen
 import com.jjrapps.constanza.progress.ProgressUiState
+import com.jjrapps.constanza.recap.LoadedWeeklyRecap
+import com.jjrapps.constanza.recap.WeeklyRecapRow
+import com.jjrapps.constanza.recap.WeeklyRecapScreen
+import com.jjrapps.constanza.recap.WeeklyRecapUiState
 import com.jjrapps.constanza.reminding.DayReviewSectionContent
 import com.jjrapps.constanza.reminding.DayReviewSettingsUiState
 import com.jjrapps.constanza.reminding.NotificationPermissionDecision
@@ -46,6 +51,7 @@ import com.jjrapps.constanza.reminding.SnoozeSettingsScreen
 import org.junit.Rule
 import org.junit.Test
 import java.io.ByteArrayOutputStream
+import java.time.LocalDate
 import java.util.Locale
 
 /**
@@ -136,6 +142,37 @@ class GraphiteScreensRealRenderTest {
                 onPermissionRequested = {},
             )
         }
+    }
+
+    /** weekly-recap: option B with the canvas board's own week (18 of 28, 64 %). */
+    @Test
+    fun renderWeeklyRecap() = render("GraphiteRenderWeeklyRecap") {
+        fun marks(pattern: String) = pattern.map { if (it == '1') RecapMark.DONE else RecapMark.MISSED }
+        fun row(id: Long, name: String, color: HabitColor, pattern: String) = WeeklyRecapRow(
+            habitId = id,
+            name = name,
+            colorArgb = color.argb,
+            marks = marks(pattern),
+            done = pattern.count { it == '1' },
+            total = pattern.length,
+        )
+        val mobility = "Hacer movilidad al sol en la primera media hora tras levantarme"
+        WeeklyRecapScreen(
+            WeeklyRecapUiState(
+                LoadedWeeklyRecap(
+                    weekStart = LocalDate.parse("2026-10-12"),
+                    rows = listOf(
+                        row(1, mobility, HabitColor.SAND, "1011010"),
+                        row(2, "Trabajar o estar al menos 20 min al sol", HabitColor.OLIVE, "1110111"),
+                        row(3, "Comer antes de las 15h", HabitColor.SAGE, "1101101"),
+                        row(4, "Cenar antes de las 22h", HabitColor.BLUE, "0100101"),
+                    ),
+                    done = 18,
+                    total = 28,
+                    percent = 64,
+                ),
+            ),
+        )
     }
 
     private fun render(logTag: String, content: @Composable () -> Unit) {

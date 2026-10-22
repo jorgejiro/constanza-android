@@ -1,26 +1,34 @@
 package com.jjrapps.constanza.recap
 
-import android.content.Context
-import android.text.format.DateUtils
+import android.text.format.DateFormat
 import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneOffset
-import java.util.Formatter
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private const val LAST_DAY_OFFSET = 6L
+private const val RANGE_SEPARATOR = " – "
+
+/** The first run of `d` outside a quoted literal in a date pattern. */
+private val DAY_FIELD = Regex("""d+(?=(?:[^']*'[^']*')*[^']*$)""")
 
 /**
- * weekly-recap: "12–18 de octubre" / "October 12–18", and "28 sept – 4 oct" across a month, from the
- * platform's own range formatter rather than a hand-built pattern per language. Both ends are taken
- * at noon UTC and formatted in UTC, so neither the device zone nor DST can shift a day. The
- * [Formatter] carries [locale] explicitly: below API 33 the app's chosen language is not the JVM
- * default, so the screen passes its composition locale and the notification its localized context's.
+ * weekly-recap: "12 – 18 de octubre" / "October 12 – 18" within one month, and
+ * "28 de septiembre – 4 de octubre" across two. The day-and-month pattern is the platform's best
+ * pattern for [locale], the same source `TodayHeader` uses for its date, and [locale] is always
+ * explicit: below API 33 the app's chosen language is not the JVM default, so anything that reads
+ * the default (as `DateUtils.formatDateRange` does for month names) would print the system's
+ * language instead. Within one month the start day is spliced in front of the end date's own day
+ * field, so each language keeps its own order around the range.
  */
-fun weekRangeLabel(context: Context, weekStart: LocalDate, locale: Locale): String {
-    val noon = LocalTime.NOON
-    val start = weekStart.atTime(noon).toInstant(ZoneOffset.UTC).toEpochMilli()
-    val end = weekStart.plusDays(LAST_DAY_OFFSET).atTime(noon).toInstant(ZoneOffset.UTC).toEpochMilli()
-    val flags = DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_NO_YEAR
-    return DateUtils.formatDateRange(context, Formatter(StringBuilder(), locale), start, end, flags, "UTC").toString()
+fun weekRangeLabel(weekStart: LocalDate, locale: Locale): String {
+    val weekEnd = weekStart.plusDays(LAST_DAY_OFFSET)
+    val dayMonth = DateFormat.getBestDateTimePattern(locale, "dMMMM")
+    if (weekStart.month != weekEnd.month) {
+        val formatter = DateTimeFormatter.ofPattern(dayMonth, locale)
+        return formatter.format(weekStart) + RANGE_SEPARATOR + formatter.format(weekEnd)
+    }
+    val spliced = DAY_FIELD.find(dayMonth)?.let { day ->
+        dayMonth.replaceRange(day.range, "'${weekStart.dayOfMonth}$RANGE_SEPARATOR'${day.value}")
+    } ?: dayMonth
+    return DateTimeFormatter.ofPattern(spliced, locale).format(weekEnd)
 }
