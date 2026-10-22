@@ -1,0 +1,8 @@
+Constanza 1.1.1: tu semana de un vistazo.
+
+• Cada lunes a las 9:00, un aviso con el % de cumplimiento de la semana anterior.
+• Tócalo, o el nuevo icono de gráfico en Hoy, para ver cada hábito día a día: cumplido ✓ o no ✕.
+• Puedes desactivar el aviso del lunes en Ajustes › Resumen semanal.
+• Corregido: un hábito pendiente ya no parece respondido con "sí".
+
+Sin cuentas, sin nube, sin anuncios, sin seguimiento.

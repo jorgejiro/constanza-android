@@ -1,0 +1,8 @@
+Constanza 1.1.1: your week at a glance.
+
+• Every Monday at 9:00, a notification with last week's completion percentage.
+• Tap it, or the new chart icon on Today, to see each habit day by day: done ✓ or not ✕.
+• Turn the Monday notification off in Settings › Weekly recap.
+• Fixed: a pending habit no longer looks already answered "yes".
+
+No accounts, no cloud, no ads, no tracking.
