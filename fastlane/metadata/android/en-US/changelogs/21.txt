@@ -1,0 +1,7 @@
+Constanza 1.2.0: start the day with a look at yesterday.
+
+• Every morning at 7:00, a notification with yesterday's completion. Tap it to see that day's list.
+• The night review now comes at 23:30, and only if something is still unanswered.
+• Both can be switched off or moved in Settings.
+
+No accounts, no cloud, no ads, no tracking.
