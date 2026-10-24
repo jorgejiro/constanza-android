@@ -31,10 +31,13 @@ platform :android do
     )
   end
 
-  desc "Build :app:bundleRelease and upload the signed AAB to a Play track (params: track, release_status, images)"
+  desc "Build :app:bundleRelease and publish the signed AAB to Play production, live (params: track, release_status, images)"
   lane :subir do |options|
-    track = options[:track] || "internal"
-    release_status = options[:release_status] || "draft"
+    # Production + completed by default: the owner wants a release to go live in one command, not
+    # sit as a draft to be sent to review by hand (1.2.0 was the first published this way). Pass
+    # track:internal release_status:draft to stage one instead.
+    track = options[:track] || "production"
+    release_status = options[:release_status] || "completed"
     reupload_images = options.fetch(:images, false)
 
     ENV["JAVA_HOME"] = "/Applications/Android Studio.app/Contents/jbr/Contents/Home"

@@ -81,9 +81,9 @@ credenciales con las que autenticarse.
   funcionan antes de tocar nada real.
 - `fastlane ficha` — sube solo la ficha (textos + capturas + icono + gráfico de función), sin
   ningún binario.
-- `fastlane subir track:internal` — compila `:app:bundleRelease` y sube el AAB firmado a la pista
-  indicada (`internal` por defecto) con estado `draft` (por defecto no publica, solo lo deja listo
-  para revisar en Play Console). Admite también `release_status:` y `images:true` si además hay
+- `fastlane subir` — compila `:app:bundleRelease` y publica el AAB firmado en producción con estado
+  `completed`: sale directamente, sin borrador. Para dejarlo preparado sin publicar, usa
+  `fastlane subir track:internal release_status:draft`. Admite también `images:true` si además hay
   que resubir capturas o icono junto con el binario.
 
 ### Lo que sigue siendo manual
