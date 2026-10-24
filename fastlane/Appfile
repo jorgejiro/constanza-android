@@ -7,7 +7,9 @@ package_name("com.jjrapps.constanza")
 #    `con-claves 'fastlane subir'`. Nothing is written to disk.
 # 2. A file: SUPPLY_JSON_KEY if set, else ~/.config/play/jjrmobileapps.json.
 #
-# Only one may be set: supply treats json_key and json_key_data as conflicting options.
+# Leave SUPPLY_JSON_KEY unset when using the Bitwarden key: supply reads that variable on its own,
+# and when both are present it silently prefers the file over the key data (its conflicting-options
+# check only covers options passed to the action, so no error is raised).
 play_key_json = ENV["ANDROID_CONSTANZA_JSON_KEY"].to_s
 if play_key_json.strip.empty?
   json_key_file(ENV["SUPPLY_JSON_KEY"] || File.expand_path("~/.config/play/jjrmobileapps.json"))

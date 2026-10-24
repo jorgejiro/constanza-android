@@ -3,8 +3,9 @@
 Todo lo necesario para sacar una versión nueva desde cualquier Mac: preparar la máquina una vez,
 verificar, subir la versión, compilar, y publicar en GitHub, Google Play y F-Droid.
 
-Ninguna clave vive en el repositorio ni en disco: todas están en Bitwarden Secrets Manager (BWS) y
-`con-claves` las inyecta como variables de entorno solo durante el comando que las necesita.
+Ninguna clave vive en el repositorio: todas están en Bitwarden Secrets Manager (BWS) y `con-claves`
+las inyecta como variables de entorno solo durante el comando que las necesita, sin escribirlas en
+disco.
 
 ---
 
@@ -38,7 +39,8 @@ con-claves 'fastlane validar'         # valida la ficha de Play contra la API; n
 | `ANDROID_CONSTANZA_JSON_KEY` | JSON de la cuenta de servicio de Play Console | `fastlane/Appfile` |
 
 Si falta `ANDROID_CONSTANZA_JSON_KEY`, fastlane busca el JSON en un archivo: `SUPPLY_JSON_KEY` si está
-definida, o `~/.config/play/jjrmobileapps.json`.
+definida, o `~/.config/play/jjrmobileapps.json`. Con la clave de BWS, dejar `SUPPLY_JSON_KEY` sin
+definir: si están las dos, fastlane usa el archivo sin avisar.
 
 ---
 
