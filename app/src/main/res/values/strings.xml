@@ -337,6 +337,10 @@
     <string name="notification_morning_recap_title">Yesterday: %1$d%% done</string>
     <string name="notification_morning_recap_text">%1$d of %2$d habits · tap to see which</string>
     <string name="today_weekly_recap">Weekly recap</string>
+    <string name="settings_morning_recap_section_title">Morning recap</string>
+    <string name="settings_morning_recap_toggle">Morning notification</string>
+    <string name="settings_morning_recap_toggle_supporting">How yesterday went, and a tap opens its list.</string>
+    <string name="settings_morning_recap_time_label">Recap time</string>
     <string name="settings_weekly_recap_section_title">Weekly recap</string>
     <string name="settings_weekly_recap_toggle">Monday notification</string>
     <string name="settings_weekly_recap_toggle_supporting">Every Monday at %1$s, how last week went.</string>

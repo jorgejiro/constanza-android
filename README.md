@@ -87,6 +87,12 @@ For each habit: the current streak, the best streak, and the compliance percenta
 At 23:30 by default, if something is still unanswered, a review notification reminds you what
 is still open that day. You can move it, have it fire every night, or switch it off in Settings.
 
+### ☀️ A morning recap of yesterday
+
+Every morning, at 7:00 by default, a notification tells you how much of yesterday you completed;
+tapping it opens yesterday's list so you can see at a glance what you did and what you missed.
+You can change the time or switch it off in Settings.
+
 ### 💾 Your data, your file
 
 Export or import all your data as a file, through the system's own file picker: it is your copy,

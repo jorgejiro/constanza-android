@@ -36,6 +36,7 @@ import com.jjrapps.constanza.core.ui.theme.Dimens
 import com.jjrapps.constanza.core.ui.theme.Spacing
 import com.jjrapps.constanza.localization.LanguageSection
 import com.jjrapps.constanza.portability.DataPortabilitySection
+import com.jjrapps.constanza.recap.MorningRecapSection
 import com.jjrapps.constanza.recap.WeeklyRecapSection
 
 private const val MINUTES_PER_HOUR = 60
@@ -48,12 +49,13 @@ fun SnoozeSettingsRoute(onBack: () -> Unit, viewModel: SnoozeSettingsViewModel =
 }
 
 /**
- * The three Hilt-backed sections below the snooze chips, as slots. Production passes nothing and
+ * The Hilt-backed sections below the snooze chips, as slots. Production passes nothing and
  * gets the real sections; a test or render passes their presentational halves, which is what lets
  * the whole screen be drawn without a Hilt-enabled Activity.
  */
 data class SettingsSections(
     val dayReview: @Composable () -> Unit = { DayReviewSection() },
+    val morningRecap: @Composable () -> Unit = { MorningRecapSection() },
     val weeklyRecap: @Composable () -> Unit = { WeeklyRecapSection() },
     val language: @Composable () -> Unit = { LanguageSection() },
     val data: @Composable () -> Unit = { DataPortabilitySection() },
@@ -105,6 +107,7 @@ fun SnoozeSettingsScreen(
                 }
             }
             item { sections.dayReview() }
+            item { sections.morningRecap() }
             item { sections.weeklyRecap() }
             item { sections.language() }
             item { sections.data() }

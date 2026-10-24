@@ -17,9 +17,9 @@ Branch: `feat/day-review-toggle-and-morning-recap` · Delivery: single PR (merge
 
 | ID | Specs | Route | Status | Commit |
 |----|-------|-------|--------|--------|
-| T1 | S1, S2, S3 | inline | pending | |
-| T2 | S4, S6, S7 | inline | pending | |
-| T3 | S5, S6 | inline | pending | |
+| T1 | S1, S2, S3 | inline | done (RED→GREEN: store 3, VM 1, worker 1, section compose 2) | 0e04e05 |
+| T2 | S4, S6, S7 | inline | done (RED→GREEN: summary 5, store 3, publisher 3, worker 2) | e50f533 |
+| T3 | S5, S6 | inline | done (RED→GREEN: showDay 2, VM 3, section compose 2) | see L4 |
 
 - T1: `DayReviewSettingsStore` defaults + `reviewEnabled`, worker skip, Settings switch, strings en/es, tests.
 - T2: `summarizeDay`, `MorningRecapSettingsStore` (enabled + time), alarm → receiver → worker → poster on its own channel, re-armed on boot/time change/package replace/app start.
@@ -32,3 +32,4 @@ Route evidence: no writer trigger — the units share `RescheduleReceivers`, `Co
 - **L1** (2026-10-24) Original request: "Buenas, quiero hacer un cambio en la app, pues la notificación de por la noche (creo a las 23h) que me dice las tareas que he informado y las que no, y me lleva a un resumen del día, quiero que se quede a las 23:30 y sólo aparezca en el caso que me quede algún hábito por marcar. Y al día siguiente a primera hora (07:00am) me llegue otra notificación que me avise del grado de cumplimiento de hábitos del día anterior, y que al pulsarlo me lleve al listado de hábitos del día anterior para ver de forma ágil los que cumplí y los que no."
 - **L2** (2026-10-24) Owner, after learning time and mode were already settings: "sobre el 1, sí cambialo a las 23:30h como hora por defecto, y que se pueda desactivar si no lo quieres (activado por defecto), pues me voy a poner un hábito para las 23h para iniciar relax para dormir, y sólo debe avisar si quedan hábitos por responder, no sé si es lo que hace ahora por defecto. y sobre el 2, todo OK; activado por defecto, y se puede cambiar la hora y activar/desactivar en ajustes."
 - **L3** Finding: the current default mode is "every night" (`DEFAULT_REVIEW_FIRES_EVERY_NIGHT = true`), so S3 changes a default. `TodayViewModel` sits at detekt's `TooManyFunctions` ceiling (10), so the deep link generalises `showToday()` into `showDay(date: LocalDate? = null)` instead of adding an 11th function.
+- **L4** (2026-10-24) T1–T3 implemented inline. `./gradlew :domain:test :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:detektMain` green (app 410 tests, domain 65). detekt `LongMethod` on `ConstanzaApp` resolved by extracting `OpenTodayEffect`, shared by the reminder tap (live edge) and the morning-recap tap (its date). README (en/es) and store listing texts updated from "23:00". Pending: device-free emulator matrix (`:app:emulatorMatrixGroupDebugAndroidTest`).

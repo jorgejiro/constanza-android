@@ -41,6 +41,8 @@ import com.jjrapps.constanza.progress.ProgressUiState
 import com.jjrapps.constanza.recap.LoadedWeeklyRecap
 import com.jjrapps.constanza.recap.WeeklyRecapRow
 import com.jjrapps.constanza.recap.WeeklyRecapScreen
+import com.jjrapps.constanza.recap.MorningRecapSectionContent
+import com.jjrapps.constanza.recap.MorningRecapSettingsUiState
 import com.jjrapps.constanza.recap.WeeklyRecapSectionContent
 import com.jjrapps.constanza.recap.WeeklyRecapUiState
 import com.jjrapps.constanza.reminding.DayReviewSectionContent
@@ -114,6 +116,13 @@ class GraphiteScreensRealRenderTest {
                         onReviewTimeChange = {},
                         onFiresEveryNightChange = {},
                         onEnabledChange = {},
+                    )
+                },
+                morningRecap = {
+                    MorningRecapSectionContent(
+                        uiState = MorningRecapSettingsUiState(),
+                        onEnabledChange = {},
+                        onTimeChange = {},
                     )
                 },
                 weeklyRecap = { WeeklyRecapSectionContent(enabled = true, onEnabledChange = {}) },

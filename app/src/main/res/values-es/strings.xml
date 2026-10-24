@@ -291,6 +291,10 @@
     <string name="notification_morning_recap_title">Ayer: %1$d %% cumplido</string>
     <string name="notification_morning_recap_text">%1$d de %2$d hábitos · toca para ver cuáles</string>
     <string name="today_weekly_recap">Resumen semanal</string>
+    <string name="settings_morning_recap_section_title">Resumen de la mañana</string>
+    <string name="settings_morning_recap_toggle">Aviso de la mañana</string>
+    <string name="settings_morning_recap_toggle_supporting">Cómo fue el día anterior; al tocarlo se abre su lista.</string>
+    <string name="settings_morning_recap_time_label">Hora del resumen</string>
     <string name="settings_weekly_recap_section_title">Resumen semanal</string>
     <string name="settings_weekly_recap_toggle">Aviso del lunes</string>
     <string name="settings_weekly_recap_toggle_supporting">Cada lunes a las %1$s, cómo fue la semana anterior.</string>

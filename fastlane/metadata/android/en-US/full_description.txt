@@ -8,7 +8,7 @@ A day you do not answer does not disappear: at midnight, any slot left unanswere
 
 Reminders survive a phone reboot and a time or timezone change: you do not need to reopen the app to keep them firing. If your phone does not grant the exact-alarm permission by default, Constanza tells you without blocking anything and takes you to the setting; if you would rather not grant it, reminders still arrive, just with a few minutes of slack.
 
-Every night, at 23:00 by default, a review notification reminds you what is still open that day -or only when something actually is, if you would rather set it that way. And in Settings you can change how long a snooze lasts, pick the language (following the system, English or Spanish), and export or import all your data as a file, through the system's own file picker: it is your copy, not ours.
+At 23:30 by default, if something is still unanswered, a review notification reminds you before the day closes; and at 7:00, another one tells you how yesterday went and opens its list. And in Settings you can change how long a snooze lasts, pick the language (following the system, English or Spanish), and export or import all your data as a file, through the system's own file picker: it is your copy, not ours.
 
 The interface is dark, always, with no light mode. That is not an oversight: the background is deliberately neutral so the only colour on screen is the one you gave each habit.
 

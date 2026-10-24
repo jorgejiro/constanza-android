@@ -81,7 +81,7 @@ class TodayViewModel @Inject constructor(
     /** today-past-day-correction, design.md decision 1: [clock] is the latest value read from
      *  [CurrentDateSource] — the [init] collection below, or [refreshDate]'s `ON_RESUME`
      *  correction — and is written UNCONDITIONALLY by both, never guarded on whether the user has
-     *  navigated away. [navigated], set only by [showPreviousDay]/[showNextDay]/[showToday], is
+     *  navigated away. [navigated], set only by [showPreviousDay]/[showNextDay]/[showDay], is
      *  the deliberate override; [viewed] is a total PROJECTION, never a stored value, so returning
      *  to the live edge ([navigated] = null) always reflects the CURRENT [clock], catching up any
      *  date change that happened while away with no extra clock read. [navigated] is only ever set
@@ -225,7 +225,7 @@ class TodayViewModel @Inject constructor(
      *  backgrounded across local midnight, per the spec's "backgrounded app corrects the date on
      *  resume" scenario. Unconditional, exactly like the [init] collector (design.md decision 1) —
      *  while the user is on a past day this still updates [TodayDate.clock], it simply does not
-     *  move [TodayDate.viewed] until [showToday] re-attaches. A rollover that already fired while
+     *  move [TodayDate.viewed] until [showDay] re-attaches. A rollover that already fired while
      *  foregrounded is a no-op here — the timer already advanced [TodayDate.clock], and
      *  `MutableStateFlow` conflates the identical value.
      *
@@ -273,14 +273,21 @@ class TodayViewModel @Inject constructor(
         }
     }
 
-    /** today-past-day-correction, design.md decision 1: returns straight to the live edge via
-     *  `navigated = null`, the same re-attachment [showNextDay] performs when it lands on the
-     *  clock date. A no-op at the live edge already — [TodayDate.viewed] would not change, so the
-     *  per-slot UI state is left alone. */
-    fun showToday() {
-        if (dateState.value.navigated != null) {
+    /** today-past-day-correction, design.md decision 1: with no [date], returns straight to the live
+     *  edge via `navigated = null`, the same re-attachment [showNextDay] performs when it lands on
+     *  the clock date. day-review-and-morning-recap generalised the former `showToday()` so the
+     *  morning recap's tap can open Today on the day it recaps: a [date] strictly before
+     *  [TodayDate.clock] navigates there, and one at or after it re-attaches to the live edge, so
+     *  invariant 4 (navigated is always strictly earlier than the clock) still holds. A no-op when
+     *  [TodayDate.navigated] would not change, leaving the per-slot UI state alone. Folded into one
+     *  function rather than added beside `showToday()` because this class sits at detekt's
+     *  `TooManyFunctions` ceiling. */
+    fun showDay(date: LocalDate? = null) {
+        val current = dateState.value
+        val navigated = date?.takeIf { it < current.clock }
+        if (navigated != current.navigated) {
             expandedHabitIds.value = emptySet()
-            dateState.update { it.copy(navigated = null) }
+            dateState.update { it.copy(navigated = navigated) }
         }
     }
 

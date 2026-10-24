@@ -90,6 +90,12 @@ A las 23:30 por defecto, si queda algo sin responder, un aviso de repaso te recu
 quedó pendiente ese día. En Ajustes puedes cambiar la hora, hacer que avise todas las noches o
 desactivarlo.
 
+### ☀️ Un resumen de ayer por la mañana
+
+Cada mañana, a las 7:00 por defecto, un aviso te dice cuánto cumpliste el día anterior; al
+tocarlo se abre la lista de ese día para ver de un vistazo qué hiciste y qué no. En Ajustes
+puedes cambiar la hora o desactivarlo.
+
 ### 💾 Tus datos, tu archivo
 
 Exporta o importa todos tus datos como un archivo, con el selector de archivos del propio
