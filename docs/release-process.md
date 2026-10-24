@@ -38,9 +38,9 @@ con-claves 'fastlane validar'         # valida la ficha de Play contra la API; n
 | `CONSTANZA_KEY_PASSWORD` | Contraseña de la clave | `app/build.gradle.kts` |
 | `ANDROID_CONSTANZA_JSON_KEY` | JSON de la cuenta de servicio de Play Console | `fastlane/Appfile` |
 
-Si falta `ANDROID_CONSTANZA_JSON_KEY`, fastlane busca el JSON en un archivo: `SUPPLY_JSON_KEY` si está
-definida, o `~/.config/play/jjrmobileapps.json`. Con la clave de BWS, dejar `SUPPLY_JSON_KEY` sin
-definir: si están las dos, fastlane usa el archivo sin avisar.
+Si falta `ANDROID_CONSTANZA_JSON_KEY`, fastlane busca el JSON en `~/.config/play/jjrmobileapps.json`.
+No definir `SUPPLY_JSON_KEY` (el nombre antiguo de la clave): fastlane la lee por su cuenta y, si
+existe, gana a la de BWS sin avisar.
 
 ---
 

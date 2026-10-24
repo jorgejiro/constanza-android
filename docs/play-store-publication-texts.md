@@ -66,10 +66,11 @@ subida por `fastlane`:
 5. En Play Console → **Usuarios y permisos**, invitar la cuenta de servicio (su email
    `...@....iam.gserviceaccount.com`) con permisos de **Gestión de versiones** (release) y
    **Ficha de Play Store** (store listing) sobre esta app.
-6. Guardar la clave JSON **fuera del repositorio**, en `~/.config/play/jjrmobileapps.json` (la
-   ruta por defecto de `fastlane/Appfile`) o en cualquier otra ruta, exportándola como
-   `SUPPLY_JSON_KEY` antes de invocar `fastlane`. La clave nunca debe entrar en el repositorio ni
-   subirse a ningún sitio.
+6. Guardar la clave JSON en Bitwarden Secrets Manager como `ANDROID_CONSTANZA_JSON_KEY`
+   (`guardar-clave ANDROID_CONSTANZA_JSON_KEY < clave.json`, y luego borrar el archivo); los comandos
+   se lanzan con `con-claves '...'`, que la inyecta sin escribirla en disco. En un Mac sin acceso a
+   Bitwarden, dejarla en `~/.config/play/jjrmobileapps.json`. La clave nunca debe entrar en el
+   repositorio ni subirse a ningún otro sitio.
 
 Hasta que estos seis pasos estén hechos, ningún comando de `fastlane` de más abajo tiene
 credenciales con las que autenticarse.
