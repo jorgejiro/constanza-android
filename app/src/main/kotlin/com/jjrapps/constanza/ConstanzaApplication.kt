@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.WorkManager
 import com.jjrapps.constanza.scheduling.DayReviewAlarmScheduler
+import com.jjrapps.constanza.scheduling.MorningRecapAlarmScheduler
 import com.jjrapps.constanza.scheduling.WeeklyRecapAlarmScheduler
 import com.jjrapps.constanza.scheduling.WorkScheduler
 import dagger.hilt.android.HiltAndroidApp
@@ -30,6 +31,8 @@ class ConstanzaApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var weeklyRecapAlarmScheduler: WeeklyRecapAlarmScheduler
 
+    @Inject lateinit var morningRecapAlarmScheduler: MorningRecapAlarmScheduler
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
 
@@ -52,6 +55,8 @@ class ConstanzaApplication : Application(), Configuration.Provider {
         // rule objects to. Application has no lifecycleScope/viewModelScope of its own to reuse
         // (unlike that observer), so a bare CoroutineScope(Job()) stands in for one.
         CoroutineScope(Job()).launch { dayReviewAlarmScheduler.scheduleNext() }
+        // day-review-and-morning-recap: same shape as the day review — its time is a DataStore read.
+        CoroutineScope(Job()).launch { morningRecapAlarmScheduler.scheduleNext() }
         // weekly-recap: AlarmManager like the day review, but no DataStore read, so no coroutine.
         weeklyRecapAlarmScheduler.scheduleNext()
     }

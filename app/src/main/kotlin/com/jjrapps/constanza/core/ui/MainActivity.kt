@@ -128,6 +128,9 @@ class MainActivity : ComponentActivity() {
         /** weekly-recap: the recap notification's content intent carries the week's Monday as an
          *  ISO date under this key; its presence alone means "open that week's recap". */
         const val EXTRA_WEEKLY_RECAP_WEEK_START = "com.jjrapps.constanza.EXTRA_WEEKLY_RECAP_WEEK_START"
+
+        /** day-review-and-morning-recap: the ISO local date the morning recap's tap opens on Today. */
+        const val EXTRA_DAY_RECAP_DATE = "com.jjrapps.constanza.EXTRA_DAY_RECAP_DATE"
     }
 }
 

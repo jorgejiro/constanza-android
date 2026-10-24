@@ -24,7 +24,8 @@ private const val TAG = "RescheduleReceivers"
  * below. All five triggers (task 4a.4's three plus [ExactAlarmPermissionReceiver]) converge on the
  * same idempotent entry points, [OccurrencePlanner.replanAll],
  * [DayReviewAlarmScheduler.scheduleNext] (day-review-exact-alarm) and
- * [WeeklyRecapAlarmScheduler.scheduleNext] (weekly-recap) — `goAsync()` keeps the broadcast alive
+ * [WeeklyRecapAlarmScheduler.scheduleNext] (weekly-recap) and
+ * [MorningRecapAlarmScheduler.scheduleNext] (day-review-and-morning-recap) — `goAsync()` keeps the broadcast alive
  * past `onReceive()`'s ~10s budget while they run, each as its own [replanStep].
  *
  * [dayReviewAlarmScheduler] joined this function, rather than each receiver pasting a second call
@@ -46,6 +47,7 @@ private fun BroadcastReceiver.replanAsync(
     planner: OccurrencePlanner,
     dayReviewAlarmScheduler: DayReviewAlarmScheduler,
     weeklyRecapAlarmScheduler: WeeklyRecapAlarmScheduler,
+    morningRecapAlarmScheduler: MorningRecapAlarmScheduler,
 ) {
     val pendingResult = goAsync()
     CoroutineScope(Dispatchers.IO).launch {
@@ -53,6 +55,7 @@ private fun BroadcastReceiver.replanAsync(
             replanStep("reminder occurrences") { planner.replanAll() }
             replanStep("day review alarm") { dayReviewAlarmScheduler.scheduleNext() }
             replanStep("weekly recap alarm") { weeklyRecapAlarmScheduler.scheduleNext() }
+            replanStep("morning recap alarm") { morningRecapAlarmScheduler.scheduleNext() }
         } finally {
             pendingResult.finish()
         }
@@ -98,9 +101,12 @@ class BootReceiver : BroadcastReceiver() {
 
     @Inject lateinit var weeklyRecapAlarmScheduler: WeeklyRecapAlarmScheduler
 
+
+    @Inject lateinit var morningRecapAlarmScheduler: MorningRecapAlarmScheduler
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
-        replanAsync(occurrencePlanner, dayReviewAlarmScheduler, weeklyRecapAlarmScheduler)
+        replanAsync(occurrencePlanner, dayReviewAlarmScheduler, weeklyRecapAlarmScheduler, morningRecapAlarmScheduler)
     }
 }
 
@@ -114,9 +120,12 @@ class PackageReplacedReceiver : BroadcastReceiver() {
 
     @Inject lateinit var weeklyRecapAlarmScheduler: WeeklyRecapAlarmScheduler
 
+
+    @Inject lateinit var morningRecapAlarmScheduler: MorningRecapAlarmScheduler
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
-        replanAsync(occurrencePlanner, dayReviewAlarmScheduler, weeklyRecapAlarmScheduler)
+        replanAsync(occurrencePlanner, dayReviewAlarmScheduler, weeklyRecapAlarmScheduler, morningRecapAlarmScheduler)
     }
 }
 
@@ -135,9 +144,12 @@ class TimeChangeReceiver : BroadcastReceiver() {
 
     @Inject lateinit var weeklyRecapAlarmScheduler: WeeklyRecapAlarmScheduler
 
+
+    @Inject lateinit var morningRecapAlarmScheduler: MorningRecapAlarmScheduler
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action !in ALLOWED_ACTIONS) return
-        replanAsync(occurrencePlanner, dayReviewAlarmScheduler, weeklyRecapAlarmScheduler)
+        replanAsync(occurrencePlanner, dayReviewAlarmScheduler, weeklyRecapAlarmScheduler, morningRecapAlarmScheduler)
         if (intent.action == Intent.ACTION_DATE_CHANGED) enqueueMidnightSweep(context)
     }
 
@@ -183,8 +195,11 @@ class ExactAlarmPermissionReceiver : BroadcastReceiver() {
 
     @Inject lateinit var weeklyRecapAlarmScheduler: WeeklyRecapAlarmScheduler
 
+
+    @Inject lateinit var morningRecapAlarmScheduler: MorningRecapAlarmScheduler
+
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED) return
-        replanAsync(occurrencePlanner, dayReviewAlarmScheduler, weeklyRecapAlarmScheduler)
+        replanAsync(occurrencePlanner, dayReviewAlarmScheduler, weeklyRecapAlarmScheduler, morningRecapAlarmScheduler)
     }
 }
