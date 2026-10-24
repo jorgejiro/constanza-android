@@ -67,7 +67,7 @@ fun TodayRoute(
         onNotificationPermissionRequested = viewModel::recordNotificationPermissionRequested,
         onPreviousDay = viewModel::showPreviousDay,
         onNextDay = viewModel::showNextDay,
-        onToday = viewModel::showToday,
+        onToday = { viewModel.showDay() },
     )
 }
 

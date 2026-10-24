@@ -33,7 +33,7 @@ Un día que no contestas no desaparece: a medianoche, cualquier hueco sin respon
 
 Los recordatorios sobreviven a un reinicio del teléfono y a un cambio de hora o de zona horaria: no hace falta volver a abrir la app para que sigan sonando. Si tu teléfono no concede el permiso de alarmas exactas por defecto, Constanza te avisa sin bloquear nada y te lleva al ajuste; si prefieres no concedérselo, los recordatorios igualmente siguen llegando, solo que pueden hacerlo con algunos minutos de margen.
 
-Cada noche, a las 23:00 por defecto, un aviso de repaso te recuerda lo que quedó pendiente ese día -o solo si de verdad quedó algo, si así lo prefieres-. Y en Ajustes puedes cambiar cuánto dura un aplazamiento, elegir el idioma (siguiendo al sistema, español o inglés), y exportar o importar todos tus datos como un archivo, con el selector de archivos del propio sistema: es tu copia, no la nuestra.
+A las 23:30 por defecto, si queda algo sin responder, un aviso de repaso te lo recuerda antes de que termine el día; y a las 7:00, otro te cuenta cómo fue el día anterior y te lleva a su lista. Y en Ajustes puedes cambiar cuánto dura un aplazamiento, elegir el idioma (siguiendo al sistema, español o inglés), y exportar o importar todos tus datos como un archivo, con el selector de archivos del propio sistema: es tu copia, no la nuestra.
 
 La interfaz es oscura siempre, sin modo claro. No es un olvido: el fondo es deliberadamente neutro para que el único color de la pantalla sea el que tú le has puesto a cada hábito.
 
@@ -60,7 +60,7 @@ A day you do not answer does not disappear: at midnight, any slot left unanswere
 
 Reminders survive a phone reboot and a time or timezone change: you do not need to reopen the app to keep them firing. If your phone does not grant the exact-alarm permission by default, Constanza tells you without blocking anything and takes you to the setting; if you would rather not grant it, reminders still arrive, just with a few minutes of slack.
 
-Every night, at 23:00 by default, a review notification reminds you what is still open that day -or only when something actually is, if you would rather set it that way. And in Settings you can change how long a snooze lasts, pick the language (following the system, English or Spanish), and export or import all your data as a file, through the system's own file picker: it is your copy, not ours.
+At 23:30 by default, if something is still unanswered, a review notification reminds you before the day closes; and at 7:00, another one tells you how yesterday went and opens its list. And in Settings you can change how long a snooze lasts, pick the language (following the system, English or Spanish), and export or import all your data as a file, through the system's own file picker: it is your copy, not ours.
 
 The interface is dark, always, with no light mode. That is not an oversight: the background is deliberately neutral so the only colour on screen is the one you gave each habit.
 

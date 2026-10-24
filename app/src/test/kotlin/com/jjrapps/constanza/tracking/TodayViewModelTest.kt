@@ -534,11 +534,43 @@ class TodayViewModelTest {
         assertEquals(YESTERDAY, viewModel.uiState.value.date)
     }
 
-    /** today-past-day-correction, task 2.4 / design.md decision 1, invariant 3. [showToday] sets
+    /** day-review-and-morning-recap: the morning recap's tap opens Today straight on the day it
+     *  recaps, however many days back that is. */
+    @Test
+    fun `showDay with a past date lands on that date off the live edge`() = runTest {
+        val twoDaysAgo = YESTERDAY.minusDays(1)
+        val viewModel = buildViewModel(
+            entriesByDate = mapOf(TODAY to emptyList(), YESTERDAY to emptyList(), twoDaysAgo to emptyList()),
+        )
+        viewModel.uiState.first { it.rows.isNotEmpty() }
+
+        viewModel.showDay(twoDaysAgo)
+
+        val state = viewModel.uiState.first { it.date == twoDaysAgo }
+        assertTrue(state.isPastDay)
+    }
+
+    /** A date at or past the clock never pins a future view: it re-attaches to the live edge. */
+    @Test
+    fun `showDay with today or a later date returns to the live edge`() = runTest {
+        val viewModel = buildViewModel(
+            entriesByDate = mapOf(TODAY to emptyList(), YESTERDAY to emptyList(), TOMORROW to emptyList()),
+        )
+        viewModel.uiState.first { it.rows.isNotEmpty() }
+        viewModel.showPreviousDay()
+        viewModel.uiState.first { it.date == YESTERDAY }
+
+        viewModel.showDay(TOMORROW)
+
+        val state = viewModel.uiState.first { it.date == TODAY }
+        assertTrue(state.isPastDay.not())
+    }
+
+    /** today-past-day-correction, task 2.4 / design.md decision 1, invariant 3. [showDay] with no date sets
      *  `navigated = null`, which re-attaches [TodayDate.viewed] to whatever [TodayDate.clock]
      *  CURRENTLY is — a date change that happened while away must be caught up, not ignored. */
     @Test
-    fun `showToday after a tick that fired while away lands on the new clock date`() = runTest {
+    fun `showDay with no date after a tick that fired while away lands on the new clock date`() = runTest {
         val currentDateSource = FakeCurrentDateSource(TODAY)
         val viewModel = buildViewModel(
             currentDateSource = currentDateSource,
@@ -550,7 +582,7 @@ class TodayViewModelTest {
         viewModel.uiState.first { it.date == YESTERDAY }
 
         currentDateSource.advanceTo(TOMORROW)
-        viewModel.showToday()
+        viewModel.showDay()
 
         assertEquals(TOMORROW, viewModel.uiState.value.date)
     }
@@ -685,7 +717,7 @@ class TodayViewModelTest {
         viewModel.showPreviousDay()
         assertTrue(viewModel.uiState.first { it.date == YESTERDAY }.isPastDay)
 
-        viewModel.showToday()
+        viewModel.showDay()
         assertTrue(viewModel.uiState.first { it.date == TODAY }.isPastDay.not())
     }
 

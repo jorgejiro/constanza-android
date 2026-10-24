@@ -8,7 +8,7 @@ Un día que no contestas no desaparece: a medianoche, cualquier hueco sin respon
 
 Los recordatorios sobreviven a un reinicio del teléfono y a un cambio de hora o de zona horaria: no hace falta volver a abrir la app para que sigan sonando. Si tu teléfono no concede el permiso de alarmas exactas por defecto, Constanza te avisa sin bloquear nada y te lleva al ajuste; si prefieres no concedérselo, los recordatorios igualmente siguen llegando, solo que pueden hacerlo con algunos minutos de margen.
 
-Cada noche, a las 23:00 por defecto, un aviso de repaso te recuerda lo que quedó pendiente ese día -o solo si de verdad quedó algo, si así lo prefieres-. Y en Ajustes puedes cambiar cuánto dura un aplazamiento, elegir el idioma (siguiendo al sistema, español o inglés), y exportar o importar todos tus datos como un archivo, con el selector de archivos del propio sistema: es tu copia, no la nuestra.
+A las 23:30 por defecto, si queda algo sin responder, un aviso de repaso te lo recuerda antes de que termine el día; y a las 7:00, otro te cuenta cómo fue el día anterior y te lleva a su lista. Y en Ajustes puedes cambiar cuánto dura un aplazamiento, elegir el idioma (siguiendo al sistema, español o inglés), y exportar o importar todos tus datos como un archivo, con el selector de archivos del propio sistema: es tu copia, no la nuestra.
 
 La interfaz es oscura siempre, sin modo claro. No es un olvido: el fondo es deliberadamente neutro para que el único color de la pantalla sea el que tú le has puesto a cada hábito.
 

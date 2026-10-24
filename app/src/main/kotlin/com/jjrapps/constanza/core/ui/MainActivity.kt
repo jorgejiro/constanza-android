@@ -33,6 +33,7 @@ import com.jjrapps.constanza.tracking.TodayRoute
 import com.jjrapps.constanza.tracking.TodayViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.LocalDate
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -79,6 +80,10 @@ class MainActivity : ComponentActivity() {
     private var weeklyRecapRequest by mutableStateOf<WeeklyRecapRequest?>(null)
     private var tapCount = 0
 
+    /** day-review-and-morning-recap: the latest morning-recap tap, carrying the date to open on
+     *  Today; [tapCount] keeps two taps on the same date distinct, as for [weeklyRecapRequest]. */
+    private var dayRecapRequest by mutableStateOf<DayRecapRequest?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Pins both system bars to dark-background icon style regardless of the device's
@@ -89,10 +94,17 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(AndroidColor.TRANSPARENT),
         )
         lifecycle.addObserver(replanOnResumeObserver)
-        if (savedInstanceState == null) readWeeklyRecapTap(intent)
+        if (savedInstanceState == null) {
+            readWeeklyRecapTap(intent)
+            readDayRecapTap(intent)
+        }
         setContent {
             ConstanzaTheme {
-                FirstRunGate(resetToTodaySignal = resetToTodaySignal, weeklyRecapRequest = weeklyRecapRequest)
+                FirstRunGate(
+                    resetToTodaySignal = resetToTodaySignal,
+                    weeklyRecapRequest = weeklyRecapRequest,
+                    dayRecapRequest = dayRecapRequest,
+                )
             }
         }
     }
@@ -111,11 +123,17 @@ class MainActivity : ComponentActivity() {
             resetToTodaySignal++
         }
         readWeeklyRecapTap(intent)
+        readDayRecapTap(intent)
     }
 
     private fun readWeeklyRecapTap(intent: Intent) {
         val weekStart = intent.getStringExtra(EXTRA_WEEKLY_RECAP_WEEK_START) ?: return
         weeklyRecapRequest = WeeklyRecapRequest(weekStart, ++tapCount)
+    }
+
+    private fun readDayRecapTap(intent: Intent) {
+        val date = intent.getStringExtra(EXTRA_DAY_RECAP_DATE) ?: return
+        dayRecapRequest = DayRecapRequest(date, ++tapCount)
     }
 
     companion object {
@@ -136,6 +154,8 @@ class MainActivity : ComponentActivity() {
 
 /** weekly-recap: one recap-notification tap — the week to open, and which tap this is. */
 internal data class WeeklyRecapRequest(val weekStart: String, val tap: Int)
+
+internal data class DayRecapRequest(val date: String, val tap: Int)
 
 /**
  * Task 6a's navigation decision: no navigation library. A list plus one editor is small enough
@@ -196,24 +216,21 @@ private sealed interface ConstanzaRoute : java.io.Serializable {
  *  Today screen recomposes. [TodayViewModel] is only obtained here, via [hiltViewModel], once a
  *  tap has actually happened (`resetToTodaySignal > 0`) — never unconditionally — so a session
  *  that never taps a notification never constructs it a moment earlier than [TodayRoute] itself
- *  would have. */
+ *  would have. [dayRecapRequest] (day-review-and-morning-recap) does the same for a morning-recap
+ *  tap, landing on the date the recap is about instead of the live edge. */
 @Composable
 private fun ConstanzaApp(
     startRoute: ConstanzaRoute = ConstanzaRoute.Today,
     resetToTodaySignal: Int = 0,
     weeklyRecapRequest: WeeklyRecapRequest? = null,
+    dayRecapRequest: DayRecapRequest? = null,
 ) {
     var route by rememberSaveable { mutableStateOf(startRoute) }
     LaunchedEffect(weeklyRecapRequest) {
         weeklyRecapRequest?.let { route = ConstanzaRoute.WeeklyRecap(it.weekStart) }
     }
-    if (resetToTodaySignal > 0) {
-        val todayViewModel: TodayViewModel = hiltViewModel()
-        LaunchedEffect(resetToTodaySignal) {
-            route = ConstanzaRoute.Today
-            todayViewModel.showToday()
-        }
-    }
+    if (resetToTodaySignal > 0) OpenTodayEffect(resetToTodaySignal, date = null) { route = ConstanzaRoute.Today }
+    dayRecapRequest?.let { OpenTodayEffect(it, LocalDate.parse(it.date)) { route = ConstanzaRoute.Today } }
     when (val current = route) {
         is ConstanzaRoute.Today -> TodayRoute(
             onManageHabits = { route = ConstanzaRoute.HabitList },
@@ -293,6 +310,20 @@ private fun ConstanzaApp(
  * starts the upstream read when this ViewModel is constructed, not when the first collector
  * subscribes, so the read is already in flight while Compose does its first layout pass.
  */
+/** A notification tap that lands on Today: each new [key] sets the route through [onLandOnToday]
+ *  and moves the Activity-scoped [TodayViewModel] to [date] — the live edge when `null`
+ *  ([resetToTodaySignal][ConstanzaApp]), or the morning recap's day. Its own composable so the
+ *  [TodayViewModel] is still obtained only once a tap has happened, as [ConstanzaApp]'s KDoc
+ *  requires. */
+@Composable
+private fun OpenTodayEffect(key: Any, date: LocalDate?, onLandOnToday: () -> Unit) {
+    val todayViewModel: TodayViewModel = hiltViewModel()
+    LaunchedEffect(key) {
+        onLandOnToday()
+        todayViewModel.showDay(date)
+    }
+}
+
 @HiltViewModel
 internal class FirstRunGateViewModel @Inject constructor(
     settingsStore: ReminderSettingsStore,
@@ -340,6 +371,7 @@ private fun FirstRunGate(
     viewModel: FirstRunGateViewModel = hiltViewModel(),
     resetToTodaySignal: Int = 0,
     weeklyRecapRequest: WeeklyRecapRequest? = null,
+    dayRecapRequest: DayRecapRequest? = null,
 ) {
     val startupState by viewModel.startupState.collectAsState()
     // Write-once. Set synchronously inside onFinished, BEFORE the flag write is requested
@@ -358,6 +390,7 @@ private fun FirstRunGate(
                     startRoute = startRoute,
                     resetToTodaySignal = resetToTodaySignal,
                     weeklyRecapRequest = weeklyRecapRequest,
+                    dayRecapRequest = dayRecapRequest,
                 )
             } else {
                 OnboardingRoute(
