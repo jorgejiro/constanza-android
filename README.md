@@ -248,6 +248,7 @@ and API 37 emulators that Gradle provisions itself — no phone required.
 - [Feature specs](openspec/specs/)
 - [Google Play listing texts](docs/play-store-publication-texts.md)
 - [Play release notes](docs/play-release-notes.md)
+- [Building and publishing a release](docs/release-process.md) (Spanish): new-Mac setup, secrets, GitHub, Google Play and F-Droid
 
 ---
 

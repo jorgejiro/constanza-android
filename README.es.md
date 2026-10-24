@@ -237,6 +237,7 @@ emuladores API 31 y API 37 que el propio Gradle provisiona — no hace falta nin
 - [Especificaciones de funcionalidades](openspec/specs/)
 - [Textos de la ficha de Google Play](docs/play-store-publication-texts.md)
 - [Notas de la versión para Play](docs/play-release-notes.md)
+- [Compilar y publicar una versión](docs/release-process.md): preparar un Mac, claves, GitHub, Google Play y F-Droid
 
 ---
 
