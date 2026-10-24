@@ -56,6 +56,7 @@ fun UiDevice.tapAllowOnTheSystemPermissionDialog() {
     waitForIdle()
     val deadline = System.currentTimeMillis() + DIALOG_TIMEOUT_MS
     while (System.currentTimeMillis() < deadline) {
+        dismissSystemAnrDialogs()
         val button = ALLOW_BUTTON_IDS.firstNotNullOfOrNull { id -> findObject(By.res(id)) }
             ?: findObject(By.text(ALLOW_BUTTON_TEXT).clickable(true))
         if (button != null) {
@@ -84,6 +85,7 @@ fun UiDevice.tapDenyOnTheSystemPermissionDialog() {
     waitForIdle()
     val deadline = System.currentTimeMillis() + DIALOG_TIMEOUT_MS
     while (System.currentTimeMillis() < deadline) {
+        dismissSystemAnrDialogs()
         val button = DENY_BUTTON_IDS.firstNotNullOfOrNull { id -> findObject(By.res(id)) }
             ?: findObject(By.text(DENY_BUTTON_TEXT).clickable(true))
         if (button != null) {

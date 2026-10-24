@@ -350,6 +350,7 @@ class CoreFlowE2ETest {
         // finished it, so a user who came to manage a habit had the app close on them instead of
         // returning to Today. This test is already standing on the list with an onboarded app, so
         // the proof costs one keypress rather than another launch.
+        device.dismissSystemAnrDialogs()
         device.pressBack()
         awaitText(string(R.string.today_title))
 
