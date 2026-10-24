@@ -15,7 +15,9 @@ private fun row(id: Long, vararg statuses: EntryStatus) = TodayHabitRow(
     habitName = "Habit $id",
     dayStatus = DayStatus.PENDING,
     colorArgb = 0,
-    slots = statuses.map { TodaySlot(slotId = null, minuteOfDay = null, status = it, occurrenceId = null, snoozedUntilEpochMs = null) },
+    slots = statuses.map {
+        TodaySlot(slotId = null, minuteOfDay = null, status = it, occurrenceId = null, snoozedUntilEpochMs = null)
+    },
 )
 
 class MorningRecapSummaryTest {
