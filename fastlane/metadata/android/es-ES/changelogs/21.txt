@@ -1,0 +1,7 @@
+Constanza 1.2.0: un buen día empieza repasando el anterior.
+
+• Cada mañana a las 7:00, un aviso con el % de hábitos cumplidos ayer. Tócalo y verás la lista de ese día.
+• El aviso de la noche llega a las 23:30 y solo si queda algo sin responder.
+• Ambos se pueden desactivar o cambiar de hora en Ajustes.
+
+Sin cuentas, sin nube, sin anuncios, sin seguimiento.
