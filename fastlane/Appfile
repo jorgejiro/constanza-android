@@ -5,14 +5,14 @@ package_name("com.jjrapps.constanza")
 #
 # 1. ANDROID_CONSTANZA_JSON_KEY — the JSON content itself, as Bitwarden Secrets Manager injects it:
 #    `con-claves 'fastlane subir'`. Nothing is written to disk.
-# 2. A file: SUPPLY_JSON_KEY if set, else ~/.config/play/jjrmobileapps.json.
+# 2. The file ~/.config/play/jjrmobileapps.json, for a Mac without Bitwarden access.
 #
-# Leave SUPPLY_JSON_KEY unset when using the Bitwarden key: supply reads that variable on its own,
-# and when both are present it silently prefers the file over the key data (its conflicting-options
-# check only covers options passed to the action, so no error is raised).
+# Do not define SUPPLY_JSON_KEY (the key's former name): supply reads that variable on its own, and
+# when it is present it silently wins over the Bitwarden key (its conflicting-options check only
+# covers options passed to the action, so no error is raised).
 play_key_json = ENV["ANDROID_CONSTANZA_JSON_KEY"].to_s
 if play_key_json.strip.empty?
-  json_key_file(ENV["SUPPLY_JSON_KEY"] || File.expand_path("~/.config/play/jjrmobileapps.json"))
+  json_key_file(File.expand_path("~/.config/play/jjrmobileapps.json"))
 else
   json_key_data_raw(play_key_json)
 end
