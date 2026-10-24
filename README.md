@@ -84,8 +84,8 @@ For each habit: the current streak, the best streak, and the compliance percenta
 
 ### 🌙 A nightly review, on your terms
 
-Every night, at 23:00 by default, a review notification reminds you what is still open that
-day — or only when something actually is, if you would rather set it that way.
+At 23:30 by default, if something is still unanswered, a review notification reminds you what
+is still open that day. You can move it, have it fire every night, or switch it off in Settings.
 
 ### 💾 Your data, your file
 

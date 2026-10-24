@@ -8,6 +8,7 @@ import org.junit.rules.TemporaryFolder
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 private const val DAY_REVIEW_SETTINGS_FILE_NAME = "day_review_settings_test.preferences_pb"
 
@@ -31,8 +32,31 @@ class DayReviewSettingsStoreTest {
     }
 
     @Test
-    fun `default review mode is fires-every-night before any setting is written`() = runBlocking {
+    fun `default review mode is DEFAULT_REVIEW_FIRES_EVERY_NIGHT before any setting is written`() = runBlocking {
         assertEquals(DEFAULT_REVIEW_FIRES_EVERY_NIGHT, newStore().currentReviewFiresEveryNight())
+    }
+
+    @Test
+    fun `the default review time is 23-30 and the default mode only fires when something is unanswered`() =
+        runBlocking {
+            val store = newStore()
+
+            assertEquals(23 * 60 + 30, store.currentReviewTimeMinuteOfDay())
+            assertFalse(store.currentReviewFiresEveryNight())
+        }
+
+    @Test
+    fun `the day review is enabled by default`() = runBlocking {
+        assertTrue(newStore().currentReviewEnabled())
+    }
+
+    @Test
+    fun `setReviewEnabled persists and is read back by currentReviewEnabled`() = runBlocking {
+        val store = newStore()
+
+        store.setReviewEnabled(false)
+
+        assertFalse(store.currentReviewEnabled())
     }
 
     @Test

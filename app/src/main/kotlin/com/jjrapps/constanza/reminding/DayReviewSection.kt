@@ -18,6 +18,7 @@ import com.jjrapps.constanza.R
 import com.jjrapps.constanza.core.ui.component.SectionHeader
 import com.jjrapps.constanza.core.ui.component.SettingsNavigationRow
 import com.jjrapps.constanza.core.ui.component.SettingsRowDivider
+import com.jjrapps.constanza.core.ui.component.SettingsSwitchRow
 import com.jjrapps.constanza.core.ui.component.SingleChoiceDialog
 import com.jjrapps.constanza.core.ui.theme.ConstanzaColors
 import com.jjrapps.constanza.core.ui.theme.Spacing
@@ -37,6 +38,7 @@ fun DayReviewSection(viewModel: DayReviewSettingsViewModel = hiltViewModel()) {
         uiState = uiState,
         onReviewTimeChange = viewModel::setReviewTimeMinuteOfDay,
         onFiresEveryNightChange = viewModel::setReviewFiresEveryNight,
+        onEnabledChange = viewModel::setReviewEnabled,
     )
 }
 
@@ -45,6 +47,11 @@ fun DayReviewSection(viewModel: DayReviewSettingsViewModel = hiltViewModel()) {
  * [com.jjrapps.constanza.localization.LanguageSectionContent]'s own reasoning: it takes state and
  * callbacks and owns none itself (beyond whether its dialog is open), so a Compose test can drive it
  * with `createComposeRule()` and no Hilt-enabled Activity.
+ *
+ * day-review-and-morning-recap: a [SettingsSwitchRow] leads the section and turns the whole review
+ * on or off. While it is off the time and mode rows are not drawn at all — they configure a
+ * notification that will not post, and [SettingsNavigationRow]/[ReminderTimeField] have no disabled
+ * look to offer instead.
  *
  * Graphite redesign: two list rows. "Review time" is [ReminderTimeField], the app's one
  * time-of-day control (label left, time right). "When to notify" shows the current mode as its
@@ -66,33 +73,19 @@ fun DayReviewSectionContent(
     uiState: DayReviewSettingsUiState,
     onReviewTimeChange: (Int) -> Unit,
     onFiresEveryNightChange: (Boolean) -> Unit,
+    onEnabledChange: (Boolean) -> Unit,
 ) {
     var showModeDialog by rememberSaveable { mutableStateOf(false) }
     Column {
         SectionHeader(stringResource(R.string.settings_day_review_section_title))
-        ReminderTimeField(
-            minuteOfDay = uiState.reviewTimeMinuteOfDay,
-            onMinuteOfDayChange = onReviewTimeChange,
-            label = stringResource(R.string.settings_day_review_time_label),
-            modifier = Modifier.padding(horizontal = Spacing.lg),
-        )
-        val timeFormat = rememberTimeOfDayFormat()
-        Text(
-            stringResource(
-                R.string.settings_day_review_time_supporting,
-                timeFormat.format(REVIEW_TIME_LATEST_MINUTE_OF_DAY),
-            ),
-            style = MaterialTheme.typography.bodySmall,
-            color = ConstanzaColors.OnBackgroundMuted,
-            modifier = Modifier.padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.md),
+        SettingsSwitchRow(
+            title = stringResource(R.string.settings_day_review_toggle),
+            subtitle = stringResource(R.string.settings_day_review_toggle_supporting),
+            checked = uiState.reviewEnabled,
+            onCheckedChange = onEnabledChange,
         )
         SettingsRowDivider()
-        SettingsNavigationRow(
-            title = stringResource(R.string.settings_day_review_mode_label),
-            subtitle = stringResource(modeLabelRes(uiState.reviewFiresEveryNight)),
-            onClick = { showModeDialog = true },
-        )
-        SettingsRowDivider()
+        if (uiState.reviewEnabled) DayReviewOptionRows(uiState, onReviewTimeChange) { showModeDialog = true }
     }
     if (showModeDialog) {
         SingleChoiceDialog(
@@ -106,6 +99,38 @@ fun DayReviewSectionContent(
             onDismiss = { showModeDialog = false },
         )
     }
+}
+
+/** The time and mode rows, drawn only while the review is enabled. */
+@Composable
+private fun DayReviewOptionRows(
+    uiState: DayReviewSettingsUiState,
+    onReviewTimeChange: (Int) -> Unit,
+    onOpenModeDialog: () -> Unit,
+) {
+    ReminderTimeField(
+        minuteOfDay = uiState.reviewTimeMinuteOfDay,
+        onMinuteOfDayChange = onReviewTimeChange,
+        label = stringResource(R.string.settings_day_review_time_label),
+        modifier = Modifier.padding(horizontal = Spacing.lg),
+    )
+    val timeFormat = rememberTimeOfDayFormat()
+    Text(
+        stringResource(
+            R.string.settings_day_review_time_supporting,
+            timeFormat.format(REVIEW_TIME_LATEST_MINUTE_OF_DAY),
+        ),
+        style = MaterialTheme.typography.bodySmall,
+        color = ConstanzaColors.OnBackgroundMuted,
+        modifier = Modifier.padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.md),
+    )
+    SettingsRowDivider()
+    SettingsNavigationRow(
+        title = stringResource(R.string.settings_day_review_mode_label),
+        subtitle = stringResource(modeLabelRes(uiState.reviewFiresEveryNight)),
+        onClick = onOpenModeDialog,
+    )
+    SettingsRowDivider()
 }
 
 @StringRes

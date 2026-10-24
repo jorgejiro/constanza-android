@@ -48,6 +48,10 @@ data class DayReviewComponents @Inject constructor(
  * moment has passed" — so the chain continues exactly as if the notification had posted, via the
  * unconditional [DayReviewAlarmScheduler.scheduleNext] call below.
  *
+ * **The on/off switch** ([DayReviewSettingsStore.currentReviewEnabled], day-review-and-morning-recap)
+ * gates only the post: a disabled review still re-arms its successor, so switching it back on needs
+ * no reschedule.
+ *
  * **The "nothing due at all" rule**, also carried over unchanged: [decideDayReview] treats an empty
  * [DayHabitRowsAssembler.rowsFor] result as "nothing to review" in both
  * [DayReviewSettingsStore.currentReviewFiresEveryNight] modes.
@@ -71,7 +75,7 @@ class DayReviewFireWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         val scheduledDate = inputData.getString(KEY_SCHEDULED_DATE)?.let(LocalDate::parse)
             ?: timeProvider.today()
-        if (timeProvider.today() == scheduledDate) {
+        if (timeProvider.today() == scheduledDate && components.settingsStore.currentReviewEnabled()) {
             val rows = components.rowsAssembler.rowsFor(scheduledDate)
             val firesEveryNight = components.settingsStore.currentReviewFiresEveryNight()
             when (val decision = decideDayReview(rows, firesEveryNight)) {

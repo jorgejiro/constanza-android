@@ -86,8 +86,9 @@ Para cada hábito: la racha actual, la mejor racha y el porcentaje de cumplimien
 
 ### 🌙 Un repaso nocturno, a tu manera
 
-Cada noche, a las 23:00 por defecto, un aviso de repaso te recuerda lo que quedó pendiente ese
-día — o solo si de verdad quedó algo, si así lo prefieres.
+A las 23:30 por defecto, si queda algo sin responder, un aviso de repaso te recuerda lo que
+quedó pendiente ese día. En Ajustes puedes cambiar la hora, hacer que avise todas las noches o
+desactivarlo.
 
 ### 💾 Tus datos, tu archivo
 
