@@ -50,12 +50,17 @@ class DayReviewSettingsViewModelTest {
     fun `uiState reflects a non-default value already held by the store`() = runTest {
         val (viewModel, _, _) = newViewModel(
             reviewTimeMinuteOfDay = 20 * 60,
-            reviewFiresEveryNight = false,
+            reviewFiresEveryNight = true,
+            reviewEnabled = false,
         )
 
         viewModel.uiState.test {
             assertEquals(
-                DayReviewSettingsUiState(reviewTimeMinuteOfDay = 20 * 60, reviewFiresEveryNight = false),
+                DayReviewSettingsUiState(
+                    reviewTimeMinuteOfDay = 20 * 60,
+                    reviewFiresEveryNight = true,
+                    reviewEnabled = false,
+                ),
                 awaitItem(),
             )
         }
@@ -92,13 +97,25 @@ class DayReviewSettingsViewModelTest {
         coVerify(exactly = 0) { dayReviewAlarmScheduler.scheduleNext() }
     }
 
+    @Test
+    fun `setReviewEnabled writes to the store without touching the scheduler`() = runTest {
+        val (viewModel, settingsStore, dayReviewAlarmScheduler) = newViewModel()
+
+        viewModel.setReviewEnabled(false)
+
+        coVerify { settingsStore.setReviewEnabled(false) }
+        coVerify(exactly = 0) { dayReviewAlarmScheduler.scheduleNext() }
+    }
+
     private fun newViewModel(
         reviewTimeMinuteOfDay: Int = DEFAULT_REVIEW_TIME_MINUTE_OF_DAY,
         reviewFiresEveryNight: Boolean = DEFAULT_REVIEW_FIRES_EVERY_NIGHT,
+        reviewEnabled: Boolean = DEFAULT_REVIEW_ENABLED,
     ): Triple<DayReviewSettingsViewModel, DayReviewSettingsStore, DayReviewAlarmScheduler> {
         val settingsStore = mockk<DayReviewSettingsStore>(relaxUnitFun = true) {
             every { this@mockk.reviewTimeMinuteOfDay } returns MutableStateFlow(reviewTimeMinuteOfDay)
             every { this@mockk.reviewFiresEveryNight } returns MutableStateFlow(reviewFiresEveryNight)
+            every { this@mockk.reviewEnabled } returns MutableStateFlow(reviewEnabled)
         }
         val dayReviewAlarmScheduler = mockk<DayReviewAlarmScheduler>(relaxUnitFun = true)
         val viewModel = DayReviewSettingsViewModel(settingsStore, dayReviewAlarmScheduler)

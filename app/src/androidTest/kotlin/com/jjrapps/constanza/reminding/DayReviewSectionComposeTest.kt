@@ -3,6 +3,8 @@ package com.jjrapps.constanza.reminding
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
@@ -51,6 +53,7 @@ class DayReviewSectionComposeTest {
                 uiState = DayReviewSettingsUiState(reviewFiresEveryNight = false),
                 onReviewTimeChange = {},
                 onFiresEveryNightChange = {},
+                onEnabledChange = {},
             )
         }
 
@@ -74,6 +77,7 @@ class DayReviewSectionComposeTest {
                 uiState = DayReviewSettingsUiState(reviewFiresEveryNight = false),
                 onReviewTimeChange = {},
                 onFiresEveryNightChange = { reported = it },
+                onEnabledChange = {},
             )
         }
 
@@ -92,5 +96,41 @@ class DayReviewSectionComposeTest {
 
         assertEquals(true, reported)
         inDialog(everyNightLabel).assertDoesNotExist()
+    }
+
+    @Test
+    fun theSwitchShowsTheStateAndFlipsItOnTap() {
+        val changes = mutableListOf<Boolean>()
+        composeTestRule.setContent {
+            DayReviewSectionContent(
+                uiState = DayReviewSettingsUiState(reviewEnabled = true),
+                onReviewTimeChange = {},
+                onFiresEveryNightChange = {},
+                onEnabledChange = { changes += it },
+            )
+        }
+        val row = composeTestRule.onNodeWithText(context.getString(R.string.settings_day_review_toggle), substring = true)
+
+        row.assertIsOn()
+        row.performClick()
+
+        assertEquals(listOf(false), changes)
+    }
+
+    @Test
+    fun aDisabledReviewShowsTheSwitchOffAndHidesTheTimeAndModeRows() {
+        composeTestRule.setContent {
+            DayReviewSectionContent(
+                uiState = DayReviewSettingsUiState(reviewEnabled = false),
+                onReviewTimeChange = {},
+                onFiresEveryNightChange = {},
+                onEnabledChange = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText(context.getString(R.string.settings_day_review_toggle), substring = true)
+            .assertIsOff()
+        composeTestRule.onNodeWithText(context.getString(R.string.settings_day_review_time_label)).assertDoesNotExist()
+        composeTestRule.onNodeWithText(modeLabel).assertDoesNotExist()
     }
 }

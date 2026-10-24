@@ -152,4 +152,15 @@ class DayReviewFireWorkerTest {
 
         coVerify(exactly = 0) { notificationPoster.postReview(any()) }
     }
+
+    @Test
+    fun aDisabledDayReviewPostsNothingButStillReschedulesItsSuccessor() = runBlocking {
+        database.insertHabitWithSchedule(kind = "DAILY")
+        dayReviewSettingsStore.setReviewEnabled(false)
+
+        buildWorker(scheduledDate = today).doWork()
+
+        coVerify(exactly = 0) { notificationPoster.postReview(any()) }
+        coVerify(exactly = 1) { alarmScheduler.scheduleNext() }
+    }
 }

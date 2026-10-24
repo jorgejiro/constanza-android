@@ -35,6 +35,7 @@ class DayReviewSettingsViewModel @Inject constructor(
     val uiState: StateFlow<DayReviewSettingsUiState> = combine(
         settingsStore.reviewTimeMinuteOfDay,
         settingsStore.reviewFiresEveryNight,
+        settingsStore.reviewEnabled,
         ::DayReviewSettingsUiState,
     ).stateIn(viewModelScope, SharingStarted.Eagerly, DayReviewSettingsUiState())
 
@@ -48,12 +49,18 @@ class DayReviewSettingsViewModel @Inject constructor(
     fun setReviewFiresEveryNight(fireEveryNight: Boolean) {
         viewModelScope.launch { settingsStore.setReviewFiresEveryNight(fireEveryNight) }
     }
+
+    /** Like [setReviewFiresEveryNight], decides what the fire path does, not when it runs. */
+    fun setReviewEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsStore.setReviewEnabled(enabled) }
+    }
 }
 
 /** [DayReviewSettingsViewModel.uiState]'s shape, defaulting to exactly
- *  [DayReviewSettingsStore]'s own two defaults so the very first frame — before either flow has
+ *  [DayReviewSettingsStore]'s own defaults so the very first frame — before either flow has
  *  emitted — already matches what the store itself would report. */
 data class DayReviewSettingsUiState(
     val reviewTimeMinuteOfDay: Int = DEFAULT_REVIEW_TIME_MINUTE_OF_DAY,
     val reviewFiresEveryNight: Boolean = DEFAULT_REVIEW_FIRES_EVERY_NIGHT,
+    val reviewEnabled: Boolean = DEFAULT_REVIEW_ENABLED,
 )

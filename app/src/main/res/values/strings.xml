@@ -270,6 +270,8 @@
          formatted %1$s (the device's own time format), never a fixed literal, so it can never
          disagree with what the time field itself shows. -->
     <string name="settings_day_review_section_title">Day review</string>
+    <string name="settings_day_review_toggle">Night review</string>
+    <string name="settings_day_review_toggle_supporting">If something is still unanswered, a nudge before the day closes.</string>
     <string name="settings_day_review_time_label">Review time</string>
     <string name="settings_day_review_time_supporting">No later than %1$s, so the review lands before the day closes.</string>
     <string name="settings_day_review_mode_label">When to notify</string>

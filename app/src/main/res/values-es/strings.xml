@@ -225,6 +225,8 @@
 
     <!-- day-review, slice C (day-review-notification): la sección de ajustes del repaso nocturno. -->
     <string name="settings_day_review_section_title">Repaso del día</string>
+    <string name="settings_day_review_toggle">Aviso de la noche</string>
+    <string name="settings_day_review_toggle_supporting">Si queda algo sin responder, un aviso antes de que termine el día.</string>
     <string name="settings_day_review_time_label">Hora del repaso</string>
     <string name="settings_day_review_time_supporting">No más tarde de las %1$s, para que el repaso llegue antes de que termine el día.</string>
     <string name="settings_day_review_mode_label">Cuándo avisar</string>

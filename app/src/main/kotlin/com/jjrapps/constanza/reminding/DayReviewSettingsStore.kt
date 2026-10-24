@@ -12,17 +12,16 @@ import javax.inject.Inject
 
 /**
  * day-review, slice A (day-review-data): the default time for the once-a-day "review your day"
- * notification — 23:00, as a minute-of-day. day-review-exact-alarm moved this earlier from its
- * original 23:30: the review now rides [com.jjrapps.constanza.scheduling.DayReviewAlarmScheduler]'s
- * exact alarm rather than anchored `WorkManager` work, but its degraded `setWindow` fallback
- * ([com.jjrapps.constanza.scheduling.scheduleExactOrInexact]) still has a 10-minute window, and OEM
- * background-kill/throttling can still push even an exact alarm's `WorkManager` follow-up late. A
- * WIDER margin before the midnight sweep that turns any still-`UNKNOWN` slot into `MISSED` is the
- * point now, not merely "late evening" — the sweep is still the hard boundary this default is
- * chosen against (see [REVIEW_TIME_LATEST_MINUTE_OF_DAY]), just with more room to spare against it
- * than 23:30 left. Do not move it without understanding that relationship.
+ * notification — 23:30, as a minute-of-day. day-review-exact-alarm had moved it to 23:00 for a wider
+ * margin before the midnight sweep that turns any still-`UNKNOWN` slot into `MISSED`;
+ * day-review-and-morning-recap (S1) moves it back to 23:30 at the owner's request, so a habit
+ * scheduled at 23:00 can be answered before the review asks about it. The margin that remains is
+ * the reason this is still not later: the degraded `setWindow` fallback
+ * ([com.jjrapps.constanza.scheduling.scheduleExactOrInexact]) has a 10-minute window and OEM
+ * throttling can push the `WorkManager` follow-up late, and the sweep stays the hard boundary (see
+ * [REVIEW_TIME_LATEST_MINUTE_OF_DAY]).
  */
-const val DEFAULT_REVIEW_TIME_MINUTE_OF_DAY = 23 * 60
+const val DEFAULT_REVIEW_TIME_MINUTE_OF_DAY = 23 * 60 + 30
 
 /**
  * day-review, slice A: the latest minute-of-day the review notification's time may ever be
@@ -34,12 +33,17 @@ const val DEFAULT_REVIEW_TIME_MINUTE_OF_DAY = 23 * 60
  */
 const val REVIEW_TIME_LATEST_MINUTE_OF_DAY = 23 * 60 + 45
 
-/** day-review, slice A: the default review mode — fires every night as a closing ritual, rather
- *  than only when something is still unanswered. */
-const val DEFAULT_REVIEW_FIRES_EVERY_NIGHT = true
+/** day-review, slice A: the default review mode. day-review-and-morning-recap (S3) flipped it to
+ *  `false` — fire only when something is still unanswered — since the morning recap now covers the
+ *  "how did the day go" summary. */
+const val DEFAULT_REVIEW_FIRES_EVERY_NIGHT = false
+
+/** day-review-and-morning-recap (S2): the day review is on until the owner switches it off. */
+const val DEFAULT_REVIEW_ENABLED = true
 
 /**
- * day-review's two settings (slice A, day-review-data): the once-a-day "review your day"
+ * day-review's settings (slice A, day-review-data, plus day-review-and-morning-recap's
+ * [reviewEnabled] switch): the once-a-day "review your day"
  * notification's time ([reviewTimeMinuteOfDay]/[setReviewTimeMinuteOfDay], default
  * [DEFAULT_REVIEW_TIME_MINUTE_OF_DAY]) and whether it fires every night or only when something is
  * still unanswered ([reviewFiresEveryNight]/[setReviewFiresEveryNight], default
@@ -88,7 +92,21 @@ class DayReviewSettingsStore @Inject constructor(
         dataStore.edit { it[REVIEW_FIRES_EVERY_NIGHT_KEY] = fireEveryNight }
     }
 
+    /** `false` posts no day review at all; the alarm keeps re-arming, so switching it back on needs
+     *  no reschedule — the same shape as [com.jjrapps.constanza.recap.WeeklyRecapSettingsStore]. */
+    val reviewEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[REVIEW_ENABLED_KEY] ?: DEFAULT_REVIEW_ENABLED
+    }
+
+    suspend fun currentReviewEnabled(): Boolean = reviewEnabled.first()
+
+    @Suppress("RedundantSuspendModifier")
+    suspend fun setReviewEnabled(enabled: Boolean) {
+        dataStore.edit { it[REVIEW_ENABLED_KEY] = enabled }
+    }
+
     internal companion object {
+        val REVIEW_ENABLED_KEY = booleanPreferencesKey("review_enabled")
         val REVIEW_TIME_MINUTE_OF_DAY_KEY = intPreferencesKey("review_time_minute_of_day")
         val REVIEW_FIRES_EVERY_NIGHT_KEY = booleanPreferencesKey("review_fires_every_night")
 

@@ -113,6 +113,7 @@ class GraphiteScreensRealRenderTest {
                         ),
                         onReviewTimeChange = {},
                         onFiresEveryNightChange = {},
+                        onEnabledChange = {},
                     )
                 },
                 weeklyRecap = { WeeklyRecapSectionContent(enabled = true, onEnabledChange = {}) },
