@@ -350,6 +350,7 @@ class CoreFlowE2ETest {
         // finished it, so a user who came to manage a habit had the app close on them instead of
         // returning to Today. This test is already standing on the list with an onboarded app, so
         // the proof costs one keypress rather than another launch.
+        device.dismissSystemAnrDialogs()
         device.pressBack()
         awaitText(string(R.string.today_title))
 
@@ -441,6 +442,11 @@ class CoreFlowE2ETest {
         compose.onNode(isToggleable()).performScrollTo().performClick()
         compose.onNodeWithText(string(R.string.habit_editor_save)).performClick()
 
+        // Leaving the editor first, then seeing the name: awaitText(name) alone also matches the
+        // editor's own name field, so it returned before the save had committed and the caller's
+        // database read raced it (seen on the api37 leg, where the write landed ~3s after Save).
+        // The editor only closes once HabitEditorViewModel has persisted the habit.
+        awaitTextGone(string(R.string.habit_editor_save))
         awaitText(name)
     }
 
