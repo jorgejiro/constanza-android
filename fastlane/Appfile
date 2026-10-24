@@ -1,6 +1,18 @@
 package_name("com.jjrapps.constanza")
 
-# Never inside the repo: the service-account JSON key authenticates as Constanza's Play
-# Console account. SUPPLY_JSON_KEY lets the owner point at wherever they keep it; the default
-# below is only a convenience path outside the working tree.
-json_key_file(ENV["SUPPLY_JSON_KEY"] || File.expand_path("~/.config/play/jjrmobileapps.json"))
+# The Play service-account key authenticates as Constanza's Play Console account, so it never lives
+# inside the repo. Two sources, in this order:
+#
+# 1. ANDROID_CONSTANZA_JSON_KEY — the JSON content itself, as Bitwarden Secrets Manager injects it:
+#    `con-claves 'fastlane subir'`. Nothing is written to disk.
+# 2. A file: SUPPLY_JSON_KEY if set, else ~/.config/play/jjrmobileapps.json.
+#
+# Leave SUPPLY_JSON_KEY unset when using the Bitwarden key: supply reads that variable on its own,
+# and when both are present it silently prefers the file over the key data (its conflicting-options
+# check only covers options passed to the action, so no error is raised).
+play_key_json = ENV["ANDROID_CONSTANZA_JSON_KEY"].to_s
+if play_key_json.strip.empty?
+  json_key_file(ENV["SUPPLY_JSON_KEY"] || File.expand_path("~/.config/play/jjrmobileapps.json"))
+else
+  json_key_data_raw(play_key_json)
+end
