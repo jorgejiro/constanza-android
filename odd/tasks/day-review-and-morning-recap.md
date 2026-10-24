@@ -1,7 +1,7 @@
 # Day review toggle + morning recap
 
 Objective: move the nightly day review to 23:30, make it only fire when something is unanswered and let it be switched off; add a 07:00 morning notification with yesterday's completion that opens yesterday on Today.
-Branch: `feat/day-review-toggle-and-morning-recap` · Delivery: single PR (merge commit) · Tests: `./gradlew :domain:test :app:testDebugUnitTest :app:detektMain :app:compileDebugAndroidTestKotlin`
+Branch: `feat/day-review-toggle-and-morning-recap` · Delivery: stacked PRs to main (#162 → #163 → #164) · Tests: `./gradlew :domain:test :app:testDebugUnitTest :app:detektMain :app:compileDebugAndroidTestKotlin`
 
 ## Specs
 
@@ -35,3 +35,4 @@ Route evidence: no writer trigger — the units share `RescheduleReceivers`, `Co
 - **L4** (2026-10-24) T1–T3 implemented inline. `./gradlew :domain:test :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:detektMain` green (app 410 tests, domain 65). detekt `LongMethod` on `ConstanzaApp` resolved by extracting `OpenTodayEffect`, shared by the reminder tap (live edge) and the morning-recap tap (its date). README (en/es) and store listing texts updated from "23:00". Pending: device-free emulator matrix (`:app:emulatorMatrixGroupDebugAndroidTest`).
 - **L5** (2026-10-24) `.atl/` skill-registry files had been committed by mistake in 0e04e05; untracked again in a follow-up commit (files kept on disk). RDD assess over `2e56ca7..HEAD` (committed-only, untracked excluded): risk `medium`, `review_due: false` (`under_budget`) → no native review started. Risk line: none of items 1–6 (new preference keys only; changed defaults are requested; `showToday()`→`showDay()` is internal).
 - **L6** (2026-10-24) Emulator matrix: api31 237/237 green (3 skipped). api37: `CoreFlowE2ETest` fails 3 tests (a1, a2 permission dialog never reached; delete/remove habit "not in the database") with an ANR "Close app / Wait" dialog in the foreground. Reproduced identically on `main` (2e56ca7) in a scratch worktree → pre-existing on api37, not caused by this change. All other api37 tests pass.
+- **L7** (2026-10-24) Owner chose "3 PRs encadenados". Slices: #162 `feat/day-review-23-30-toggle` (T1, 274 lines) → #163 `feat/morning-recap-core` (T2, 587 lines, size exception requested: one alarm→worker→notification unit, about half tests/KDoc) → #164 `feat/morning-recap-settings-and-tap` (T3 + ODD log, 404 lines). Branches rebuilt from the original commits without the stray `.atl/` files; the stack's final tree equals the tested one; #162 and #163 verified on their own (394 / 405 app unit tests, detekt green).
